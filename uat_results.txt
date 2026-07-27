@@ -1,0 +1,70 @@
+================================================
+PHASE 6 UAT: END-TO-END WORKFLOW VERIFICATION
+================================================
+
+--- SCENARIO 1: INSTRUCTOR WORKFLOW ---
+[1] Registering Instructor Account: inst_1782361508400@test.com
+Status: 404 | Response: {"statusCode":404,"timestamp":"2026-06-25T04:25:08.687Z","path":"/api/auth/register","message":"Cannot POST /api/auth/register"}
+CRITICAL ERROR: Failed to register instructor
+================================================
+PHASE 6 UAT: END-TO-END WORKFLOW VERIFICATION
+================================================
+
+--- SCENARIO 1: INSTRUCTOR WORKFLOW ---
+[1] Registering Instructor Account: inst_1782361556877@test.com
+Status: 500 | Response: {"statusCode":500,"timestamp":"2026-06-25T04:26:16.664Z","path":"/auth/register","message":"Reached the max retries per request limit (which is 20). Refer to \"maxRetriesPerRequest\" option for details."}
+CRITICAL ERROR: Failed to register instructor
+================================================
+PHASE 6 UAT: END-TO-END WORKFLOW VERIFICATION
+================================================
+
+--- SCENARIO 1: INSTRUCTOR WORKFLOW ---
+[1] Registering Instructor Account: inst_1782361789371@test.com
+Status: 400 | Response: {"statusCode":400,"timestamp":"2026-06-25T04:29:49.523Z","path":"/auth/register","message":["property name should not exist","fullName must be a string","fullName should not be empty","educationLevel must be one of the following values: HIGH_SCHOOL, UNIVERSITY"]}
+CRITICAL ERROR: Failed to register instructor
+================================================
+PHASE 6 UAT: END-TO-END WORKFLOW VERIFICATION
+================================================
+
+--- SCENARIO 1: INSTRUCTOR WORKFLOW ---
+[1] Registering Instructor Account: inst_1782361812285@test.com
+Status: 201 | Response: {"accessToken":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3ODRhYmIwZi05NDFmLTRlYWMtYTZlYy1mMjJhOGJmODM0YjUiLCJlbWFpbCI6Imluc3RfMTc4MjM2MTgxMjI4NUB0ZXN0LmNvbSIsInJvbGUiOiJTVFVERU5UIiwiaWF0IjoxNzgyMzYxODEyLCJleHAiOjE3ODIzNjI3MTJ9.4chVOG4a1-kMby-uzPk_3zeM47XBnRA4jknxhgwS0yk","refreshToken":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI3ODRhYmIwZi05NDFmLTRlYWMtYTZlYy1mMjJhOGJmODM0YjUiLCJlbWFpbCI6Imluc3RfMTc4MjM2MTgxMjI4NUB0ZXN0LmNvbSIsInJvbGUiOiJTVFVERU5UIiwiaWF0IjoxNzgyMzYxODEyLCJleHAiOjE3ODI5NjY2MTJ9.QoKWy4Jp60YwSgzDU2DOZADvgwrln1l-h3O5_X4QsRU","user":{"id":"784abb0f-941f-4eac-a6ec-f22a8bf834b5","email":"inst_1782361812285@test.com","role":"STUDENT","full_name":"Test Instructor","xp":0,"streak_days":0,"is_active":true}}
+[2] Creating Course
+Status: 403 | Response: {"statusCode":403,"timestamp":"2026-06-25T04:30:12.622Z","path":"/courses","message":"Forbidden resource"}
+Got 403 Forbidden. The user must be promoted to INSTRUCTOR.
+Promoted user to INSTRUCTOR via DB.
+Status (Retry): 400 | Response: {"statusCode":400,"timestamp":"2026-06-25T04:30:12.776Z","path":"/courses","message":["property price should not exist","audienceType should not be empty","audienceType must be one of the following values: HIGH_SCHOOL, UNIVERSITY"]}
+[3] Creating Chapter in Course undefined
+Status: 404 | Response: {"statusCode":404,"timestamp":"2026-06-25T04:30:12.785Z","path":"/courses/undefined/chapters","message":"Cannot POST /courses/undefined/chapters"}
+[4] Creating Lecture in Chapter undefined
+Status: 404 | Response: {"statusCode":404,"timestamp":"2026-06-25T04:30:12.794Z","path":"/chapters/undefined/lectures","message":"Cannot POST /chapters/undefined/lectures"}
+[5] Uploading HOMEWORK attachment to Lecture undefined
+Status: 400 | Response: {"statusCode":400,"timestamp":"2026-06-25T04:30:12.947Z","path":"/attachments","message":"Multipart: Unexpected end of form"}
+[6] Uploading PDF attachment to Lecture undefined
+Status: 400 | Response: {"statusCode":400,"timestamp":"2026-06-25T04:30:12.958Z","path":"/attachments","message":"Multipart: Unexpected end of form"}
+[7] Creating Quiz for Lecture undefined
+Status: 400 | Response: {"statusCode":400,"timestamp":"2026-06-25T04:30:12.972Z","path":"/quizzes","message":["lectureId must be a string","lectureId should not be empty"]}
+[8] Creating Exam for Course undefined
+Status: 400 | Response: {"statusCode":400,"timestamp":"2026-06-25T04:30:12.985Z","path":"/exams","message":["property durationMinutes should not exist"]}
+[9] Publishing Course undefined
+Status: 403 | Response: {"statusCode":403,"timestamp":"2026-06-25T04:30:13.003Z","path":"/courses/undefined/publish","message":"Database Access Refused: You are not an assigned instructor for this course."}
+[10] Generating Activation Code for Course undefined
+Status: 404 | Response: {"statusCode":404,"timestamp":"2026-06-25T04:30:13.010Z","path":"/admin/activation-codes","message":"Cannot POST /admin/activation-codes"}
+
+--- SCENARIO 2: STUDENT WORKFLOW ---
+[1] Registering Student Account: stu_1782361812285@test.com
+Status: 201 | Response: {"accessToken":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1Y2YxZTNhOS0xN2M3LTQ2MDQtYmM4ZS04ZjA2ODZkNGZlZmIiLCJlbWFpbCI6InN0dV8xNzgyMzYxODEyMjg1QHRlc3QuY29tIiwicm9sZSI6IlNUVURFTlQiLCJpYXQiOjE3ODIzNjE4MTMsImV4cCI6MTc4MjM2MjcxM30.avcKbk0xaIR1o756sXzcvZDZTlsSfy6eltuoGQ_pY88","refreshToken":"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1Y2YxZTNhOS0xN2M3LTQ2MDQtYmM4ZS04ZjA2ODZkNGZlZmIiLCJlbWFpbCI6InN0dV8xNzgyMzYxODEyMjg1QHRlc3QuY29tIiwicm9sZSI6IlNUVURFTlQiLCJpYXQiOjE3ODIzNjE4MTMsImV4cCI6MTc4Mjk2NjYxM30.ZAmFqBv1hakSFGwej5jyjr3u0Dv13u_sKee2unc1qdY","user":{"id":"5cf1e3a9-17c7-4604-bc8e-8f0686d4fefb","email":"stu_1782361812285@test.com","role":"STUDENT","full_name":"Test Student","xp":0,"streak_days":0,"is_active":true}}
+[2] Redeeming Activation Code: 
+Status: 404 | Response: {"statusCode":404,"timestamp":"2026-06-25T04:30:13.166Z","path":"/courses/redeem","message":"Cannot POST /courses/redeem"}
+[3] Accessing Course undefined
+Status: 404 | Response: {"statusCode":404,"timestamp":"2026-06-25T04:30:13.190Z","path":"/courses/undefined","message":"Course with ID undefined not found"}...
+[4] Watching Lecture undefined (Fetching stream token)
+Status: 404 | Response: {"statusCode":404,"timestamp":"2026-06-25T04:30:13.196Z","path":"/lectures/undefined/stream-token","message":"Cannot GET /lectures/undefined/stream-token"}
+[5] Fetching attachments for Lecture undefined
+Status: 404 | Response: {"statusCode":404,"timestamp":"2026-06-25T04:30:13.202Z","path":"/lectures/undefined/attachments","message":"Cannot GET /lectures/undefined/attachments"}
+[6] Completing Quiz undefined
+Status: 404 | Response: {"statusCode":404,"timestamp":"2026-06-25T04:30:13.208Z","path":"/quizzes/undefined/submit","message":"Cannot POST /quizzes/undefined/submit"}
+[7] Completing Exam undefined
+Status: 400 | Response: {"statusCode":400,"timestamp":"2026-06-25T04:30:13.218Z","path":"/exams/submit","message":["property attemptId should not exist","examId must be a string","examId should not be empty"]}
+[8] Viewing Exam Score
+Status: 404 | Response: {"statusCode":404,"timestamp":"2026-06-25T04:30:13.223Z","path":"/exams/undefined/results","message":"Cannot GET /exams/undefined/results"}

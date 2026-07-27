@@ -1,0 +1,784 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+
+enum NotificationEventCategory {
+  QUIZ_FAILED
+  EXAM_FAILED
+  LECTURE_EXPIRED
+  RISK_ALERT
+}
+
+enum NotificationChannelType {
+  WHATSAPP
+  SMS
+  EMAIL
+}
+
+enum NotificationDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
+enum Role {
+  ADMIN
+  INSTRUCTOR
+  STUDENT
+}
+
+enum EducationLevel {
+  HIGH_SCHOOL
+  UNIVERSITY
+}
+
+enum CodeStatus {
+  UNUSED
+  REDEEMED
+}
+
+enum ActivationCodeType {
+  LECTURE
+  COURSE
+}
+
+enum CourseStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+model User {
+  id                      String         @id @default(uuid())
+  fullName                String
+  email                   String         @unique
+  password                String
+  role                    Role           @default(STUDENT)
+  isActive                Boolean        @default(true)
+  deviceId                String? // Stores the unique hardware fingerprint
+  profilePictureUrl       String?
+  profilePictureMediaId   String?  @unique
+  profilePicture          Media?   @relation("ProfilePicture", fields: [profilePictureMediaId], references: [id], onDelete: SetNull)
+  educationLevel          EducationLevel @default(UNIVERSITY)
+  phoneNumber       String?
+  parentPhoneNumber String? // Required strictly for HIGH_SCHOOL
+  refreshToken      String?
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+
+  // Gamification Fields
+  xp          Int       @default(0)
+  streakDays  Int       @default(0)
+  lastLoginAt DateTime?
+
+  // Soft Delete
+  deletedAt DateTime?
+
+  deviceSessions DeviceSession[]
+  deviceHistory  DeviceHistory[]
+  auditLogs      AuditLog[]
+  systemAuditLogs SystemAuditLog[]
+
+  teachingCourses CourseInstructor[]
+
+  redeemedCodes       ActivationCode[]
+  codeHistoryAsStudent ActivationCodeHistory[] @relation("HistoryStudent")
+  codeHistoryAsActor   ActivationCodeHistory[] @relation("HistoryActor")
+  accessedLectures    StudentLectureAccess[]
+  accessedCourses     StudentCourseAccess[]
+
+  quizAttempts QuizAttempt[]
+
+  sessionProgress SessionProgress[]
+
+  examAttempts ExamAttempt[]
+
+  aiExtractionLogs AIExtractionLog[]
+
+  badges              StudentBadge[]
+  certificates        Certificate[]
+  aiUsageLogs         AiUsageLog[]
+  riskProfile         StudentRiskProfile?
+  parentLogs          ParentNotificationLog[]
+  uploadedMedia       Media[]
+}
+
+model Course {
+  id                        String         @id @default(uuid())
+  title                     String
+  description               String?
+  thumbnailUrl              String?
+  thumbnailMediaId          String?  @unique
+  thumbnailMedia            Media?   @relation("CourseThumbnail", fields: [thumbnailMediaId], references: [id], onDelete: SetNull)
+  introductoryVideoUrl      String?
+  introductoryVideoMediaId  String?  @unique
+  introductoryVideoMedia    Media?   @relation("CourseVideo", fields: [introductoryVideoMediaId], references: [id], onDelete: SetNull)
+  audienceType              EducationLevel @default(HIGH_SCHOOL)
+  validityDays              Int?
+  status       CourseStatus   @default(DRAFT)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  deletedAt    DateTime?
+
+  instructors CourseInstructor[]
+  chapters    Chapter[]
+  lectures    Lecture[]
+  attachments CourseAttachment[]
+
+  exams        Exam[]
+  certificates Certificate[]
+
+  // Access & Codes
+  studentAccess     StudentCourseAccess[]
+  redeemedCodes     ActivationCode[]
+  codeHistory       ActivationCodeHistory[]
+}
+
+model Chapter {
+  id          String    @id @default(uuid())
+  courseId    String
+  title       String
+  description String?
+  sortOrder   Int       @default(0)
+  orderIndex  Int       @default(0)
+  isPublished Boolean @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  course   Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lectures Lecture[]
+  exams    Exam[]
+  attachments ChapterAttachment[]
+
+  @@index([courseId])
+}
+
+model ChapterAttachment {
+  id        String   @id @default(uuid())
+  chapterId String
+  title     String
+  fileUrl   String
+  mediaId   String?
+  media     Media?   @relation("ChapterAttachmentFile", fields: [mediaId], references: [id], onDelete: SetNull)
+  type      AttachmentType @default(OTHER)
+  createdAt DateTime @default(now())
+
+  chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+
+  @@index([chapterId])
+}
+
+model CourseAttachment {
+  id        String   @id @default(uuid())
+  courseId  String
+  title     String
+  fileUrl   String
+  mediaId   String?
+  media     Media?   @relation("CourseAttachmentFile", fields: [mediaId], references: [id], onDelete: SetNull)
+  type      AttachmentType @default(OTHER)
+  createdAt DateTime @default(now())
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([courseId])
+}
+
+model Lecture {
+  id                    String    @id @default(uuid())
+  courseId              String
+  chapterId             String?
+  title                 String
+  description           String?
+  sortOrder             Int       @default(0)
+  orderIndex            Int       @default(0)
+  isPublished Boolean @default(true)
+  thumbnailUrl          String?
+  thumbnailMediaId      String?  @unique
+  thumbnailMedia        Media?   @relation("LectureThumbnail", fields: [thumbnailMediaId], references: [id], onDelete: SetNull)
+  validityDays          Int?
+  durationDays          Int       @default(0)
+  durationHours         Int       @default(0)
+  durationMinutes       Int       @default(0)
+  warningHours          Int       @default(0)
+  warningMinutes        Int       @default(0)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  deletedAt             DateTime?
+
+  course   Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  chapter  Chapter?  @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  sessions Session[]
+
+  activationCodes        ActivationCode[]
+  activationCodeHistory  ActivationCodeHistory[]
+  studentAccess          StudentLectureAccess[]
+
+  quizzes Quiz[]
+
+  exams Exam[]
+
+  attachments Attachment[]
+
+  @@index([courseId])
+  @@index([chapterId])
+}
+
+model Session {
+  id          String   @id @default(uuid())
+  lectureId   String
+  title       String
+  description String?
+  videoUrl    String?
+  videoMediaId String?  @unique
+  videoMedia  Media?    @relation("SessionVideo", fields: [videoMediaId], references: [id], onDelete: SetNull)
+  duration    Int      @default(0) // in seconds
+  sortOrder   Int      @default(0)
+  orderIndex  Int      @default(0)
+  isPublished Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  lecture Lecture @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+
+  progress SessionProgress[]
+
+  @@index([lectureId])
+}
+
+model CourseInstructor {
+  courseId     String
+  instructorId String
+  assignedAt   DateTime @default(now())
+  deletedAt    DateTime?
+
+  // Relationships
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  instructor   User     @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+
+  @@id([courseId, instructorId]) // Compound primary key guarantees uniqueness in the DB
+  @@index([instructorId])
+}
+
+model ActivationCode {
+  id         String     @id @default(uuid())
+  code       String     @unique
+  status     CodeStatus @default(UNUSED)
+  
+  targetType     ActivationCodeType @default(LECTURE)
+  educationLevel EducationLevel     @default(UNIVERSITY)
+
+  redeemedAt DateTime?
+  deletedAt  DateTime?
+
+  // The lecture or course this code was actually spent on (set AT REDEMPTION)
+  redeemedLectureId String?
+  redeemedLecture   Lecture? @relation(fields: [redeemedLectureId], references: [id], onDelete: SetNull)
+
+  redeemedCourseId  String?
+  redeemedCourse    Course?  @relation(fields: [redeemedCourseId], references: [id], onDelete: SetNull)
+
+  studentId String?
+  student   User?   @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+
+  history ActivationCodeHistory[]
+
+  @@index([redeemedLectureId])
+  @@index([redeemedCourseId])
+  @@index([studentId])
+}
+
+model ActivationCodeHistory {
+  id        String     @id @default(uuid())
+  codeId    String
+  code      String
+  
+  redeemedLectureId String?
+  redeemedCourseId  String?
+  
+  studentId String?
+  action    String     // GENERATED | REDEEMED | REVOKED | EXPIRED
+  oldStatus CodeStatus?
+  newStatus CodeStatus
+  actorId   String?
+  ipAddress String?
+  browser   String?
+  createdAt DateTime   @default(now())
+
+  codeRel         ActivationCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  redeemedLecture Lecture?       @relation(fields: [redeemedLectureId], references: [id], onDelete: SetNull)
+  redeemedCourse  Course?        @relation(fields: [redeemedCourseId], references: [id], onDelete: SetNull)
+  
+  student User?          @relation("HistoryStudent", fields: [studentId], references: [id], onDelete: SetNull)
+  actor   User?          @relation("HistoryActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([codeId])
+  @@index([redeemedLectureId])
+  @@index([redeemedCourseId])
+  @@index([studentId])
+  @@index([actorId])
+  @@index([createdAt])
+}
+
+// This acts as the "wallet" or "inventory" for a student's unlocked content
+model StudentLectureAccess {
+  id          String    @id @default(uuid())
+  studentId   String
+  lectureId   String
+  createdAt   DateTime  @default(now())
+  activatedAt DateTime  @default(now())
+  expiresAt   DateTime?
+  timerPausedAt DateTime?
+  deletedAt   DateTime?
+
+  student User    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  lecture Lecture @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+
+  // A student can only unlock a specific lecture once
+  @@unique([studentId, lectureId])
+  @@index([lectureId])
+}
+
+model StudentCourseAccess {
+  id          String    @id @default(uuid())
+  studentId   String
+  courseId    String
+  createdAt   DateTime  @default(now())
+  activatedAt DateTime  @default(now())
+  expiresAt   DateTime?
+  deletedAt   DateTime?
+
+  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+  @@index([courseId])
+}
+
+model Quiz {
+  id          String  @id @default(uuid())
+  lectureId   String
+  title       String
+  description String?
+  passGrade   Int     @default(50)
+  maxAttempts Int     @default(1)
+  isPublished Boolean @default(true)
+  timeLimit   Int? // In minutes. If null, no time limit.
+
+  // --- New Fields for the Playlist Approach ---
+  sortOrder  Int     @default(0)
+  orderIndex Int     @default(0)
+  isRevision Boolean @default(false) // Flags if this quiz locks the next lecture
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  lecture   Lecture        @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+  questions QuizQuestion[]
+  attempts  QuizAttempt[]
+
+  @@index([lectureId])
+}
+
+model QuizQuestion {
+  id                 String   @id @default(uuid())
+  quizId             String
+  text               String
+  type               QuestionType @default(MCQ)
+  options            String[]
+  correctOptionIndex Int
+  points             Int      @default(1)
+  orderIndex         Int      @default(0)
+  createdAt          DateTime @default(now())
+
+  // Relations
+  quiz               Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([quizId])
+}
+
+// Tracks student performance and prevents them from moving forward if they fail
+model QuizAttempt {
+  id          String        @id @default(uuid())
+  studentId   String
+  quizId      String
+  startedAt   DateTime      @default(now())
+  submittedAt DateTime?
+  score       Int           @default(0)
+  status      AttemptStatus @default(PENDING)
+  draftAnswers Json?        // Stores partial answers for save-and-resume: { "questionId": selectedOptionIndex }
+  createdAt   DateTime      @default(now())
+
+  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  quiz    Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([quizId])
+}
+
+// Tracks video completion
+model SessionProgress {
+  id          String    @id @default(uuid())
+  studentId   String
+  sessionId   String
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  student User    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  session Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // A student can only have one progress record per session
+  @@unique([studentId, sessionId])
+  @@index([sessionId])
+}
+
+enum AttemptStatus {
+  PENDING
+  PASSED
+  FAILED
+}
+
+enum AttachmentType {
+  HOMEWORK
+  PDF
+  SHEET
+  REFERENCE
+  ASSIGNMENT
+  OTHER
+}
+
+enum QuestionType {
+  MCQ
+  TRUE_FALSE
+  SHORT_ANSWER
+  ESSAY
+  READ_ONLY_TEXT
+}
+
+model Exam {
+  id          String  @id @default(uuid())
+  title       String
+  description String?
+
+  // Scope Flexibility: An exam can belong to a Course, Chapter, OR a Lecture
+  courseId  String?
+  chapterId String?
+  lectureId String?
+
+  timeLimit   Int? // In minutes
+  maxAttempts Int     @default(1)
+  passGrade   Int     @default(50)
+  isPublished Boolean @default(true)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  course  Course?  @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  chapter Chapter? @relation(fields: [chapterId], references: [id], onDelete: SetNull)
+  lecture Lecture? @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+
+  questions ExamQuestion[]
+  attempts  ExamAttempt[]
+
+  @@index([courseId])
+  @@index([lectureId])
+  @@index([chapterId])
+}
+
+model ExamQuestion {
+  id     String       @id @default(uuid())
+  examId String
+  text   String
+  type   QuestionType @default(MCQ)
+  points Int          @default(1)
+
+  options            String[]
+  correctOptionIndex Int @default(0)
+  referenceAnswer    String?
+
+  createdAt DateTime @default(now())
+
+  exam      Exam                  @relation(fields: [examId], references: [id], onDelete: Cascade)
+  responses StudentExamResponse[]
+
+  @@index([examId])
+}
+
+// Tracks the overall attempt and timer
+model ExamAttempt {
+  id        String @id @default(uuid())
+  studentId String
+  examId    String
+
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+
+  score  Int? // Stays null until fully graded
+  status AttemptStatus @default(PENDING)
+
+  createdAt DateTime @default(now())
+
+  student   User                  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  exam      Exam                  @relation(fields: [examId], references: [id], onDelete: Cascade)
+  responses StudentExamResponse[]
+
+  @@index([studentId])
+  @@index([examId])
+}
+
+// Tracks the exact answer a student gave for a specific question
+model StudentExamResponse {
+  id         String @id @default(uuid())
+  attemptId  String
+  questionId String
+
+  // They will use ONE of these depending on the QuestionType
+  selectedOptionIndex Int? // Used for MCQ / True-False
+  textResponse        String? // Used for Short Answer / Essay
+
+  earnedPoints Int? // Populated automatically for MCQ, manually/AI for Essay
+
+  aiScoreGuess            Float?
+  aiConfidenceScore       Float?
+  instructorOverrideScore Float?
+  evaluationNote          String?
+
+  attempt  ExamAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question ExamQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  @@index([attemptId])
+  @@index([questionId])
+}
+
+model AIExtractionLog {
+  id              String   @id @default(uuid())
+  instructorId    String
+  fileName        String
+  fileType        String
+  questionCount   Int      @default(0)
+  estimatedTokens Int      @default(0) // Tracks API cost
+  isSuccess       Boolean  @default(true)
+  errorMessage    String?
+  createdAt       DateTime @default(now())
+
+  instructor User @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+
+  @@index([instructorId])
+}
+
+// --- Gamification ---
+
+model Badge {
+  id          String   @id @default(uuid())
+  name        String
+  description String
+  iconUrl     String?
+  createdAt   DateTime @default(now())
+
+  students StudentBadge[]
+}
+
+model StudentBadge {
+  id        String   @id @default(uuid())
+  studentId String
+  badgeId   String
+  earnedAt  DateTime @default(now())
+  deletedAt DateTime?
+
+  student User  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  badge   Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, badgeId])
+  @@index([badgeId])
+}
+
+model Certificate {
+  id        String   @id @default(uuid())
+  studentId String
+  courseId  String
+  issuedAt  DateTime @default(now())
+  pdfUrl    String?
+  pdfMediaId String?  @unique
+  pdfMedia  Media?    @relation("CertificatePdf", fields: [pdfMediaId], references: [id], onDelete: SetNull)
+  deletedAt DateTime?
+
+  student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId])
+  @@index([courseId])
+}
+
+model SystemSetting {
+  key         String   @id
+  value       String
+  type        String   @default("STRING")  // STRING | BOOLEAN | INTEGER | JSON
+  description String?
+  updatedAt   DateTime @updatedAt
+}
+
+model AiUsageLog {
+  id           String   @id @default(uuid())
+  instructorId String
+  featureUsed  String
+  tokens       Int      @default(0)
+  cost         Float    @default(0.0)
+  createdAt    DateTime @default(now())
+
+  instructor User @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+
+  @@index([instructorId])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  entity    String?
+  entityId  String?
+  details   String? // JSON string
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+}
+
+model Attachment {
+  id         String    @id @default(uuid())
+  lectureId  String
+  title      String
+  fileUrl    String
+  mediaId    String?
+  media      Media?    @relation("AttachmentFile", fields: [mediaId], references: [id], onDelete: SetNull)
+  type       AttachmentType @default(OTHER)
+  orderIndex Int       @default(0)
+  isPublished Boolean  @default(true)
+  createdAt  DateTime  @default(now())
+  deletedAt  DateTime?
+
+  // Relations
+  lecture    Lecture   @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+  @@index([lectureId])
+}
+
+model DeviceSession {
+  id                String   @id @default(uuid())
+  studentId         String
+  deviceFingerprint String
+  browser           String?
+  ipAddress         String?
+  isLocked          Boolean  @default(true)
+  lastLoginAt       DateTime @default(now())
+  createdAt         DateTime @default(now())
+  deletedAt         DateTime?
+
+  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, deviceFingerprint])
+  @@index([studentId])
+}
+
+model DeviceHistory {
+  id                String   @id @default(uuid())
+  studentId         String
+  deviceFingerprint String
+  action            String   // REGISTERED | RESET | REMOVED | REPLACED
+  ipAddress         String?
+  browser           String?
+  createdAt         DateTime @default(now())
+
+  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([createdAt])
+}
+
+model Media {
+  id           String   @id @default(uuid())
+  filename     String
+  originalName String
+  mimeType     String
+  fileSize     Int
+  storageKey   String
+  thumbnail    String?
+  altText      String?
+  uploadedById String
+  uploadedAt   DateTime @default(now())
+
+  uploadedBy User @relation(fields: [uploadedById], references: [id])
+
+  // Back-references from entities referencing this media
+  profilePictureUser      User?               @relation("ProfilePicture")
+  courseThumbnail         Course?              @relation("CourseThumbnail")
+  courseVideo             Course?              @relation("CourseVideo")
+  lectureThumbnail        Lecture?             @relation("LectureThumbnail")
+  sessionVideo            Session?             @relation("SessionVideo")
+  attachmentFiles         Attachment[]         @relation("AttachmentFile")
+  chapterAttachmentFiles  ChapterAttachment[]  @relation("ChapterAttachmentFile")
+  courseAttachmentFiles   CourseAttachment[]   @relation("CourseAttachmentFile")
+  certificatePdf          Certificate?         @relation("CertificatePdf")
+
+  @@index([uploadedById])
+  @@index([uploadedAt])
+  @@index([mimeType])
+}
+
+model StudentRiskProfile {
+  id                  String   @id @default(uuid())
+  studentId           String   @unique
+  student             User     @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  consecutiveFailures Int      @default(0)
+  runningAverageScore Float    @default(100.0)
+  isAtRisk            Boolean  @default(false)
+  updatedAt           DateTime @updatedAt
+  createdAt           DateTime @default(now())
+}
+
+model ParentNotificationLog {
+  id                String                     @id @default(uuid())
+  studentId         String
+  student           User                       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  parentPhoneNumber String
+  eventCategory     NotificationEventCategory
+  channelType       NotificationChannelType
+  deliveryStatus    NotificationDeliveryStatus @default(PENDING)
+  messageContent    String
+  dispatchedAt      DateTime                   @default(now())
+  errorNote         String?
+
+  @@index([studentId])
+}
+
+model SystemAuditLog {
+  id         String   @id @default(uuid())
+  actorId    String
+  actionType String
+  payload    String?  // JSON stringified execution payload
+  ipAddress  String?
+  createdAt  DateTime @default(now())
+
+  actor User @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([actorId])
+  @@index([createdAt])
+}

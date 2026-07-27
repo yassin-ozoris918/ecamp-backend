@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "SystemSetting" ADD COLUMN "type" TEXT NOT NULL DEFAULT 'STRING';
