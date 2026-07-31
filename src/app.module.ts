@@ -57,18 +57,14 @@ import { ExportModule } from './export/export.module';
       useFactory: async (configService: ConfigService) => {
         try {
           const useTls = configService.get<string>('REDIS_TLS') === 'true';
-          const socketOptions: any = {
-            host: configService.get<string>('REDIS_HOST') || 'localhost',
-            port: parseInt(configService.get<string>('REDIS_PORT') || '6379', 10),
-          };
-          if (useTls) {
-            socketOptions.tls = { servername: socketOptions.host };
-          }
+          const host = configService.get<string>('REDIS_HOST') || 'localhost';
+          const port = configService.get<string>('REDIS_PORT') || '6379';
+          const password = configService.get<string>('REDIS_PASSWORD');
+          
+          const protocol = useTls ? 'rediss' : 'redis';
+          const url = password ? `${protocol}://default:${encodeURIComponent(password)}@${host}:${port}` : `${protocol}://${host}:${port}`;
 
-          const client = createClient({
-            socket: socketOptions,
-            password: configService.get<string>('REDIS_PASSWORD'),
-          });
+          const client = createClient({ url });
 
           client.on('error', (err) => {
             console.warn('Redis Cache Error:', err.message);
@@ -94,15 +90,13 @@ import { ExportModule } from './export/export.module';
         try {
           const useTls = configService.get<string>('REDIS_TLS') === 'true';
           const host = configService.get<string>('REDIS_HOST') || 'localhost';
-          storage = new ThrottlerStorageRedisService(
-            new Redis({
-              host,
-              port: parseInt(configService.get<string>('REDIS_PORT') || '6379', 10),
-              password: configService.get<string>('REDIS_PASSWORD'),
-              tls: useTls ? { servername: host } : undefined,
-              maxRetriesPerRequest: 3,
-            })
-          );
+          const port = configService.get<string>('REDIS_PORT') || '6379';
+          const password = configService.get<string>('REDIS_PASSWORD');
+          
+          const protocol = useTls ? 'rediss' : 'redis';
+          const url = password ? `${protocol}://default:${encodeURIComponent(password)}@${host}:${port}` : `${protocol}://${host}:${port}`;
+
+          storage = new ThrottlerStorageRedisService(new Redis(url, { maxRetriesPerRequest: 3 }));
         } catch {
           console.warn('Redis not running, rate limiter falling back to in-memory storage');
         }
