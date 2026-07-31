@@ -60,7 +60,6 @@ import { ExportModule } from './export/export.module';
           const socketOptions: any = {
             host: configService.get<string>('REDIS_HOST') || 'localhost',
             port: parseInt(configService.get<string>('REDIS_PORT') || '6379', 10),
-            reconnectStrategy: false,
           };
           if (useTls) {
             socketOptions.tls = {};
@@ -100,8 +99,7 @@ import { ExportModule } from './export/export.module';
               port: parseInt(configService.get<string>('REDIS_PORT') || '6379', 10),
               password: configService.get<string>('REDIS_PASSWORD'),
               ...(useTls && { tls: {} }),
-              maxRetriesPerRequest: 1,
-              retryStrategy: () => null,
+              maxRetriesPerRequest: 3,
             })
           );
         } catch {
