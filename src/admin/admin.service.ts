@@ -158,7 +158,10 @@ export class AdminService {
 
     await this.prisma.user.update({
       where: { id: userId },
-      data: { deletedAt: new Date() },
+      data: { 
+        deletedAt: new Date(),
+        email: `${user.email}_deleted_${Date.now()}`
+      },
     });
 
     return { message: 'User deleted successfully' };

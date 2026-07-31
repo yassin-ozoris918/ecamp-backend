@@ -35,20 +35,27 @@ export class AuthService {
     // Determine the deviceId
     const finalDeviceId = headerDeviceId || dto.deviceId;
     
-    // 3. Create User with the new Educational tracking fields
-    const user = await this.prisma.user.create({
-      data: {
-        fullName: dto.fullName,
-        email: dto.email,
-        password: hashedPassword,
-        educationLevel: dto.educationLevel,
-        phoneNumber: dto.phoneNumber,
-        parentPhoneNumber: dto.parentPhoneNumber,
-        profilePictureUrl: dto.profilePictureUrl,
-        role: Role.STUDENT, // Explicitly lock to STUDENT to prevent injection
-        deviceId: finalDeviceId || null, // Bind it immediately if provided
-      },
-    });
+    let user;
+    try {
+      user = await this.prisma.user.create({
+        data: {
+          fullName: dto.fullName,
+          email: dto.email,
+          password: hashedPassword,
+          educationLevel: dto.educationLevel,
+          phoneNumber: dto.phoneNumber,
+          parentPhoneNumber: dto.parentPhoneNumber,
+          profilePictureUrl: dto.profilePictureUrl,
+          role: Role.STUDENT,
+          deviceId: finalDeviceId || null,
+        },
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002') {
+        throw new BadRequestException('This email is already registered. If you deleted your account, please use a different email or contact support.');
+      }
+      throw error;
+    }
 
     if (user.role === Role.STUDENT && finalDeviceId) {
       await this.prisma.deviceSession.create({
