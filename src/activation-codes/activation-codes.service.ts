@@ -134,6 +134,20 @@ export class ActivationCodesService {
     });
   }
 
+  // --- Admin Code Deletion ---
+  async deleteCode(id: string) {
+    const code = await this.prisma.activationCode.findUnique({ where: { id } });
+    if (!code) throw new NotFoundException('Code not found.');
+    
+    await this.prisma.activationCode.delete({ where: { id } });
+    return { message: 'Code deleted successfully.' };
+  }
+
+  async deleteAllCodes() {
+    const result = await this.prisma.activationCode.deleteMany();
+    return { message: `Successfully deleted ${result.count} codes.` };
+  }
+
 
   async getHistory(codeId: string) {
     const code = await this.prisma.activationCode.findUnique({

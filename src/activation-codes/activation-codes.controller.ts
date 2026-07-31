@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Delete,
   Body,
   Param,
   UseGuards,
@@ -52,6 +53,18 @@ export class ActivationCodesController {
   @Post(':id/deactivate')
   deactivateCode(@Param('id') id: string, @Req() req: RequestWithUser) {
     return this.activationCodesService.deactivateCode(id, req.user.sub);
+  }
+
+  @Roles(Role.ADMIN)
+  @Delete('all')
+  deleteAllCodes() {
+    return this.activationCodesService.deleteAllCodes();
+  }
+
+  @Roles(Role.ADMIN)
+  @Delete(':id')
+  deleteCode(@Param('id') id: string) {
+    return this.activationCodesService.deleteCode(id);
   }
 
   @Roles(Role.ADMIN)
