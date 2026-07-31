@@ -62,7 +62,7 @@ import { ExportModule } from './export/export.module';
             port: parseInt(configService.get<string>('REDIS_PORT') || '6379', 10),
           };
           if (useTls) {
-            socketOptions.tls = {};
+            socketOptions.tls = { servername: socketOptions.host };
           }
 
           const client = createClient({
@@ -93,12 +93,13 @@ import { ExportModule } from './export/export.module';
         let storage;
         try {
           const useTls = configService.get<string>('REDIS_TLS') === 'true';
+          const host = configService.get<string>('REDIS_HOST') || 'localhost';
           storage = new ThrottlerStorageRedisService(
             new Redis({
-              host: configService.get<string>('REDIS_HOST') || 'localhost',
+              host,
               port: parseInt(configService.get<string>('REDIS_PORT') || '6379', 10),
               password: configService.get<string>('REDIS_PASSWORD'),
-              ...(useTls && { tls: {} }),
+              tls: useTls ? { servername: host } : undefined,
               maxRetriesPerRequest: 3,
             })
           );
