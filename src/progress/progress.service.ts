@@ -545,6 +545,11 @@ export class ProgressService {
           isUnlocked = false;
           isExpired = true;
         }
+      } else if (!access && courseAccess && courseAccess.expiresAt) {
+        if (new Date() > courseAccess.expiresAt) {
+          isUnlocked = false;
+          isExpired = true;
+        }
       }
 
       // Format preview items (strip URLs)

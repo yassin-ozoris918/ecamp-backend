@@ -184,6 +184,10 @@ export class LecturesService {
     if (!courseAccess) {
       throw new ForbiddenException('You must redeem a code to access this lecture.');
     }
+    
+    if (courseAccess.expiresAt && now > courseAccess.expiresAt) {
+      throw new ForbiddenException('Your course access has expired.');
+    }
 
     // Create the lecture access since they have course access
     return this.prisma.studentLectureAccess.create({
