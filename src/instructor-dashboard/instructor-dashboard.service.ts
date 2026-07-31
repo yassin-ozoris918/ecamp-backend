@@ -57,7 +57,7 @@ export class InstructorDashboardService {
       where: { lecture: { courseId: { in: courseIds } }, },
       include: {
         student: {
-          select: { id: true, fullName: true, email: true, phoneNumber: true },
+          select: { id: true, fullName: true, email: true, phoneNumber: true, profilePictureUrl: true },
         },
         lecture: {
           select: {
@@ -74,6 +74,7 @@ export class InstructorDashboardService {
       fullName: a.student.fullName,
       email: a.student.email,
       phoneNumber: a.student.phoneNumber,
+      profilePictureUrl: a.student.profilePictureUrl,
       courseTitle: a.lecture.course.title,
       lectureTitle: a.lecture.title,
       grantedAt: a.createdAt,
@@ -105,7 +106,7 @@ export class InstructorDashboardService {
         submittedAt: { not: null },
       },
       include: {
-        student: { select: { id: true, fullName: true, email: true } },
+        student: { select: { id: true, fullName: true, email: true, profilePictureUrl: true } },
         exam: { select: { id: true, title: true } },
         responses: { where: { earnedPoints: null } },
       },
@@ -115,6 +116,7 @@ export class InstructorDashboardService {
       attemptId: attempt.id,
       studentName: attempt.student.fullName,
       studentEmail: attempt.student.email,
+      studentProfilePictureUrl: attempt.student.profilePictureUrl,
       examTitle: attempt.exam.title,
       submittedAt: attempt.submittedAt,
       ungradedEssaysCount: attempt.responses.length,

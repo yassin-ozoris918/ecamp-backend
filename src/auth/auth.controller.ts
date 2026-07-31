@@ -42,6 +42,7 @@ export class AuthController {
     return this.authService.register(dto, ipAddress, browser, deviceIdHeader);
   }
 
+
   @Post('upload-avatar')
   @UseInterceptors(
     FileInterceptor('file', {

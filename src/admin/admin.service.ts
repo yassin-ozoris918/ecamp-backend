@@ -74,6 +74,7 @@ export class AdminService {
           lastLoginAt: true,
           phoneNumber: true,
           deviceId: true,
+          profilePictureUrl: true,
         },
         orderBy: { [sortBy]: sortOrder },
         skip,
