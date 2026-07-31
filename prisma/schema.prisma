@@ -341,7 +341,8 @@ model StudentLectureAccess {
   studentId   String
   lectureId   String
   createdAt   DateTime  @default(now())
-  activatedAt DateTime  @default(now())
+  isStarted   Boolean   @default(false)
+  activatedAt DateTime?
   expiresAt   DateTime?
   timerPausedAt DateTime?
   deletedAt   DateTime?

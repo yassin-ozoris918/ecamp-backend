@@ -146,32 +146,32 @@ export class CoursesService {
       where: { id, },
       include: {
         chapters: {
-          where: { },
+          where: { deletedAt: null },
           orderBy: { orderIndex: 'asc' },
           include: {
             lectures: {
-              where: { },
+              where: { deletedAt: null },
               orderBy: { sortOrder: 'asc' },
               include: {
                 sessions: {
-                  where: { },
+                  where: { deletedAt: null },
                 },
                 quizzes: {
-                  where: { },
+                  where: { deletedAt: null },
                 },
               },
             },
           },
         },
         lectures: {
-          where: { chapterId: null }, // unassigned lectures
+          where: { chapterId: null, deletedAt: null }, // unassigned lectures
           orderBy: { sortOrder: 'asc' },
           include: {
             sessions: {
-              where: { },
+              where: { deletedAt: null },
             },
             quizzes: {
-              where: { },
+              where: { deletedAt: null },
             },
           },
         },

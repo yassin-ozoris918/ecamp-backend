@@ -2,6 +2,7 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLectureDto } from './dto/create-lecture.dto';
@@ -146,6 +147,56 @@ export class LecturesService {
     });
   }
 
+  async startAccess(lectureId: string, studentId: string) {
+    const lecture = await this.findOne(lectureId);
+    
+    // Check if they already have an unstarted lecture access
+    const existingAccess = await this.prisma.studentLectureAccess.findFirst({
+      where: { studentId, lectureId },
+    });
+
+    const now = new Date();
+    const daysMs = (lecture.durationDays || 0) * 24 * 60 * 60 * 1000;
+    const hoursMs = (lecture.durationHours || 0) * 60 * 60 * 1000;
+    const minutesMs = (lecture.durationMinutes || 0) * 60 * 1000;
+    const totalAccessDurationMs = daysMs + hoursMs + minutesMs;
+    const expiresAt = totalAccessDurationMs > 0 ? new Date(now.getTime() + totalAccessDurationMs) : null;
+
+    if (existingAccess) {
+      if (existingAccess.isStarted) {
+        throw new BadRequestException('Timer has already been started for this lecture.');
+      }
+      return this.prisma.studentLectureAccess.update({
+        where: { id: existingAccess.id },
+        data: {
+          isStarted: true,
+          activatedAt: now,
+          expiresAt,
+        },
+      });
+    }
+
+    // Otherwise, check if they have course access
+    const courseAccess = await this.prisma.studentCourseAccess.findFirst({
+      where: { studentId, courseId: lecture.courseId },
+    });
+
+    if (!courseAccess) {
+      throw new ForbiddenException('You must redeem a code to access this lecture.');
+    }
+
+    // Create the lecture access since they have course access
+    return this.prisma.studentLectureAccess.create({
+      data: {
+        studentId,
+        lectureId,
+        isStarted: true,
+        activatedAt: now,
+        expiresAt,
+      },
+    });
+  }
+
   // --- Phase D: Secure Streaming Token ---
   async getSecureStreamToken(sessionId: string, studentId: string) {
     const session = await this.prisma.session.findUnique({
@@ -164,6 +215,10 @@ export class LecturesService {
 
     if (!access) {
       throw new ForbiddenException('You must redeem a code to access this session.');
+    }
+
+    if (!access.isStarted) {
+      throw new ForbiddenException('You must start the lecture before accessing the video.');
     }
 
     if (access.expiresAt && new Date() > access.expiresAt) {

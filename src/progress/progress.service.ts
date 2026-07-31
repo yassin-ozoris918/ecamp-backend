@@ -176,6 +176,7 @@ export class ProgressService {
 
     const now = new Date();
     let isFullyLocked = true;
+    let isStarted = false;
     let applicableAccess: any = null;
 
     if (access) {
@@ -189,6 +190,7 @@ export class ProgressService {
       
       if (!effectiveExpiresAt || now <= effectiveExpiresAt) {
         isFullyLocked = false;
+        isStarted = access.isStarted;
         applicableAccess = { ...access, expiresAt: effectiveExpiresAt };
       }
     }
@@ -196,6 +198,8 @@ export class ProgressService {
     if (courseAccess && isFullyLocked) {
       if (!courseAccess.expiresAt || now <= courseAccess.expiresAt) {
         isFullyLocked = false;
+        // courseAccess alone means lecture is NOT started yet
+        isStarted = false;
         applicableAccess = courseAccess;
       }
     }
@@ -223,7 +227,8 @@ export class ProgressService {
 
     let playlist: any[] = [];
 
-    if (isFullyLocked) {
+    // Mask content if they haven't started it yet or if they are fully locked
+    if (isFullyLocked || !isStarted) {
       // STRICT WHITE-LISTING FOR LOCKED CONTENT
       playlist = [
         ...sessions.map((s) => ({
@@ -397,6 +402,7 @@ export class ProgressService {
 
     return {
       isLocked: isFullyLocked,
+      isStarted: isStarted,
       expiresAt: applicableAccess?.expiresAt || null,
       access_expires_at: applicableAccess?.expiresAt || null,
       courseId: lectureInfo.courseId,
@@ -417,7 +423,10 @@ export class ProgressService {
     studentId: string,
     itemId: string,
   ) {
-    const { playlist } = await this.getLecturePlaylist(lectureId, studentId);
+    const { playlist, isStarted, isLocked: isFullyLocked } = await this.getLecturePlaylist(lectureId, studentId);
+    if (isFullyLocked) throw new ForbiddenException('You do not have access to this lecture.');
+    if (!isStarted) throw new ForbiddenException('You must start the lecture first.');
+    
     const item = playlist.find((i) => i.id === itemId);
     if (!item) throw new NotFoundException('Item not found in playlist.');
     if (item.isLocked)
@@ -478,22 +487,22 @@ export class ProgressService {
       orderBy: { orderIndex: 'asc' },
       include: {
         lectures: {
-          where: { },
+          where: { deletedAt: null },
           orderBy: { sortOrder: 'asc' },
           include: {
-            sessions: { where: { }, orderBy: { sortOrder: 'asc' } },
-            quizzes: { where: { }, orderBy: { sortOrder: 'asc' } },
+            sessions: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
+            quizzes: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
           },
         },
       },
     });
 
     const standaloneLectures = await this.prisma.lecture.findMany({
-      where: { courseId, chapterId: null, },
+      where: { courseId, chapterId: null, deletedAt: null },
       orderBy: { sortOrder: 'asc' },
       include: {
-        sessions: { where: { }, orderBy: { sortOrder: 'asc' } },
-        quizzes: { where: { }, orderBy: { sortOrder: 'asc' } },
+        sessions: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
+        quizzes: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
       },
     });
 
@@ -505,16 +514,21 @@ export class ProgressService {
 
     // If studentId is provided, check which lectures they have access to
     let accesses: any[] = [];
+    let courseAccess: any = null;
     if (studentId) {
       accesses = await this.prisma.studentLectureAccess.findMany({
         where: { studentId, lectureId: { in: allLectures.map((l) => l.id) }, },
+      });
+      courseAccess = await this.prisma.studentCourseAccess.findFirst({
+        where: { studentId, courseId },
       });
     }
 
     const formatLecture = (l: any) => {
       const access = accesses.find((a) => a.lectureId === l.id);
 
-      let isUnlocked = !!access;
+      let isUnlocked = !!access || !!courseAccess;
+      let isStarted = access ? access.isStarted : false;
       let isExpired = false;
 
       // Check if the lecture access has expired
@@ -557,7 +571,11 @@ export class ProgressService {
         description: l.description,
         thumbnailUrl: l.thumbnailUrl,
         validityDays: l.validityDays,
+        durationDays: l.durationDays,
+        durationHours: l.durationHours,
+        durationMinutes: l.durationMinutes,
         isUnlocked,
+        isStarted,
         isExpired,
         chapterId: l.chapterId,
         items,

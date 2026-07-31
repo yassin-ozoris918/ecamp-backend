@@ -56,6 +56,13 @@ export class LecturesController {
     return this.lecturesService.findByCourse(courseId);
   }
 
+  @Roles(Role.STUDENT)
+  @Post(':id/start-access')
+  startAccess(@Param('id') id: string, @Req() req: RequestWithUser) {
+    const user = req.user;
+    return this.lecturesService.startAccess(id, user.sub);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.lecturesService.findOne(id);

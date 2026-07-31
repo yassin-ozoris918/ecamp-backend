@@ -199,20 +199,11 @@ export class ActivationCodesService {
           throw new ForbiddenException('You already have access to this lecture. Keep this code safe!');
         }
 
-        const daysMs = (lecture.durationDays || 0) * 24 * 60 * 60 * 1000;
-        const hoursMs = (lecture.durationHours || 0) * 60 * 60 * 1000;
-        const minutesMs = (lecture.durationMinutes || 0) * 60 * 1000;
-        const totalAccessDurationMs = daysMs + hoursMs + minutesMs;
-        if (totalAccessDurationMs > 0) {
-          expiresAt = new Date(now.getTime() + totalAccessDurationMs);
-        }
-
         await tx.studentLectureAccess.create({
           data: {
             studentId,
             lectureId: dto.targetId,
-            activatedAt: now,
-            expiresAt,
+            isStarted: false,
           },
         });
         responseTitle = lecture.title;
