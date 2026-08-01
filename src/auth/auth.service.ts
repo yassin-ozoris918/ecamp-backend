@@ -30,6 +30,11 @@ export class AuthService {
     if (existingUser) {
       throw new BadRequestException('Email already in use');
     }
+
+    if (dto.phoneNumber && dto.parentPhoneNumber && dto.phoneNumber.trim() === dto.parentPhoneNumber.trim()) {
+      throw new BadRequestException('Student and parent phone numbers cannot be the same');
+    }
+
     const hashedPassword = await this.hashData(dto.password);
     
     // Determine the deviceId
@@ -48,6 +53,7 @@ export class AuthService {
           profilePictureUrl: dto.profilePictureUrl,
           role: Role.STUDENT,
           deviceId: finalDeviceId || null,
+          isActive: false, // Students require manual approval by an admin
         },
       });
     } catch (error: any) {
@@ -79,6 +85,25 @@ export class AuthService {
       });
     }
 
+    if (user.role === Role.STUDENT) {
+      return {
+        status: 'PENDING_APPROVAL',
+        user: {
+          id: user.id,
+          email: user.email,
+          role: user.role,
+          full_name: user.fullName,
+          profilePictureUrl: user.profilePictureUrl,
+          xp: user.xp,
+          streak_days: user.streakDays,
+          is_active: user.isActive,
+          phone_number: user.phoneNumber,
+          parent_phone_number: user.parentPhoneNumber,
+        },
+      };
+    }
+
+    // Fallback for non-students (if this endpoint ever allows other roles)
     const tokens = await this.getTokens(user.id, user.email, user.role);
     await this.updateRefreshToken(user.id, tokens.refreshToken);
 
