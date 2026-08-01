@@ -1,13 +1,13 @@
 import { Controller, Get, Post, Body, Param, UseGuards, Req } from '@nestjs/common';
 import { ProfileUpdateRequestsService } from './profile-update-requests.service';
 import { CreateProfileUpdateRequestDto } from './dto/create-profile-update-request.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('profile-update-requests')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(AuthGuard('jwt'), RolesGuard)
 export class ProfileUpdateRequestsController {
   constructor(private readonly profileUpdateRequestsService: ProfileUpdateRequestsService) {}
 
