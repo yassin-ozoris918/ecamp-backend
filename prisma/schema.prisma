@@ -13,7 +13,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 enum NotificationEventCategory {
   QUIZ_FAILED
   EXAM_FAILED
@@ -61,22 +60,22 @@ enum CourseStatus {
 }
 
 model User {
-  id                      String         @id @default(uuid())
-  fullName                String
-  email                   String         @unique
-  password                String
-  role                    Role           @default(STUDENT)
-  isActive                Boolean        @default(true)
-  deviceId                String? // Stores the unique hardware fingerprint
-  profilePictureUrl       String?
-  profilePictureMediaId   String?  @unique
-  profilePicture          Media?   @relation("ProfilePicture", fields: [profilePictureMediaId], references: [id], onDelete: SetNull)
-  educationLevel          EducationLevel @default(UNIVERSITY)
-  phoneNumber       String?
-  parentPhoneNumber String? // Required strictly for HIGH_SCHOOL
-  refreshToken      String?
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
+  id                    String         @id @default(uuid())
+  fullName              String
+  email                 String         @unique
+  password              String
+  role                  Role           @default(STUDENT)
+  isActive              Boolean        @default(true)
+  deviceId              String? // Stores the unique hardware fingerprint
+  profilePictureUrl     String?
+  profilePictureMediaId String?        @unique
+  profilePicture        Media?         @relation("ProfilePicture", fields: [profilePictureMediaId], references: [id], onDelete: SetNull)
+  educationLevel        EducationLevel @default(UNIVERSITY)
+  phoneNumber           String?
+  parentPhoneNumber     String? // Required strictly for HIGH_SCHOOL
+  refreshToken          String?
+  createdAt             DateTime       @default(now())
+  updatedAt             DateTime       @updatedAt
 
   // Gamification Fields
   xp          Int       @default(0)
@@ -86,18 +85,18 @@ model User {
   // Soft Delete
   deletedAt DateTime?
 
-  deviceSessions DeviceSession[]
-  deviceHistory  DeviceHistory[]
-  auditLogs      AuditLog[]
+  deviceSessions  DeviceSession[]
+  deviceHistory   DeviceHistory[]
+  auditLogs       AuditLog[]
   systemAuditLogs SystemAuditLog[]
 
   teachingCourses CourseInstructor[]
 
-  redeemedCodes       ActivationCode[]
+  redeemedCodes        ActivationCode[]
   codeHistoryAsStudent ActivationCodeHistory[] @relation("HistoryStudent")
   codeHistoryAsActor   ActivationCodeHistory[] @relation("HistoryActor")
-  accessedLectures    StudentLectureAccess[]
-  accessedCourses     StudentCourseAccess[]
+  accessedLectures     StudentLectureAccess[]
+  accessedCourses      StudentCourseAccess[]
 
   quizAttempts QuizAttempt[]
 
@@ -107,30 +106,33 @@ model User {
 
   aiExtractionLogs AIExtractionLog[]
 
-  badges              StudentBadge[]
-  certificates        Certificate[]
-  aiUsageLogs         AiUsageLog[]
-  riskProfile         StudentRiskProfile?
-  parentLogs          ParentNotificationLog[]
-  uploadedMedia       Media[]
+  badges        StudentBadge[]
+  certificates  Certificate[]
+  aiUsageLogs   AiUsageLog[]
+  riskProfile   StudentRiskProfile?
+  parentLogs    ParentNotificationLog[]
+  uploadedMedia Media[]
+
+  profileUpdateRequests  ProfileUpdateRequest[] @relation("ProfileUpdateStudent")
+  profileUpdatesReviewed ProfileUpdateRequest[] @relation("ProfileUpdateReviewer")
 }
 
 model Course {
-  id                        String         @id @default(uuid())
-  title                     String
-  description               String?
-  thumbnailUrl              String?
-  thumbnailMediaId          String?  @unique
-  thumbnailMedia            Media?   @relation("CourseThumbnail", fields: [thumbnailMediaId], references: [id], onDelete: SetNull)
-  introductoryVideoUrl      String?
-  introductoryVideoMediaId  String?  @unique
-  introductoryVideoMedia    Media?   @relation("CourseVideo", fields: [introductoryVideoMediaId], references: [id], onDelete: SetNull)
-  audienceType              EducationLevel @default(HIGH_SCHOOL)
-  validityDays              Int?
-  status       CourseStatus   @default(DRAFT)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  deletedAt    DateTime?
+  id                       String         @id @default(uuid())
+  title                    String
+  description              String?
+  thumbnailUrl             String?
+  thumbnailMediaId         String?        @unique
+  thumbnailMedia           Media?         @relation("CourseThumbnail", fields: [thumbnailMediaId], references: [id], onDelete: SetNull)
+  introductoryVideoUrl     String?
+  introductoryVideoMediaId String?        @unique
+  introductoryVideoMedia   Media?         @relation("CourseVideo", fields: [introductoryVideoMediaId], references: [id], onDelete: SetNull)
+  audienceType             EducationLevel @default(HIGH_SCHOOL)
+  validityDays             Int?
+  status                   CourseStatus   @default(DRAFT)
+  createdAt                DateTime       @default(now())
+  updatedAt                DateTime       @updatedAt
+  deletedAt                DateTime?
 
   instructors CourseInstructor[]
   chapters    Chapter[]
@@ -141,9 +143,9 @@ model Course {
   certificates Certificate[]
 
   // Access & Codes
-  studentAccess     StudentCourseAccess[]
-  redeemedCodes     ActivationCode[]
-  codeHistory       ActivationCodeHistory[]
+  studentAccess StudentCourseAccess[]
+  redeemedCodes ActivationCode[]
+  codeHistory   ActivationCodeHistory[]
 }
 
 model Chapter {
@@ -153,28 +155,28 @@ model Chapter {
   description String?
   sortOrder   Int       @default(0)
   orderIndex  Int       @default(0)
-  isPublished Boolean @default(true)
+  isPublished Boolean   @default(true)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   deletedAt   DateTime?
 
-  course   Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lectures Lecture[]
-  exams    Exam[]
+  course      Course              @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lectures    Lecture[]
+  exams       Exam[]
   attachments ChapterAttachment[]
 
   @@index([courseId])
 }
 
 model ChapterAttachment {
-  id        String   @id @default(uuid())
+  id        String         @id @default(uuid())
   chapterId String
   title     String
   fileUrl   String
   mediaId   String?
-  media     Media?   @relation("ChapterAttachmentFile", fields: [mediaId], references: [id], onDelete: SetNull)
+  media     Media?         @relation("ChapterAttachmentFile", fields: [mediaId], references: [id], onDelete: SetNull)
   type      AttachmentType @default(OTHER)
-  createdAt DateTime @default(now())
+  createdAt DateTime       @default(now())
 
   chapter Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
 
@@ -182,14 +184,14 @@ model ChapterAttachment {
 }
 
 model CourseAttachment {
-  id        String   @id @default(uuid())
+  id        String         @id @default(uuid())
   courseId  String
   title     String
   fileUrl   String
   mediaId   String?
-  media     Media?   @relation("CourseAttachmentFile", fields: [mediaId], references: [id], onDelete: SetNull)
+  media     Media?         @relation("CourseAttachmentFile", fields: [mediaId], references: [id], onDelete: SetNull)
   type      AttachmentType @default(OTHER)
-  createdAt DateTime @default(now())
+  createdAt DateTime       @default(now())
 
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
@@ -197,34 +199,34 @@ model CourseAttachment {
 }
 
 model Lecture {
-  id                    String    @id @default(uuid())
-  courseId              String
-  chapterId             String?
-  title                 String
-  description           String?
-  sortOrder             Int       @default(0)
-  orderIndex            Int       @default(0)
-  isPublished Boolean @default(true)
-  thumbnailUrl          String?
-  thumbnailMediaId      String?  @unique
-  thumbnailMedia        Media?   @relation("LectureThumbnail", fields: [thumbnailMediaId], references: [id], onDelete: SetNull)
-  validityDays          Int?
-  durationDays          Int       @default(0)
-  durationHours         Int       @default(0)
-  durationMinutes       Int       @default(0)
-  warningHours          Int       @default(0)
-  warningMinutes        Int       @default(0)
-  createdAt             DateTime  @default(now())
-  updatedAt             DateTime  @updatedAt
-  deletedAt             DateTime?
+  id               String    @id @default(uuid())
+  courseId         String
+  chapterId        String?
+  title            String
+  description      String?
+  sortOrder        Int       @default(0)
+  orderIndex       Int       @default(0)
+  isPublished      Boolean   @default(true)
+  thumbnailUrl     String?
+  thumbnailMediaId String?   @unique
+  thumbnailMedia   Media?    @relation("LectureThumbnail", fields: [thumbnailMediaId], references: [id], onDelete: SetNull)
+  validityDays     Int?
+  durationDays     Int       @default(0)
+  durationHours    Int       @default(0)
+  durationMinutes  Int       @default(0)
+  warningHours     Int       @default(0)
+  warningMinutes   Int       @default(0)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
 
   course   Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
   chapter  Chapter?  @relation(fields: [chapterId], references: [id], onDelete: SetNull)
   sessions Session[]
 
-  activationCodes        ActivationCode[]
-  activationCodeHistory  ActivationCodeHistory[]
-  studentAccess          StudentLectureAccess[]
+  activationCodes       ActivationCode[]
+  activationCodeHistory ActivationCodeHistory[]
+  studentAccess         StudentLectureAccess[]
 
   quizzes Quiz[]
 
@@ -237,20 +239,20 @@ model Lecture {
 }
 
 model Session {
-  id          String   @id @default(uuid())
-  lectureId   String
-  title       String
-  description String?
-  videoUrl    String?
-  videoMediaId String?  @unique
-  videoMedia  Media?    @relation("SessionVideo", fields: [videoMediaId], references: [id], onDelete: SetNull)
-  duration    Int      @default(0) // in seconds
-  sortOrder   Int      @default(0)
-  orderIndex  Int      @default(0)
-  isPublished Boolean @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  id           String    @id @default(uuid())
+  lectureId    String
+  title        String
+  description  String?
+  videoUrl     String?
+  videoMediaId String?   @unique
+  videoMedia   Media?    @relation("SessionVideo", fields: [videoMediaId], references: [id], onDelete: SetNull)
+  duration     Int       @default(0) // in seconds
+  sortOrder    Int       @default(0)
+  orderIndex   Int       @default(0)
+  isPublished  Boolean   @default(true)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
 
   lecture Lecture @relation(fields: [lectureId], references: [id], onDelete: Cascade)
 
@@ -262,22 +264,22 @@ model Session {
 model CourseInstructor {
   courseId     String
   instructorId String
-  assignedAt   DateTime @default(now())
+  assignedAt   DateTime  @default(now())
   deletedAt    DateTime?
 
   // Relationships
-  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  instructor   User     @relation(fields: [instructorId], references: [id], onDelete: Cascade)
+  course     Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  instructor User   @relation(fields: [instructorId], references: [id], onDelete: Cascade)
 
   @@id([courseId, instructorId]) // Compound primary key guarantees uniqueness in the DB
   @@index([instructorId])
 }
 
 model ActivationCode {
-  id         String     @id @default(uuid())
-  code       String     @unique
-  status     CodeStatus @default(UNUSED)
-  
+  id     String     @id @default(uuid())
+  code   String     @unique
+  status CodeStatus @default(UNUSED)
+
   targetType     ActivationCodeType @default(LECTURE)
   educationLevel EducationLevel     @default(UNIVERSITY)
 
@@ -288,8 +290,8 @@ model ActivationCode {
   redeemedLectureId String?
   redeemedLecture   Lecture? @relation(fields: [redeemedLectureId], references: [id], onDelete: SetNull)
 
-  redeemedCourseId  String?
-  redeemedCourse    Course?  @relation(fields: [redeemedCourseId], references: [id], onDelete: SetNull)
+  redeemedCourseId String?
+  redeemedCourse   Course? @relation(fields: [redeemedCourseId], references: [id], onDelete: SetNull)
 
   studentId String?
   student   User?   @relation(fields: [studentId], references: [id], onDelete: SetNull)
@@ -304,28 +306,28 @@ model ActivationCode {
 }
 
 model ActivationCodeHistory {
-  id        String     @id @default(uuid())
-  codeId    String
-  code      String
-  
+  id     String @id @default(uuid())
+  codeId String
+  code   String
+
   redeemedLectureId String?
   redeemedCourseId  String?
-  
+
   studentId String?
-  action    String     // GENERATED | REDEEMED | REVOKED | EXPIRED
+  action    String // GENERATED | REDEEMED | REVOKED | EXPIRED
   oldStatus CodeStatus?
   newStatus CodeStatus
   actorId   String?
   ipAddress String?
   browser   String?
-  createdAt DateTime   @default(now())
+  createdAt DateTime    @default(now())
 
   codeRel         ActivationCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
   redeemedLecture Lecture?       @relation(fields: [redeemedLectureId], references: [id], onDelete: SetNull)
   redeemedCourse  Course?        @relation(fields: [redeemedCourseId], references: [id], onDelete: SetNull)
-  
-  student User?          @relation("HistoryStudent", fields: [studentId], references: [id], onDelete: SetNull)
-  actor   User?          @relation("HistoryActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  student User? @relation("HistoryStudent", fields: [studentId], references: [id], onDelete: SetNull)
+  actor   User? @relation("HistoryActor", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([codeId])
   @@index([redeemedLectureId])
@@ -337,15 +339,15 @@ model ActivationCodeHistory {
 
 // This acts as the "wallet" or "inventory" for a student's unlocked content
 model StudentLectureAccess {
-  id          String    @id @default(uuid())
-  studentId   String
-  lectureId   String
-  createdAt   DateTime  @default(now())
-  isStarted   Boolean   @default(false)
-  activatedAt DateTime?
-  expiresAt   DateTime?
+  id            String    @id @default(uuid())
+  studentId     String
+  lectureId     String
+  createdAt     DateTime  @default(now())
+  isStarted     Boolean   @default(false)
+  activatedAt   DateTime?
+  expiresAt     DateTime?
   timerPausedAt DateTime?
-  deletedAt   DateTime?
+  deletedAt     DateTime?
 
   student User    @relation(fields: [studentId], references: [id], onDelete: Cascade)
   lecture Lecture @relation(fields: [lectureId], references: [id], onDelete: Cascade)
@@ -398,33 +400,33 @@ model Quiz {
 }
 
 model QuizQuestion {
-  id                 String   @id @default(uuid())
+  id                 String       @id @default(uuid())
   quizId             String
   text               String
   type               QuestionType @default(MCQ)
   options            String[]
   correctOptionIndex Int
-  points             Int      @default(1)
-  orderIndex         Int      @default(0)
-  createdAt          DateTime @default(now())
+  points             Int          @default(1)
+  orderIndex         Int          @default(0)
+  createdAt          DateTime     @default(now())
 
   // Relations
-  quiz               Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
 
   @@index([quizId])
 }
 
 // Tracks student performance and prevents them from moving forward if they fail
 model QuizAttempt {
-  id          String        @id @default(uuid())
-  studentId   String
-  quizId      String
-  startedAt   DateTime      @default(now())
-  submittedAt DateTime?
-  score       Int           @default(0)
-  status      AttemptStatus @default(PENDING)
-  draftAnswers Json?        // Stores partial answers for save-and-resume: { "questionId": selectedOptionIndex }
-  createdAt   DateTime      @default(now())
+  id           String        @id @default(uuid())
+  studentId    String
+  quizId       String
+  startedAt    DateTime      @default(now())
+  submittedAt  DateTime?
+  score        Int           @default(0)
+  status       AttemptStatus @default(PENDING)
+  draftAnswers Json? // Stores partial answers for save-and-resume: { "questionId": selectedOptionIndex }
+  createdAt    DateTime      @default(now())
 
   student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
   quiz    Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
@@ -513,7 +515,7 @@ model ExamQuestion {
   points Int          @default(1)
 
   options            String[]
-  correctOptionIndex Int @default(0)
+  correctOptionIndex Int      @default(0)
   referenceAnswer    String?
 
   createdAt DateTime @default(now())
@@ -599,10 +601,10 @@ model Badge {
 }
 
 model StudentBadge {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   studentId String
   badgeId   String
-  earnedAt  DateTime @default(now())
+  earnedAt  DateTime  @default(now())
   deletedAt DateTime?
 
   student User  @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -613,14 +615,14 @@ model StudentBadge {
 }
 
 model Certificate {
-  id        String   @id @default(uuid())
-  studentId String
-  courseId  String
-  issuedAt  DateTime @default(now())
-  pdfUrl    String?
-  pdfMediaId String?  @unique
-  pdfMedia  Media?    @relation("CertificatePdf", fields: [pdfMediaId], references: [id], onDelete: SetNull)
-  deletedAt DateTime?
+  id         String    @id @default(uuid())
+  studentId  String
+  courseId   String
+  issuedAt   DateTime  @default(now())
+  pdfUrl     String?
+  pdfMediaId String?   @unique
+  pdfMedia   Media?    @relation("CertificatePdf", fields: [pdfMediaId], references: [id], onDelete: SetNull)
+  deletedAt  DateTime?
 
   student User   @relation(fields: [studentId], references: [id], onDelete: Cascade)
   course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
@@ -632,7 +634,7 @@ model Certificate {
 model SystemSetting {
   key         String   @id
   value       String
-  type        String   @default("STRING")  // STRING | BOOLEAN | INTEGER | JSON
+  type        String   @default("STRING") // STRING | BOOLEAN | INTEGER | JSON
   description String?
   updatedAt   DateTime @updatedAt
 }
@@ -665,32 +667,33 @@ model AuditLog {
 }
 
 model Attachment {
-  id         String    @id @default(uuid())
-  lectureId  String
-  title      String
-  fileUrl    String
-  mediaId    String?
-  media      Media?    @relation("AttachmentFile", fields: [mediaId], references: [id], onDelete: SetNull)
-  type       AttachmentType @default(OTHER)
-  orderIndex Int       @default(0)
-  isPublished Boolean  @default(true)
-  createdAt  DateTime  @default(now())
-  deletedAt  DateTime?
+  id          String         @id @default(uuid())
+  lectureId   String
+  title       String
+  fileUrl     String
+  mediaId     String?
+  media       Media?         @relation("AttachmentFile", fields: [mediaId], references: [id], onDelete: SetNull)
+  type        AttachmentType @default(OTHER)
+  orderIndex  Int            @default(0)
+  isPublished Boolean        @default(true)
+  createdAt   DateTime       @default(now())
+  deletedAt   DateTime?
 
   // Relations
-  lecture    Lecture   @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+  lecture Lecture @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+
   @@index([lectureId])
 }
 
 model DeviceSession {
-  id                String   @id @default(uuid())
+  id                String    @id @default(uuid())
   studentId         String
   deviceFingerprint String
   browser           String?
   ipAddress         String?
-  isLocked          Boolean  @default(true)
-  lastLoginAt       DateTime @default(now())
-  createdAt         DateTime @default(now())
+  isLocked          Boolean   @default(true)
+  lastLoginAt       DateTime  @default(now())
+  createdAt         DateTime  @default(now())
   deletedAt         DateTime?
 
   student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
@@ -703,7 +706,7 @@ model DeviceHistory {
   id                String   @id @default(uuid())
   studentId         String
   deviceFingerprint String
-  action            String   // REGISTERED | RESET | REMOVED | REPLACED
+  action            String // REGISTERED | RESET | REMOVED | REPLACED
   ipAddress         String?
   browser           String?
   createdAt         DateTime @default(now())
@@ -729,15 +732,15 @@ model Media {
   uploadedBy User @relation(fields: [uploadedById], references: [id])
 
   // Back-references from entities referencing this media
-  profilePictureUser      User?               @relation("ProfilePicture")
-  courseThumbnail         Course?              @relation("CourseThumbnail")
-  courseVideo             Course?              @relation("CourseVideo")
-  lectureThumbnail        Lecture?             @relation("LectureThumbnail")
-  sessionVideo            Session?             @relation("SessionVideo")
-  attachmentFiles         Attachment[]         @relation("AttachmentFile")
-  chapterAttachmentFiles  ChapterAttachment[]  @relation("ChapterAttachmentFile")
-  courseAttachmentFiles   CourseAttachment[]   @relation("CourseAttachmentFile")
-  certificatePdf          Certificate?         @relation("CertificatePdf")
+  profilePictureUser     User?               @relation("ProfilePicture")
+  courseThumbnail        Course?             @relation("CourseThumbnail")
+  courseVideo            Course?             @relation("CourseVideo")
+  lectureThumbnail       Lecture?            @relation("LectureThumbnail")
+  sessionVideo           Session?            @relation("SessionVideo")
+  attachmentFiles        Attachment[]        @relation("AttachmentFile")
+  chapterAttachmentFiles ChapterAttachment[] @relation("ChapterAttachmentFile")
+  courseAttachmentFiles  CourseAttachment[]  @relation("CourseAttachmentFile")
+  certificatePdf         Certificate?        @relation("CertificatePdf")
 
   @@index([uploadedById])
   @@index([uploadedAt])
@@ -774,7 +777,7 @@ model SystemAuditLog {
   id         String   @id @default(uuid())
   actorId    String
   actionType String
-  payload    String?  // JSON stringified execution payload
+  payload    String? // JSON stringified execution payload
   ipAddress  String?
   createdAt  DateTime @default(now())
 
@@ -782,4 +785,31 @@ model SystemAuditLog {
 
   @@index([actorId])
   @@index([createdAt])
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model ProfileUpdateRequest {
+  id                   String        @id @default(uuid())
+  studentId            String
+  requestedFullName    String?
+  requestedPhoneNumber String?
+  requestedParentPhone String?
+  status               RequestStatus @default(PENDING)
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  rejectionReason String?
+
+  student  User  @relation("ProfileUpdateStudent", fields: [studentId], references: [id], onDelete: Cascade)
+  reviewer User? @relation("ProfileUpdateReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+
+  @@index([studentId])
+  @@index([status])
 }

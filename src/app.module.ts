@@ -40,6 +40,7 @@ import { ChapterAttachmentsModule } from './chapter-attachments/chapter-attachme
 import { MediaModule } from './media/media.module';
 import { ReorderModule } from './reorder/reorder.module';
 import { ExportModule } from './export/export.module';
+import { ProfileUpdateRequestsModule } from './profile-update-requests/profile-update-requests.module';
 
 @Module({
   imports: [
@@ -138,6 +139,7 @@ import { ExportModule } from './export/export.module';
     MediaModule,
     ReorderModule,
     ExportModule,
+    ProfileUpdateRequestsModule,
   ],
   controllers: [AppController],
   providers: [
