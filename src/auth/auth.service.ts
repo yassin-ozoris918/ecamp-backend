@@ -93,6 +93,8 @@ export class AuthService {
         xp: user.xp,
         streak_days: user.streakDays,
         is_active: user.isActive,
+        phone_number: user.phoneNumber,
+        parent_phone_number: user.parentPhoneNumber,
       },
     };
   }
@@ -195,6 +197,8 @@ export class AuthService {
         xp: user.xp,
         streak_days: user.streakDays,
         is_active: user.isActive,
+        phone_number: user.phoneNumber,
+        parent_phone_number: user.parentPhoneNumber,
       },
     };
   }
@@ -238,6 +242,8 @@ export class AuthService {
         xp: user.xp,
         streak_days: user.streakDays,
         is_active: user.isActive,
+        phone_number: user.phoneNumber,
+        parent_phone_number: user.parentPhoneNumber,
       },
     };
   }
