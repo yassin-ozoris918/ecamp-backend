@@ -73,6 +73,7 @@ export class AdminService {
           createdAt: true,
           lastLoginAt: true,
           phoneNumber: true,
+          parentPhoneNumber: true,
           deviceId: true,
           profilePictureUrl: true,
         },
