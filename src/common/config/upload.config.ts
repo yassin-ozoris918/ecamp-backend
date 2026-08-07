@@ -22,7 +22,7 @@ export const ALL_MIME_TYPES = [
 export const UPLOAD_LIMITS = {
   AVATAR: 5 * 1024 * 1024,
   THUMBNAIL: 5 * 1024 * 1024,
-  VIDEO: 500 * 1024 * 1024,
+  VIDEO: 100 * 1024 * 1024 * 1024, // 100 GB (practically unlimited)
   ATTACHMENT: 50 * 1024 * 1024,
   EXAM: 50 * 1024 * 1024,
 } as const;
