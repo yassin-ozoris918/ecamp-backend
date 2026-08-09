@@ -22,6 +22,7 @@ export class UsersProvider implements DataProvider {
         { fullName: { contains: filters.search, mode: 'insensitive' } },
         { email: { contains: filters.search, mode: 'insensitive' } },
         { phoneNumber: { contains: filters.search, mode: 'insensitive' } },
+        { parentPhoneNumber: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
     if (filters?.dateFrom || filters?.dateTo) {

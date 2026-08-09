@@ -49,12 +49,13 @@ export class AdminService {
       if (dateTo) where.createdAt.lte = new Date(dateTo);
     }
 
-    // Search filter (partial case-insensitive on fullName, email, phoneNumber)
+    // Search filter (partial case-insensitive on fullName, email, phoneNumber, parentPhoneNumber)
     if (search) {
       where.OR = [
         { fullName: { contains: search, mode: 'insensitive' } },
         { email: { contains: search, mode: 'insensitive' } },
         { phoneNumber: { contains: search, mode: 'insensitive' } },
+        { parentPhoneNumber: { contains: search, mode: 'insensitive' } },
       ];
     }
 
