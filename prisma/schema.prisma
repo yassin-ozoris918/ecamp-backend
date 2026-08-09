@@ -283,6 +283,8 @@ model ActivationCode {
   targetType     ActivationCodeType @default(LECTURE)
   educationLevel EducationLevel     @default(UNIVERSITY)
 
+  isCopied Boolean @default(false)
+
   redeemedAt DateTime?
   deletedAt  DateTime?
 

@@ -62,6 +62,12 @@ export class ActivationCodesController {
   }
 
   @Roles(Role.ADMIN)
+  @Post(':id/mark-copied')
+  markCopied(@Param('id') id: string) {
+    return this.activationCodesService.markCopied(id);
+  }
+
+  @Roles(Role.ADMIN)
   @Delete(':id')
   deleteCode(@Param('id') id: string) {
     return this.activationCodesService.deleteCode(id);

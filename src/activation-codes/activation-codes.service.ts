@@ -148,6 +148,18 @@ export class ActivationCodesService {
     return { message: `Successfully deleted ${result.count} codes.` };
   }
 
+  async markCopied(id: string) {
+    const code = await this.prisma.activationCode.findUnique({ where: { id } });
+    if (!code) throw new NotFoundException('Code not found.');
+
+    await this.prisma.activationCode.update({
+      where: { id },
+      data: { isCopied: true },
+    });
+
+    return { message: 'Code marked as copied.' };
+  }
+
 
   async getHistory(codeId: string) {
     const code = await this.prisma.activationCode.findUnique({
