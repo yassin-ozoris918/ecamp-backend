@@ -21,6 +21,7 @@ export class UsersProvider implements DataProvider {
       where.OR = [
         { fullName: { contains: filters.search, mode: 'insensitive' } },
         { email: { contains: filters.search, mode: 'insensitive' } },
+        { phoneNumber: { contains: filters.search, mode: 'insensitive' } },
       ];
     }
     if (filters?.dateFrom || filters?.dateTo) {
