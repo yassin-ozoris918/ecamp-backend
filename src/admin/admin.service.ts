@@ -707,6 +707,7 @@ export class AdminService {
       where: {
         lectureId,
         isStarted: true,
+        student: { deletedAt: null }
       },
       include: {
         student: {
