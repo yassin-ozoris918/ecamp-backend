@@ -208,6 +208,11 @@ export class AdminController {
 
   // --- REPORTS ---
 
+  @Get('lectures/:id/viewers')
+  async getLectureViewers(@Param('id') id: string) {
+    return this.adminService.getLectureViewers(id);
+  }
+
   @Get('reports/students')
   async exportStudents(@Res() res: Response) {
     return this.reportsService.exportStudents(res);

@@ -701,5 +701,35 @@ export class AdminService {
     const uniqueItems = Array.from(new Map(items.map(item => [item.id, item])).values());
     return uniqueItems;
   }
+
+  async getLectureViewers(lectureId: string) {
+    const accesses = await this.prisma.studentLectureAccess.findMany({
+      where: {
+        lectureId,
+        isStarted: true,
+      },
+      include: {
+        student: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            phoneNumber: true,
+            parentPhoneNumber: true,
+          }
+        }
+      },
+      orderBy: { activatedAt: 'desc' },
+    });
+
+    return accesses.map(a => ({
+      studentId: a.student.id,
+      fullName: a.student.fullName,
+      email: a.student.email,
+      phoneNumber: a.student.phoneNumber,
+      parentPhoneNumber: a.student.parentPhoneNumber,
+      activatedAt: a.activatedAt,
+    }));
+  }
 }
 
