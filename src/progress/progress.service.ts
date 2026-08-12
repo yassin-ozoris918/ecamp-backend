@@ -65,6 +65,7 @@ export class ProgressService {
       instructorName: string;
       sessionIds: string[];
       quizIds: string[];
+      isFree: boolean;
     }>();
 
     for (const access of lectureAccesses) {
@@ -78,6 +79,7 @@ export class ProgressService {
           instructorName: course.instructors[0]?.instructor?.fullName || 'Unknown',
           sessionIds: [],
           quizIds: [],
+          isFree: course.isFree,
         });
       }
       const c = coursesMap.get(course.id)!;
@@ -96,6 +98,7 @@ export class ProgressService {
           instructorName: course.instructors[0]?.instructor?.fullName || 'Unknown',
           sessionIds: [],
           quizIds: [],
+          isFree: course.isFree,
         });
       }
       const c = coursesMap.get(course.id)!;
@@ -155,6 +158,7 @@ export class ProgressService {
         progressPct: denominator > 0
           ? ((completedSessions + passedQuizzes) / denominator) * 100
           : 0,
+        isFree: c.isFree,
       };
     });
   }
