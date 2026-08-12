@@ -188,6 +188,10 @@ export class ProgressService {
         effectiveExpiresAt = new Date(access.expiresAt.getTime() + actualExtensionMs);
       }
       
+      if (lectureInfo.course.isFree) {
+        effectiveExpiresAt = null;
+      }
+      
       if (!effectiveExpiresAt || now <= effectiveExpiresAt) {
         isFullyLocked = false;
         isStarted = access.isStarted;
@@ -195,12 +199,12 @@ export class ProgressService {
       }
     }
     
-    if (courseAccess && isFullyLocked) {
-      if (!courseAccess.expiresAt || now <= courseAccess.expiresAt) {
+    if ((courseAccess || lectureInfo.course.isFree) && isFullyLocked) {
+      if (lectureInfo.course.isFree || !courseAccess?.expiresAt || now <= courseAccess.expiresAt) {
         isFullyLocked = false;
         // courseAccess alone means lecture is NOT started yet
         isStarted = false;
-        applicableAccess = courseAccess;
+        applicableAccess = courseAccess || { expiresAt: null };
       }
     }
 
@@ -527,28 +531,30 @@ export class ProgressService {
     const formatLecture = (l: any) => {
       const access = accesses.find((a) => a.lectureId === l.id);
 
-      let isUnlocked = !!access || !!courseAccess;
+      let isUnlocked = course.isFree || !!access || !!courseAccess;
       let isStarted = access ? access.isStarted : false;
       let isExpired = false;
 
-      // Check if the lecture access has expired
-      if (access && access.expiresAt) {
-        const now = new Date();
-        let effectiveExpiresAt = access.expiresAt;
-        if (access.timerPausedAt) {
-          const timeSpentMs = now.getTime() - access.timerPausedAt.getTime();
-          const maxExtensionMs = 2 * 60 * 60 * 1000; // 2 hours global max pause
-          const actualExtensionMs = Math.max(0, Math.min(timeSpentMs, maxExtensionMs));
-          effectiveExpiresAt = new Date(access.expiresAt.getTime() + actualExtensionMs);
-        }
-        if (now > effectiveExpiresAt) {
-          isUnlocked = false;
-          isExpired = true;
-        }
-      } else if (!access && courseAccess && courseAccess.expiresAt) {
-        if (new Date() > courseAccess.expiresAt) {
-          isUnlocked = false;
-          isExpired = true;
+      if (!course.isFree) {
+        // Check if the lecture access has expired
+        if (access && access.expiresAt) {
+          const now = new Date();
+          let effectiveExpiresAt = access.expiresAt;
+          if (access.timerPausedAt) {
+            const timeSpentMs = now.getTime() - access.timerPausedAt.getTime();
+            const maxExtensionMs = 2 * 60 * 60 * 1000; // 2 hours global max pause
+            const actualExtensionMs = Math.max(0, Math.min(timeSpentMs, maxExtensionMs));
+            effectiveExpiresAt = new Date(access.expiresAt.getTime() + actualExtensionMs);
+          }
+          if (now > effectiveExpiresAt) {
+            isUnlocked = false;
+            isExpired = true;
+          }
+        } else if (!access && courseAccess && courseAccess.expiresAt) {
+          if (new Date() > courseAccess.expiresAt) {
+            isUnlocked = false;
+            isExpired = true;
+          }
         }
       }
 

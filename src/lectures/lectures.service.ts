@@ -162,18 +162,40 @@ export class LecturesService {
     const totalAccessDurationMs = daysMs + hoursMs + minutesMs;
     const expiresAt = totalAccessDurationMs > 0 ? new Date(now.getTime() + totalAccessDurationMs) : null;
 
+    const course = await this.prisma.course.findUnique({ where: { id: lecture.courseId } });
+    const isFree = course?.isFree || false;
+
     if (existingAccess) {
-      if (existingAccess.isStarted) {
+      if (existingAccess.isStarted && !isFree) {
         throw new BadRequestException('Timer has already been started for this lecture.');
       }
-      return this.prisma.studentLectureAccess.update({
-        where: { id: existingAccess.id },
-        data: {
-          isStarted: true,
-          activatedAt: now,
-          expiresAt,
-        },
-      });
+      
+      // If the course is free, we just ensure it's started but we don't modify the original expiresAt 
+      // so it can safely revert if the course becomes paid again.
+      if (isFree && !existingAccess.isStarted) {
+        return this.prisma.studentLectureAccess.update({
+          where: { id: existingAccess.id },
+          data: {
+            isStarted: true,
+            activatedAt: now,
+            // Keep the original calculated expiresAt
+            expiresAt,
+          },
+        });
+      }
+
+      if (!isFree) {
+        return this.prisma.studentLectureAccess.update({
+          where: { id: existingAccess.id },
+          data: {
+            isStarted: true,
+            activatedAt: now,
+            expiresAt,
+          },
+        });
+      }
+      
+      return existingAccess;
     }
 
     // Otherwise, check if they have course access
@@ -181,11 +203,11 @@ export class LecturesService {
       where: { studentId, courseId: lecture.courseId },
     });
 
-    if (!courseAccess) {
+    if (!courseAccess && !isFree) {
       throw new ForbiddenException('You must redeem a code to access this lecture.');
     }
     
-    if (courseAccess.expiresAt && now > courseAccess.expiresAt) {
+    if (!isFree && courseAccess && courseAccess.expiresAt && now > courseAccess.expiresAt) {
       throw new ForbiddenException('Your course access has expired.');
     }
 
@@ -217,16 +239,21 @@ export class LecturesService {
         },
     });
 
-    if (!access) {
-      throw new ForbiddenException('You must redeem a code to access this session.');
-    }
+    const course = await this.prisma.course.findUnique({ where: { id: session.lecture.courseId } });
+    const isFree = course?.isFree || false;
 
-    if (!access.isStarted) {
-      throw new ForbiddenException('You must start the lecture before accessing the video.');
-    }
+    if (!isFree) {
+      if (!access) {
+        throw new ForbiddenException('You must redeem a code to access this session.');
+      }
 
-    if (access.expiresAt && new Date() > access.expiresAt) {
-      throw new ForbiddenException('Your access to this lecture has expired.');
+      if (!access.isStarted) {
+        throw new ForbiddenException('You must start the lecture before accessing the video.');
+      }
+
+      if (access.expiresAt && new Date() > access.expiresAt) {
+        throw new ForbiddenException('Your access to this lecture has expired.');
+      }
     }
 
     if (!session.videoUrl) {

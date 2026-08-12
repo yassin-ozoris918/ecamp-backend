@@ -36,6 +36,7 @@ export class CoursesService {
         title: dto.title,
         description: dto.description,
         audienceType: dto.audienceType,
+        isFree: dto.isFree || false,
         ...(role === Role.INSTRUCTOR && {
           instructors: {
             create: {
@@ -212,6 +213,7 @@ export class CoursesService {
         title: course.title,
         description: course.description,
         status: course.status,
+        isFree: course.isFree,
         audienceType: course.audienceType,
         thumbnailUrl: course.thumbnailUrl,
         introductoryVideoUrl: course.introductoryVideoUrl,
@@ -296,6 +298,7 @@ export class CoursesService {
         title: dto.title,
         description: dto.description,
         audienceType: dto.audienceType,
+        isFree: dto.isFree,
       },
     });
   }

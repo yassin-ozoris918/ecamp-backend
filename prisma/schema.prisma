@@ -129,6 +129,7 @@ model Course {
   introductoryVideoMedia   Media?         @relation("CourseVideo", fields: [introductoryVideoMediaId], references: [id], onDelete: SetNull)
   audienceType             EducationLevel @default(HIGH_SCHOOL)
   validityDays             Int?
+  isFree                   Boolean        @default(false)
   status                   CourseStatus   @default(DRAFT)
   createdAt                DateTime       @default(now())
   updatedAt                DateTime       @updatedAt

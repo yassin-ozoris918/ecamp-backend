@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsOptional, IsString, IsEnum } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsEnum, IsBoolean } from 'class-validator';
 import { EducationLevel } from '@prisma/client';
 
 export class CreateCourseDto {
@@ -13,4 +13,8 @@ export class CreateCourseDto {
   @IsOptional()
   @IsString()
   description?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isFree?: boolean;
 }
