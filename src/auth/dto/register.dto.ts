@@ -7,21 +7,25 @@ import {
   IsOptional,
   IsEnum,
   Matches,
+  MaxLength,
 } from 'class-validator';
 import { EducationLevel } from '@prisma/client';
 
 export class RegisterDto {
-  @IsNotEmpty()
-  @IsString()
+  @IsNotEmpty({ message: 'auth.errors.nameRequired' })
+  @IsString({ message: 'auth.errors.nameInvalid' })
+  @MinLength(3, { message: 'auth.errors.nameTooShort' })
+  @MaxLength(50, { message: 'auth.errors.nameTooLong' })
   fullName: string;
 
-  @IsNotEmpty()
-  @IsEmail()
+  @IsNotEmpty({ message: 'auth.errors.emailRequired' })
+  @IsEmail({}, { message: 'auth.errors.invalidEmail' })
   email: string;
 
-  @IsNotEmpty()
-  @IsString()
-  @MinLength(6, { message: 'Password must be at least 6 characters long' })
+  @IsNotEmpty({ message: 'auth.errors.passwordRequired' })
+  @IsString({ message: 'auth.errors.passwordInvalid' })
+  @MinLength(8, { message: 'auth.errors.passwordTooShort' })
+  @Matches(/^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d!@#$%^&*()_+={}\[\]:;"'<>,.?/\\|-]{8,}$/, { message: 'auth.errors.passwordCriteria' })
   password: string;
 
   @IsEnum(EducationLevel)
@@ -30,7 +34,7 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   @Matches(/^01[0125][0-9]{8}$/, {
-    message: 'Invalid Egyptian phone number format',
+    message: 'auth.errors.invalidPhone',
   })
   phoneNumber?: string;
 
@@ -40,10 +44,10 @@ export class RegisterDto {
   )
   @IsString()
   @IsNotEmpty({
-    message: 'Parent phone number is required for High School students.',
+    message: 'auth.errors.parentPhoneRequired',
   })
   @Matches(/^01[0125][0-9]{8}$/, {
-    message: 'Invalid Egyptian parent phone number format',
+    message: 'auth.errors.invalidParentPhone',
   })
   parentPhoneNumber?: string;
 

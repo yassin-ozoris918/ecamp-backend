@@ -28,11 +28,11 @@ export class AuthService {
     });
 
     if (existingUser) {
-      throw new BadRequestException('Email already in use');
+      throw new BadRequestException('auth.errors.emailAlreadyInUse');
     }
 
     if (dto.phoneNumber && dto.parentPhoneNumber && dto.phoneNumber.trim() === dto.parentPhoneNumber.trim()) {
-      throw new BadRequestException('Student and parent phone numbers cannot be the same');
+      throw new BadRequestException('auth.errors.duplicatePhoneError');
     }
 
     const hashedPassword = await this.hashData(dto.password);
@@ -58,7 +58,7 @@ export class AuthService {
       });
     } catch (error: any) {
       if (error?.code === 'P2002') {
-        throw new BadRequestException('This email is already registered. If you deleted your account, please use a different email or contact support.');
+        throw new BadRequestException('auth.errors.emailAlreadyInUse');
       }
       throw error;
     }
@@ -129,24 +129,23 @@ export class AuthService {
       where: { email: dto.email },
     });
 
-    if (!user || !user.isActive) throw new ForbiddenException('Access Denied');
+    if (!user) throw new ForbiddenException('auth.errors.invalidCredentials');
+    if (!user.isActive) throw new ForbiddenException('auth.errors.accountPending');
 
     const passwordMatches = await bcrypt.compare(dto.password, user.password);
-    if (!passwordMatches) throw new ForbiddenException('Access Denied');
+    if (!passwordMatches) throw new ForbiddenException('auth.errors.invalidCredentials');
 
     // --- DEVICE BINDING LOGIC (STUDENTS ONLY) ---
     if (user.role === Role.STUDENT) {
       const finalDeviceId = headerDeviceId || dto.deviceId;
       
       if (!finalDeviceId) {
-        throw new ForbiddenException('Device fingerprint is required for student login.');
+        throw new ForbiddenException('auth.errors.deviceRequired');
       }
 
       // Scenario B check must happen before the transaction (throws)
       if (user.deviceId && user.deviceId !== finalDeviceId) {
-        throw new ForbiddenException(
-          'Unrecognized Device. You can only log in from your registered device. Please contact ecamp\'s technical support to request a device reset.'
-        );
+        throw new ForbiddenException('auth.errors.unrecognizedDevice');
       }
 
       await this.prisma.$transaction(async (tx) => {
