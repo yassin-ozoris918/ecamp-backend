@@ -237,7 +237,7 @@ export class AuthService {
     });
   }
 
-  async refreshTokens(userId: string, refreshToken: string) {
+  async refreshTokens(userId: string, refreshToken: string, deviceIdHeader?: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -247,6 +247,15 @@ export class AuthService {
 
     if (!user.isActive) {
       throw new ForbiddenException('Account is suspended');
+    }
+
+    if (user.role === Role.STUDENT) {
+      if (!deviceIdHeader) {
+        throw new ForbiddenException('Device ID is missing from request.');
+      }
+      if (user.deviceId && user.deviceId !== deviceIdHeader) {
+        throw new ForbiddenException('auth.errors.unrecognizedDevice');
+      }
     }
 
     const rtMatches = await bcrypt.compare(refreshToken, user.refreshToken);

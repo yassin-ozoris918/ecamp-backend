@@ -82,9 +82,11 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   refreshTokens(@Req() req: RequestWithUser) {
     const user = req.user;
+    const deviceIdHeader = req.headers['x-device-id'] as string;
     return this.authService.refreshTokens(
       user.sub,
       user.refreshToken as string,
+      deviceIdHeader
     );
   }
 
