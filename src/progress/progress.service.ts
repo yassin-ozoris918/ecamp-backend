@@ -536,7 +536,7 @@ export class ProgressService {
       const access = accesses.find((a) => a.lectureId === l.id);
 
       let isUnlocked = course.isFree || !!access || !!courseAccess;
-      let isStarted = access ? access.isStarted : false;
+      const isStarted = access ? access.isStarted : false;
       let isExpired = false;
 
       if (!course.isFree) {

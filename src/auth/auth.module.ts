@@ -7,14 +7,17 @@ import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 // Make sure to import your Prisma module or service here
 import { PrismaModule } from '../prisma/prisma.module';
 import { StorageModule } from '../storage/storage.module';
+import { SettingsModule } from '../settings/settings.module';
+import { MaintenancePolicy } from './policies/maintenance.policy';
 
 @Module({
   imports: [
     PrismaModule,
     StorageModule,
+    SettingsModule,
     JwtModule.register({}), // We don't set secrets here because the strategies handle them dynamically
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, JwtRefreshStrategy],
+  providers: [AuthService, JwtStrategy, JwtRefreshStrategy, MaintenancePolicy],
 })
 export class AuthModule {}

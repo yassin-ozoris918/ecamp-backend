@@ -1,15 +1,17 @@
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Role } from '@prisma/client';
 import { PrismaService } from '../../prisma/prisma.service';
+import { SettingsService } from '../../settings/settings.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
   constructor(
     private configService: ConfigService,
     private prisma: PrismaService,
+    private settingsService: SettingsService,
   ) {
     const secret = configService.get<string>('JWT_ACCESS_SECRET');
     if (!secret) {
@@ -33,6 +35,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Your account has been suspended.');
+    }
+
+    if (user.role !== Role.ADMIN) {
+      const isMaintenance = await this.settingsService.get('maintenance_mode');
+      if (isMaintenance) {
+        throw new ServiceUnavailableException({
+          code: 'MAINTENANCE_MODE',
+          message: 'Platform is currently under maintenance.',
+        });
+      }
     }
 
     return {

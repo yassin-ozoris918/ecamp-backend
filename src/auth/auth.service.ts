@@ -11,6 +11,7 @@ import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
 import { Role } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { MaintenancePolicy } from './policies/maintenance.policy';
 
 @Injectable()
 export class AuthService {
@@ -19,9 +20,12 @@ export class AuthService {
     private jwtService: JwtService,
     private configService: ConfigService,
     private eventEmitter: EventEmitter2,
+    private maintenancePolicy: MaintenancePolicy,
   ) {}
 
   async register(dto: RegisterDto, ipAddress?: string, browser?: string, headerDeviceId?: string) {
+    await this.maintenancePolicy.validateRegistration();
+
     // 1. Check if user exists
     const existingUser = await this.prisma.user.findUnique({
       where: { email: dto.email },
@@ -130,6 +134,9 @@ export class AuthService {
     });
 
     if (!user) throw new ForbiddenException('auth.errors.invalidCredentials');
+
+    await this.maintenancePolicy.validateLogin(user.role);
+
     if (!user.isActive) throw new ForbiddenException('auth.errors.accountPending');
 
     const passwordMatches = await bcrypt.compare(dto.password, user.password);
