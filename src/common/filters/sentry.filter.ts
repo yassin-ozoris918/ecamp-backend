@@ -62,10 +62,16 @@ export class SentryFilter implements ExceptionFilter {
 
     // Determine standard response message
     let message = exception.message || 'Internal server error';
+    let code: string | undefined = undefined;
     if (exception instanceof HttpException) {
       const resp = exception.getResponse();
-      if (typeof resp === 'object' && (resp as any).message) {
-        message = (resp as any).message;
+      if (typeof resp === 'object') {
+        if ((resp as any).message) {
+          message = (resp as any).message;
+        }
+        if ((resp as any).code) {
+          code = (resp as any).code;
+        }
       }
     }
 
@@ -74,6 +80,7 @@ export class SentryFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
       message,
+      ...(code && { code }),
     });
   }
 }
