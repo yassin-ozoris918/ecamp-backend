@@ -103,36 +103,21 @@ export class CoursesService {
     } else if (role === Role.STUDENT && userId) {
       const dbUser = await this.prisma.user.findUnique({ where: { id: userId } });
       if (dbUser) {
-        whereClause.OR = [
-          {
-            studentAccess: {
-              some: {
-                studentId: userId,
-                OR: [
-                  { expiresAt: null },
-                  { expiresAt: { gt: new Date() } }
-                ]
-              }
-            }
-          },
-          {
-            AND: [
-              { audienceType: dbUser.educationLevel },
-              ...(dbUser.educationLevel === 'HIGH_SCHOOL' ? [
-                { OR: [{ targetHighSchoolSystem: null }, { targetHighSchoolSystem: dbUser.highSchoolSystem }] },
-                { OR: [{ targetStudyMode: null }, { targetStudyMode: dbUser.studyMode }] },
-                { OR: [{ targetStudyLanguage: null }, { targetStudyLanguage: dbUser.studyLanguage }] },
-                { OR: [{ targetHighSchoolGrade: null }, { targetHighSchoolGrade: dbUser.highSchoolGrade }] },
-                { OR: [{ targetTraditionalBranch: null }, { targetTraditionalBranch: dbUser.traditionalBranch }] },
-                { OR: [{ targetBaccalaureatePath: null }, { targetBaccalaureatePath: dbUser.baccalaureatePath }] },
-              ] : [
-                { OR: [{ targetUniversity: null }, { targetUniversity: dbUser.university }] },
-                { OR: [{ targetFaculty: null }, { targetFaculty: dbUser.faculty }] },
-                { OR: [{ targetDepartment: null }, { targetDepartment: dbUser.department }] },
-                { OR: [{ targetAcademicYear: null }, { targetAcademicYear: dbUser.academicYear }] },
-              ])
-            ]
-          }
+        whereClause.AND = [
+          { audienceType: dbUser.educationLevel },
+          ...(dbUser.educationLevel === 'HIGH_SCHOOL' ? [
+            { OR: [{ targetHighSchoolSystem: null }, { targetHighSchoolSystem: dbUser.highSchoolSystem }] },
+            { OR: [{ targetStudyMode: null }, { targetStudyMode: dbUser.studyMode }] },
+            { OR: [{ targetStudyLanguage: null }, { targetStudyLanguage: dbUser.studyLanguage }] },
+            { OR: [{ targetHighSchoolGrade: null }, { targetHighSchoolGrade: dbUser.highSchoolGrade }] },
+            { OR: [{ targetTraditionalBranch: null }, { targetTraditionalBranch: dbUser.traditionalBranch }] },
+            { OR: [{ targetBaccalaureatePath: null }, { targetBaccalaureatePath: dbUser.baccalaureatePath }] },
+          ] : [
+            { OR: [{ targetUniversity: null }, { targetUniversity: dbUser.university }] },
+            { OR: [{ targetFaculty: null }, { targetFaculty: dbUser.faculty }] },
+            { OR: [{ targetDepartment: null }, { targetDepartment: dbUser.department }] },
+            { OR: [{ targetAcademicYear: null }, { targetAcademicYear: dbUser.academicYear }] },
+          ])
         ];
       }
     }
@@ -505,7 +490,6 @@ export class CoursesService {
   async getCoursesForStudent(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { educationLevel: true },
     });
 
     if (!user) {
@@ -515,7 +499,22 @@ export class CoursesService {
     return this.prisma.course.findMany({
       where: {
         status: 'PUBLISHED',
-        audienceType: user.educationLevel,
+        AND: [
+          { audienceType: user.educationLevel },
+          ...(user.educationLevel === 'HIGH_SCHOOL' ? [
+            { OR: [{ targetHighSchoolSystem: null }, { targetHighSchoolSystem: user.highSchoolSystem }] },
+            { OR: [{ targetStudyMode: null }, { targetStudyMode: user.studyMode }] },
+            { OR: [{ targetStudyLanguage: null }, { targetStudyLanguage: user.studyLanguage }] },
+            { OR: [{ targetHighSchoolGrade: null }, { targetHighSchoolGrade: user.highSchoolGrade }] },
+            { OR: [{ targetTraditionalBranch: null }, { targetTraditionalBranch: user.traditionalBranch }] },
+            { OR: [{ targetBaccalaureatePath: null }, { targetBaccalaureatePath: user.baccalaureatePath }] },
+          ] : [
+            { OR: [{ targetUniversity: null }, { targetUniversity: user.university }] },
+            { OR: [{ targetFaculty: null }, { targetFaculty: user.faculty }] },
+            { OR: [{ targetDepartment: null }, { targetDepartment: user.department }] },
+            { OR: [{ targetAcademicYear: null }, { targetAcademicYear: user.academicYear }] },
+          ])
+        ]
       },
       include: {
         instructors: {

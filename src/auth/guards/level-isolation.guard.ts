@@ -69,20 +69,6 @@ export class LevelIsolationGuard implements CanActivate {
         return false;
       }
 
-      // Check for existing entitlements (bypasses discovery/segmentation targeting)
-      const hasAccess = await this.prisma.studentCourseAccess.findUnique({
-        where: {
-          studentId_courseId: {
-            studentId: user.sub || user.id,
-            courseId: courseId,
-          }
-        }
-      });
-
-      // If they already bought/activated the course, let them in regardless of current segmentation rules
-      if (hasAccess && (!hasAccess.expiresAt || hasAccess.expiresAt > new Date())) {
-        return true;
-      }
 
       // 3. Evaluate Targeting Rules
       if (dbUser.educationLevel !== fullCourse.audienceType) {
