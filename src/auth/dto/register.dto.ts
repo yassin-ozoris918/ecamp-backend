@@ -9,7 +9,15 @@ import {
   Matches,
   MaxLength,
 } from 'class-validator';
-import { EducationLevel } from '@prisma/client';
+import { 
+  EducationLevel, 
+  HighSchoolSystem, 
+  StudyMode, 
+  StudyLanguage, 
+  HighSchoolGrade, 
+  TraditionalBranch, 
+  BaccalaureatePath 
+} from '@prisma/client';
 
 export class RegisterDto {
   @IsNotEmpty({ message: 'auth.errors.nameRequired' })
@@ -58,4 +66,63 @@ export class RegisterDto {
   @IsOptional()
   @IsString()
   deviceId?: string;
+
+  // --- High School Dimensions ---
+  @ValidateIf((o: RegisterDto) => o.educationLevel === EducationLevel.HIGH_SCHOOL)
+  @IsEnum(HighSchoolSystem)
+  @IsNotEmpty()
+  highSchoolSystem?: HighSchoolSystem;
+
+  @ValidateIf((o: RegisterDto) => o.educationLevel === EducationLevel.HIGH_SCHOOL)
+  @IsEnum(StudyMode)
+  @IsNotEmpty()
+  studyMode?: StudyMode;
+
+  @ValidateIf((o: RegisterDto) => o.educationLevel === EducationLevel.HIGH_SCHOOL)
+  @IsEnum(StudyLanguage)
+  @IsNotEmpty()
+  studyLanguage?: StudyLanguage;
+
+  @ValidateIf((o: RegisterDto) => o.educationLevel === EducationLevel.HIGH_SCHOOL)
+  @IsEnum(HighSchoolGrade)
+  @IsNotEmpty()
+  highSchoolGrade?: HighSchoolGrade;
+
+  @ValidateIf((o: RegisterDto) => 
+    o.educationLevel === EducationLevel.HIGH_SCHOOL && 
+    o.highSchoolSystem === HighSchoolSystem.TRADITIONAL && 
+    (o.highSchoolGrade === HighSchoolGrade.GRADE_2 || o.highSchoolGrade === HighSchoolGrade.GRADE_3)
+  )
+  @IsEnum(TraditionalBranch)
+  @IsNotEmpty()
+  traditionalBranch?: TraditionalBranch;
+
+  @ValidateIf((o: RegisterDto) => 
+    o.educationLevel === EducationLevel.HIGH_SCHOOL && 
+    o.highSchoolSystem === HighSchoolSystem.BACCALAUREATE && 
+    (o.highSchoolGrade === HighSchoolGrade.GRADE_2 || o.highSchoolGrade === HighSchoolGrade.GRADE_3)
+  )
+  @IsEnum(BaccalaureatePath)
+  @IsNotEmpty()
+  baccalaureatePath?: BaccalaureatePath;
+
+  // --- University Dimensions ---
+  @ValidateIf((o: RegisterDto) => o.educationLevel === EducationLevel.UNIVERSITY)
+  @IsString()
+  @IsOptional()
+  university?: string;
+
+  @ValidateIf((o: RegisterDto) => o.educationLevel === EducationLevel.UNIVERSITY)
+  @IsString()
+  @IsOptional()
+  faculty?: string;
+
+  @ValidateIf((o: RegisterDto) => o.educationLevel === EducationLevel.UNIVERSITY)
+  @IsString()
+  @IsOptional()
+  department?: string;
+
+  @IsString()
+  @IsOptional()
+  academicYear?: string;
 }

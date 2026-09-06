@@ -1,6 +1,7 @@
 import {
   Controller,
   Post,
+  Patch,
   Get,
   UseGuards,
   UseInterceptors,
@@ -62,13 +63,23 @@ export class UsersController {
     );
   }
 
-  @Post('profile')
+  @Patch('profile')
   async updateProfile(
     @Body()
     body: {
       fullName?: string;
       phoneNumber?: string;
       parentPhoneNumber?: string;
+      highSchoolSystem?: any;
+      studyMode?: any;
+      studyLanguage?: any;
+      highSchoolGrade?: any;
+      traditionalBranch?: any;
+      baccalaureatePath?: any;
+      university?: string;
+      faculty?: string;
+      department?: string;
+      academicYear?: string;
     },
     @Req() req: RequestWithUser,
   ) {

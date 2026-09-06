@@ -59,6 +59,41 @@ enum CourseStatus {
   ARCHIVED
 }
 
+enum HighSchoolSystem {
+  TRADITIONAL
+  BACCALAUREATE
+}
+
+enum StudyMode {
+  ONLINE
+  CENTER
+}
+
+enum StudyLanguage {
+  ARABIC
+  ENGLISH
+}
+
+enum HighSchoolGrade {
+  GRADE_1
+  GRADE_2
+  GRADE_3
+}
+
+enum TraditionalBranch {
+  SCIENCE
+  SCIENCE_BIOLOGY
+  SCIENCE_MATH
+  LITERARY
+}
+
+enum BaccalaureatePath {
+  MEDICINE_AND_LIFE_SCIENCES
+  ENGINEERING_AND_COMPUTER_SCIENCE
+  BUSINESS
+  ARTS_AND_HUMANITIES
+}
+
 model User {
   id                    String         @id @default(uuid())
   fullName              String
@@ -73,6 +108,23 @@ model User {
   educationLevel        EducationLevel @default(UNIVERSITY)
   phoneNumber           String?
   parentPhoneNumber     String? // Required strictly for HIGH_SCHOOL
+
+  // --- High School Dimensions ---
+  highSchoolSystem      HighSchoolSystem?
+  studyMode             StudyMode?
+  studyLanguage         StudyLanguage?
+  highSchoolGrade       HighSchoolGrade?
+  traditionalBranch     TraditionalBranch?
+  baccalaureatePath     BaccalaureatePath?
+
+  // --- University Dimensions ---
+  university            String?
+  faculty               String?
+  department            String?
+
+  // --- Shared / Master Data ---
+  academicYear          String?
+
   refreshToken          String?
   createdAt             DateTime       @default(now())
   updatedAt             DateTime       @updatedAt
@@ -128,6 +180,19 @@ model Course {
   introductoryVideoMediaId String?        @unique
   introductoryVideoMedia   Media?         @relation("CourseVideo", fields: [introductoryVideoMediaId], references: [id], onDelete: SetNull)
   audienceType             EducationLevel @default(HIGH_SCHOOL)
+
+  // --- Segmentation Targeting Additions ---
+  targetHighSchoolSystem   HighSchoolSystem?
+  targetStudyMode          StudyMode?
+  targetStudyLanguage      StudyLanguage?
+  targetHighSchoolGrade    HighSchoolGrade?
+  targetTraditionalBranch  TraditionalBranch?
+  targetBaccalaureatePath  BaccalaureatePath?
+  targetUniversity         String?
+  targetFaculty            String?
+  targetDepartment         String?
+  targetAcademicYear       String?
+
   validityDays             Int?
   isFree                   Boolean        @default(false)
   status                   CourseStatus   @default(DRAFT)
@@ -236,7 +301,7 @@ model Lecture {
   attachments Attachment[]
 
   @@index([courseId])
-  @@index([chapterId])
+@@index([chapterId])
 }
 
 model Session {

@@ -33,7 +33,13 @@ export class UsersProvider implements DataProvider {
 
     const users = await this.prisma.user.findMany({
       where,
-      select: { id: true, fullName: true, email: true, role: true, isActive: true, educationLevel: true, phoneNumber: true, createdAt: true, lastLoginAt: true, xp: true },
+      select: { 
+        id: true, fullName: true, email: true, role: true, isActive: true, 
+        educationLevel: true, highSchoolSystem: true, studyMode: true, studyLanguage: true,
+        highSchoolGrade: true, traditionalBranch: true, baccalaureatePath: true,
+        university: true, faculty: true, department: true, academicYear: true,
+        phoneNumber: true, createdAt: true, lastLoginAt: true, xp: true 
+      },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -45,6 +51,16 @@ export class UsersProvider implements DataProvider {
         { key: 'role', label: 'Role' },
         { key: 'isActive', label: 'Active' },
         { key: 'educationLevel', label: 'Education Level' },
+        { key: 'highSchoolSystem', label: 'High School System' },
+        { key: 'studyMode', label: 'Study Mode' },
+        { key: 'studyLanguage', label: 'Study Language' },
+        { key: 'highSchoolGrade', label: 'High School Grade' },
+        { key: 'traditionalBranch', label: 'Traditional Branch' },
+        { key: 'baccalaureatePath', label: 'Baccalaureate Path' },
+        { key: 'university', label: 'University' },
+        { key: 'faculty', label: 'Faculty' },
+        { key: 'department', label: 'Department' },
+        { key: 'academicYear', label: 'Academic Year' },
         { key: 'phoneNumber', label: 'Phone' },
         { key: 'createdAt', label: 'Created At' },
         { key: 'lastLoginAt', label: 'Last Login' },

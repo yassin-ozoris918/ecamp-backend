@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import * as PDFKit from 'pdfkit';
+import PDFDocument from 'pdfkit';
 import type { Response } from 'express';
 import { ExportStrategy } from '../interfaces/export-strategy.interface';
 
@@ -15,7 +15,7 @@ export class PdfStrategy implements ExportStrategy {
     filename: string,
     res: Response,
   ): Promise<void> {
-    const doc = new PDFKit({ margin: 30, size: 'A4', layout: 'landscape' });
+    const doc = new PDFDocument({ margin: 30, size: 'A4', layout: 'landscape' });
 
     res.setHeader('Content-Type', this.mimeType);
     res.setHeader('Content-Disposition', `attachment; filename="${filename}.${this.extension}"`);

@@ -37,17 +37,70 @@ export class LevelIsolationGuard implements CanActivate {
         throw new ForbiddenException('You cannot access draft courses.');
       }
 
-      // 2. Education Level Isolation check for students
-      // We must fetch the user's education level to be safe, since it might not be in the JWT
+      // 2. Education Level & Segmentation Isolation check for students
+      // Fetch the user's education level and segmentation details
       const dbUser = await this.prisma.user.findUnique({
         where: { id: user.sub || user.id },
-        select: { educationLevel: true },
+        select: { 
+          educationLevel: true,
+          highSchoolSystem: true,
+          studyMode: true,
+          studyLanguage: true,
+          highSchoolGrade: true,
+          traditionalBranch: true,
+          baccalaureatePath: true,
+          university: true,
+          faculty: true,
+          department: true,
+          academicYear: true,
+        },
       });
 
-      if (dbUser && dbUser.educationLevel !== course.audienceType) {
-        throw new ForbiddenException(
-          'You are not authorized to view courses outside of your education level.',
-        );
+      if (!dbUser) {
+        return false;
+      }
+
+      // Re-fetch the full course with targeting fields
+      const fullCourse = await this.prisma.course.findUnique({
+        where: { id: courseId },
+      });
+
+      if (!fullCourse) {
+        return false;
+      }
+
+      // Check for existing entitlements (bypasses discovery/segmentation targeting)
+      const hasAccess = await this.prisma.studentCourseAccess.findUnique({
+        where: {
+          studentId_courseId: {
+            studentId: user.sub || user.id,
+            courseId: courseId,
+          }
+        }
+      });
+
+      // If they already bought/activated the course, let them in regardless of current segmentation rules
+      if (hasAccess && (!hasAccess.expiresAt || hasAccess.expiresAt > new Date())) {
+        return true;
+      }
+
+      // 3. Evaluate Targeting Rules
+      if (dbUser.educationLevel !== fullCourse.audienceType) {
+        throw new ForbiddenException('You are not authorized to view courses outside of your education level.');
+      }
+
+      if (fullCourse.audienceType === 'HIGH_SCHOOL') {
+        if (fullCourse.targetHighSchoolSystem && fullCourse.targetHighSchoolSystem !== dbUser.highSchoolSystem) throw new ForbiddenException('Course restricted by educational system.');
+        if (fullCourse.targetStudyMode && fullCourse.targetStudyMode !== dbUser.studyMode) throw new ForbiddenException('Course restricted by study mode.');
+        if (fullCourse.targetStudyLanguage && fullCourse.targetStudyLanguage !== dbUser.studyLanguage) throw new ForbiddenException('Course restricted by study language.');
+        if (fullCourse.targetHighSchoolGrade && fullCourse.targetHighSchoolGrade !== dbUser.highSchoolGrade) throw new ForbiddenException('Course restricted by grade.');
+        if (fullCourse.targetTraditionalBranch && fullCourse.targetTraditionalBranch !== dbUser.traditionalBranch) throw new ForbiddenException('Course restricted by branch.');
+        if (fullCourse.targetBaccalaureatePath && fullCourse.targetBaccalaureatePath !== dbUser.baccalaureatePath) throw new ForbiddenException('Course restricted by path.');
+      } else if (fullCourse.audienceType === 'UNIVERSITY') {
+        if (fullCourse.targetUniversity && fullCourse.targetUniversity !== dbUser.university) throw new ForbiddenException('Course restricted by university.');
+        if (fullCourse.targetFaculty && fullCourse.targetFaculty !== dbUser.faculty) throw new ForbiddenException('Course restricted by faculty.');
+        if (fullCourse.targetDepartment && fullCourse.targetDepartment !== dbUser.department) throw new ForbiddenException('Course restricted by department.');
+        if (fullCourse.targetAcademicYear && fullCourse.targetAcademicYear !== dbUser.academicYear) throw new ForbiddenException('Course restricted by academic year.');
       }
     }
 
