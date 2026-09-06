@@ -6,7 +6,9 @@ import {
   IsBoolean,
   IsUrl,
   Min,
+  IsEnum,
 } from 'class-validator';
+import { VideoProvider } from '@prisma/client';
 
 export class CreateSessionDto {
   @IsNotEmpty()
@@ -24,6 +26,14 @@ export class CreateSessionDto {
   @IsOptional()
   @IsUrl()
   videoUrl?: string;
+
+  @IsOptional()
+  @IsEnum(VideoProvider)
+  videoProvider?: VideoProvider;
+
+  @IsOptional()
+  @IsString()
+  amaanVideoId?: string;
 
   @IsOptional()
   @IsNumber()

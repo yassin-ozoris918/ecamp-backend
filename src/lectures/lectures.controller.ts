@@ -11,7 +11,9 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { imageFileFilter, UPLOAD_LIMITS } from '../common/config/upload.config';
 import { StorageService } from '../storage/storage.service';
@@ -46,9 +48,15 @@ export class LecturesController {
   @Roles(Role.STUDENT)
   @UseGuards(DeviceRestrictionGuard)
   @Get('sessions/:id/stream-token')
-  getSecureStreamToken(@Param('id') id: string, @Req() req: RequestWithUser) {
+  async getSecureStreamToken(@Param('id') id: string, @Req() req: RequestWithUser, @Res({ passthrough: true }) res: Response) {
     const user = req.user;
-    return this.lecturesService.getSecureStreamToken(id, user.sub);
+    const result = await this.lecturesService.getSecureStreamToken(id, user.sub);
+    
+    if ('provider' in result && result.provider === 'AMAAN') {
+      res.setHeader('Cache-Control', 'no-store');
+    }
+    
+    return result;
   }
 
   @Get('course/:courseId')

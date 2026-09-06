@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { Role } from '@prisma/client';
+import { validateCourseTargeting } from '../common/utils/segmentation-validation.util';
 @Injectable()
 export class CoursesService {
   constructor(private prisma: PrismaService) {}
@@ -31,12 +32,34 @@ export class CoursesService {
   }
 
   async create(dto: CreateCourseDto, instructorId: string, role: Role) {
+    const normalize = (val: any) => (val === null || val === '') ? null : val;
+    const finalState = {
+      highSchoolSystem: dto.targetHighSchoolSystem !== undefined ? normalize(dto.targetHighSchoolSystem) : null,
+      studyMode: dto.targetStudyMode !== undefined ? normalize(dto.targetStudyMode) : null,
+      studyLanguage: dto.targetStudyLanguage !== undefined ? normalize(dto.targetStudyLanguage) : null,
+      highSchoolGrade: dto.targetHighSchoolGrade !== undefined ? normalize(dto.targetHighSchoolGrade) : null,
+      traditionalBranch: dto.targetTraditionalBranch !== undefined ? normalize(dto.targetTraditionalBranch) : null,
+      baccalaureatePath: dto.targetBaccalaureatePath !== undefined ? normalize(dto.targetBaccalaureatePath) : null,
+    };
+
+    validateCourseTargeting(finalState);
+
     return this.prisma.course.create({
       data: {
         title: dto.title,
         description: dto.description,
         audienceType: dto.audienceType,
         isFree: dto.isFree || false,
+        targetHighSchoolSystem: finalState.highSchoolSystem,
+        targetStudyMode: finalState.studyMode,
+        targetStudyLanguage: finalState.studyLanguage,
+        targetHighSchoolGrade: finalState.highSchoolGrade,
+        targetTraditionalBranch: finalState.traditionalBranch,
+        targetBaccalaureatePath: finalState.baccalaureatePath,
+        targetUniversity: dto.targetUniversity !== undefined ? normalize(dto.targetUniversity) : null,
+        targetFaculty: dto.targetFaculty !== undefined ? normalize(dto.targetFaculty) : null,
+        targetDepartment: dto.targetDepartment !== undefined ? normalize(dto.targetDepartment) : null,
+        targetAcademicYear: dto.targetAcademicYear !== undefined ? normalize(dto.targetAcademicYear) : null,
         ...(role === Role.INSTRUCTOR && {
           instructors: {
             create: {
@@ -77,12 +100,57 @@ export class CoursesService {
       whereClause.instructors = {
         some: { instructorId: userId },
       };
+    } else if (role === Role.STUDENT && userId) {
+      const dbUser = await this.prisma.user.findUnique({ where: { id: userId } });
+      if (dbUser) {
+        whereClause.OR = [
+          {
+            studentAccess: {
+              some: {
+                studentId: userId,
+                OR: [
+                  { expiresAt: null },
+                  { expiresAt: { gt: new Date() } }
+                ]
+              }
+            }
+          },
+          {
+            AND: [
+              { audienceType: dbUser.educationLevel },
+              ...(dbUser.educationLevel === 'HIGH_SCHOOL' ? [
+                { OR: [{ targetHighSchoolSystem: null }, { targetHighSchoolSystem: dbUser.highSchoolSystem }] },
+                { OR: [{ targetStudyMode: null }, { targetStudyMode: dbUser.studyMode }] },
+                { OR: [{ targetStudyLanguage: null }, { targetStudyLanguage: dbUser.studyLanguage }] },
+                { OR: [{ targetHighSchoolGrade: null }, { targetHighSchoolGrade: dbUser.highSchoolGrade }] },
+                { OR: [{ targetTraditionalBranch: null }, { targetTraditionalBranch: dbUser.traditionalBranch }] },
+                { OR: [{ targetBaccalaureatePath: null }, { targetBaccalaureatePath: dbUser.baccalaureatePath }] },
+              ] : [
+                { OR: [{ targetUniversity: null }, { targetUniversity: dbUser.university }] },
+                { OR: [{ targetFaculty: null }, { targetFaculty: dbUser.faculty }] },
+                { OR: [{ targetDepartment: null }, { targetDepartment: dbUser.department }] },
+                { OR: [{ targetAcademicYear: null }, { targetAcademicYear: dbUser.academicYear }] },
+              ])
+            ]
+          }
+        ];
+      }
     }
+
     if (search) {
-      whereClause.OR = [
+      const searchOr = [
         { title: { contains: search, mode: 'insensitive' } },
         { description: { contains: search, mode: 'insensitive' } },
       ];
+      if (whereClause.OR) {
+        whereClause.AND = [
+          { OR: whereClause.OR },
+          { OR: searchOr }
+        ];
+        delete whereClause.OR;
+      } else {
+        whereClause.OR = searchOr;
+      }
     }
     if (isPublished !== undefined) {
       whereClause.status = isPublished ? 'PUBLISHED' : 'DRAFT';
@@ -290,8 +358,22 @@ export class CoursesService {
     instructorId: string,
     role: Role,
   ) {
-    await this.findOne(id);
+    const course = await this.findOne(id);
     await this.verifyCourseOwnership(id, instructorId, role);
+    
+    const normalize = (val: any) => val === '' ? null : val;
+
+    const finalState: any = {
+      highSchoolSystem: dto.targetHighSchoolSystem !== undefined ? normalize(dto.targetHighSchoolSystem) : course.targetHighSchoolSystem,
+      studyMode: dto.targetStudyMode !== undefined ? normalize(dto.targetStudyMode) : course.targetStudyMode,
+      studyLanguage: dto.targetStudyLanguage !== undefined ? normalize(dto.targetStudyLanguage) : course.targetStudyLanguage,
+      highSchoolGrade: dto.targetHighSchoolGrade !== undefined ? normalize(dto.targetHighSchoolGrade) : course.targetHighSchoolGrade,
+      traditionalBranch: dto.targetTraditionalBranch !== undefined ? normalize(dto.targetTraditionalBranch) : course.targetTraditionalBranch,
+      baccalaureatePath: dto.targetBaccalaureatePath !== undefined ? normalize(dto.targetBaccalaureatePath) : course.targetBaccalaureatePath,
+    };
+
+    validateCourseTargeting(finalState);
+
     return this.prisma.course.update({
       where: { id },
       data: {
@@ -299,6 +381,16 @@ export class CoursesService {
         description: dto.description,
         audienceType: dto.audienceType,
         isFree: dto.isFree,
+        targetHighSchoolSystem: finalState.highSchoolSystem,
+        targetStudyMode: finalState.studyMode,
+        targetStudyLanguage: finalState.studyLanguage,
+        targetHighSchoolGrade: finalState.highSchoolGrade,
+        targetTraditionalBranch: finalState.traditionalBranch,
+        targetBaccalaureatePath: finalState.baccalaureatePath,
+        targetUniversity: dto.targetUniversity !== undefined ? normalize(dto.targetUniversity) : course.targetUniversity,
+        targetFaculty: dto.targetFaculty !== undefined ? normalize(dto.targetFaculty) : course.targetFaculty,
+        targetDepartment: dto.targetDepartment !== undefined ? normalize(dto.targetDepartment) : course.targetDepartment,
+        targetAcademicYear: dto.targetAcademicYear !== undefined ? normalize(dto.targetAcademicYear) : course.targetAcademicYear,
       },
     });
   }

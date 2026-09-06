@@ -20,6 +20,16 @@ export class AdminService {
       dateFrom,
       dateTo,
       includeDeleted,
+      highSchoolSystem,
+      studyMode,
+      studyLanguage,
+      highSchoolGrade,
+      traditionalBranch,
+      baccalaureatePath,
+      university,
+      faculty,
+      department,
+      academicYear,
       sortBy = 'createdAt',
       sortOrder = 'desc',
       skip = 0,
@@ -40,6 +50,16 @@ export class AdminService {
 
     if (role) where.role = role;
     if (educationLevel) where.educationLevel = educationLevel;
+    if (highSchoolSystem) where.highSchoolSystem = highSchoolSystem;
+    if (studyMode) where.studyMode = studyMode;
+    if (studyLanguage) where.studyLanguage = studyLanguage;
+    if (highSchoolGrade) where.highSchoolGrade = highSchoolGrade;
+    if (traditionalBranch) where.traditionalBranch = traditionalBranch;
+    if (baccalaureatePath) where.baccalaureatePath = baccalaureatePath;
+    if (university) where.university = university;
+    if (faculty) where.faculty = faculty;
+    if (department) where.department = department;
+    if (academicYear) where.academicYear = academicYear;
     if (isActive !== undefined) where.isActive = isActive;
 
     // Date range filter
@@ -77,6 +97,16 @@ export class AdminService {
           parentPhoneNumber: true,
           deviceId: true,
           profilePictureUrl: true,
+          highSchoolSystem: true,
+          studyMode: true,
+          studyLanguage: true,
+          highSchoolGrade: true,
+          traditionalBranch: true,
+          baccalaureatePath: true,
+          university: true,
+          faculty: true,
+          department: true,
+          academicYear: true,
         },
         orderBy: { [sortBy]: sortOrder },
         skip,

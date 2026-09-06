@@ -6,14 +6,16 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLectureDto } from './dto/create-lecture.dto';
-import { Role } from '@prisma/client';
+import { Role, VideoProvider } from '@prisma/client';
 import { CloudflareService } from '../cloudflare/cloudflare.service';
+import { AmaanService } from '../amaan/amaan.service';
 
 @Injectable()
 export class LecturesService {
   constructor(
     private prisma: PrismaService,
     private cloudflareService: CloudflareService,
+    private amaanService: AmaanService,
   ) {}
 
   // Verifies the user is assigned to this specific course
@@ -254,6 +256,22 @@ export class LecturesService {
       if (access.expiresAt && new Date() > access.expiresAt) {
         throw new ForbiddenException('Your access to this lecture has expired.');
       }
+    }
+
+    if (session.videoProvider === VideoProvider.AMAAN) {
+      if (!session.amaanVideoId) {
+        throw new NotFoundException('Video configuration is missing for this session');
+      }
+
+      // Generate a unique watermark identifier using the trusted user context
+      const wid = `user_${studentId}_session_${sessionId}`;
+      const amaanResponse = await this.amaanService.generateOtp(session.amaanVideoId, wid);
+
+      return {
+        provider: 'AMAAN',
+        otp: amaanResponse.otp,
+        playbackInfo: amaanResponse.playbackInfo,
+      };
     }
 
     if (!session.videoUrl) {
