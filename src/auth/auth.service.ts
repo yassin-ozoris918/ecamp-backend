@@ -3,6 +3,8 @@ import {
   Injectable,
   BadRequestException,
 } from '@nestjs/common';
+import * as fs from 'fs';
+import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -156,6 +158,35 @@ export class AuthService {
     if (user.role === Role.STUDENT) {
       const finalDeviceId = headerDeviceId || dto.deviceId;
       
+      try {
+        const logPath = path.join(process.cwd(), 'device-issues.log');
+        
+        if (fs.existsSync(logPath)) {
+          const stats = fs.statSync(logPath);
+          const daysOld = (Date.now() - stats.birthtimeMs) / (1000 * 60 * 60 * 24);
+          if (daysOld > 60) {
+            fs.unlinkSync(logPath); 
+          }
+        }
+        
+        const logData = {
+          timestamp: new Date().toISOString(),
+          studentEmail: user.email,
+          studentId: user.id,
+          expectedDeviceId: user.deviceId,
+          receivedFinalId: finalDeviceId,
+          rawHeaderDeviceId: headerDeviceId || null,
+          rawDtoDeviceId: dto.deviceId || null,
+          ipAddress: ipAddress || 'Unknown',
+          browserAgent: browser || 'Unknown',
+          isMatch: user.deviceId === finalDeviceId
+        };
+
+        fs.appendFileSync(logPath, JSON.stringify(logData) + '\n');
+      } catch (e) {
+        console.error('Failed to write device log:', e);
+      }
+
       if (!finalDeviceId) {
         throw new ForbiddenException('auth.errors.deviceRequired');
       }
