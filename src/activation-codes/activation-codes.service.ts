@@ -20,7 +20,13 @@ export class ActivationCodesService {
       whereClause.code = { contains: search, mode: 'insensitive' };
     }
     if (status && status !== 'All') {
-      whereClause.status = status;
+      if (status === 'AVAILABLE') {
+        whereClause.status = 'UNUSED';
+      } else if (status === 'REDEEMED') {
+        whereClause.status = 'REDEEMED';
+      } else if (status === 'DEACTIVATED') {
+        whereClause.deletedAt = { not: null };
+      }
     }
     if (targetType && targetType !== 'All') {
       whereClause.targetType = targetType;
