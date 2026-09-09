@@ -665,22 +665,47 @@ export class AdminService {
       where: { id: studentId, role: Role.STUDENT },
       include: {
         accessedCourses: {
+          where: { deletedAt: null },
           include: {
             course: {
               include: {
-                exams: true,
+                exams: { where: { deletedAt: null } },
                 chapters: {
-                  include: { exams: true, lectures: { include: { sessions: true, quizzes: true, exams: true } } }
+                  where: { deletedAt: null },
+                  include: { 
+                    exams: { where: { deletedAt: null } }, 
+                    lectures: { 
+                      where: { deletedAt: null },
+                      include: { 
+                        sessions: { where: { deletedAt: null } }, 
+                        quizzes: { where: { deletedAt: null } }, 
+                        exams: { where: { deletedAt: null } } 
+                      } 
+                    } 
+                  }
                 },
-                lectures: { include: { sessions: true, quizzes: true, exams: true } }
+                lectures: { 
+                  where: { deletedAt: null },
+                  include: { 
+                    sessions: { where: { deletedAt: null } }, 
+                    quizzes: { where: { deletedAt: null } }, 
+                    exams: { where: { deletedAt: null } } 
+                  } 
+                }
               }
             }
           }
         },
         accessedLectures: {
+          where: { deletedAt: null },
           include: {
             lecture: {
-              include: { sessions: true, quizzes: true, exams: true, course: true }
+              include: { 
+                sessions: { where: { deletedAt: null } }, 
+                quizzes: { where: { deletedAt: null } }, 
+                exams: { where: { deletedAt: null } }, 
+                course: true 
+              }
             }
           }
         },
