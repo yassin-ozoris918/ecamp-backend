@@ -136,6 +136,14 @@ export class AdminController {
     return this.adminService.removeLectureAccess(studentId, lectureId);
   }
 
+  @Post('users/:id/remove-course')
+  async removeCourseAccess(
+    @Param('id') studentId: string,
+    @Body('courseId') courseId: string,
+  ) {
+    return this.adminService.removeCourseAccess(studentId, courseId);
+  }
+
   @Post('users/:id/extend-lecture')
   async extendLectureExpiry(
     @Param('id') studentId: string,
