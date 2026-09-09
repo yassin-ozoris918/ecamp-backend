@@ -318,17 +318,17 @@ export class AdminService {
   async removeLectureAccess(studentId: string, lectureId: string) {
     await this.prisma.studentLectureAccess.updateMany({
       where: { studentId, lectureId, },
-      data: { deletedAt: new Date() },
+      data: { expiresAt: new Date(0), deletedAt: null },
     });
-    return { message: 'Lecture access removed successfully' };
+    return { message: 'Lecture access revoked successfully' };
   }
 
   async removeCourseAccess(studentId: string, courseId: string) {
     await this.prisma.studentCourseAccess.updateMany({
       where: { studentId, courseId },
-      data: { deletedAt: new Date() },
+      data: { expiresAt: new Date(0), deletedAt: null },
     });
-    return { message: 'Course access removed successfully' };
+    return { message: 'Course access revoked successfully' };
   }
 
   async extendLectureExpiry(studentId: string, lectureId: string, extraDays: number) {
