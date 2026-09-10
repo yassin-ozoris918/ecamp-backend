@@ -69,9 +69,10 @@ export class AdminController {
   @Post('users/:id/reset-password')
   async resetPassword(
     @Param('id') id: string,
-    @Body('newPasswordHash') newPasswordHash: string,
+    @Body('newPassword') newPassword: string,
+    @Req() req: RequestWithUser,
   ) {
-    return this.adminService.resetPassword(id, newPasswordHash);
+    return this.adminService.resetPassword(id, newPassword, req.user.sub);
   }
 
   @Post('users/:id/reset-device')

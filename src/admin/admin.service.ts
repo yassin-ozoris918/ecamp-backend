@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { Role, CodeStatus, AttemptStatus } from '@prisma/client';
 import { GetUsersQueryDto } from './dto/get-users-query.dto';
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class AdminService {
@@ -211,13 +212,30 @@ export class AdminService {
     return { message: 'User logged out successfully' };
   }
 
-  async resetPassword(userId: string, newPasswordHash: string) {
+  async resetPassword(userId: string, newPassword: string, adminId: string) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { password: newPasswordHash },
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { 
+          password: hashedPassword,
+          refreshToken: null
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminId,
+          action: 'ADMIN_RESET_PASSWORD',
+          entity: 'User',
+          entityId: userId,
+          details: JSON.stringify({ message: `Admin reset password for user ${userId}` }),
+        },
+      });
     });
 
     return { message: 'Password reset successfully' };
