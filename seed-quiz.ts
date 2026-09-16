@@ -30,15 +30,15 @@ async function main() {
   const essayQuestions = [
     {
       text: "In autonomous driving, why is it necessary to process some data instantly on the vehicle itself using edge computing, rather than sending it to the cloud for judgment? Justify your answer.",
-      referenceAnswer: "To reduce response time (latency) to improve safety, and to ensure functionality even if internet connectivity drops."
+      referenceAnswer: "Because a delay in processing driving data can affect safety (even a small delay can cause an accident); so some data is processed locally on board the vehicle using edge computing to reduce response time and decide instantly, without waiting to send data to the cloud and back."
     },
     {
       text: "Compare Augmented Reality (AR) and Virtual Reality (VR) in terms of each one’s relationship to the real world, giving a brief description of each technology.",
-      referenceAnswer: "AR overlays digital elements onto the real world (keeps user connected to reality). VR immerses the user in a completely computer-generated artificial environment."
+      referenceAnswer: "Augmented Reality (AR): overlays digital information/elements on a real-world scene, with the real world still visible. Virtual Reality (VR): places the user inside a fully computer-generated environment that replaces the real world. Difference: AR augments reality with digital additions, while VR replaces it with a complete virtual environment."
     },
     {
       text: "What is the difference between a classical bit and a qubit? And is quantum computing a general replacement for all traditional computers? Explain your answer.",
-      referenceAnswer: "A classical bit holds one state (0 or 1). A qubit uses superposition (can be both). Quantum computers speed up specific complex calculations but are NOT a general replacement for all traditional computers."
+      referenceAnswer: "A classical bit holds one state at a time (either 0 or 1). A qubit uses the principle of superposition (a combination of 0 and 1 at once). No — quantum computing is not a general replacement for all traditional computers; it is a different approach that may offer an advantage only for certain classes of problems and does not speed up all types of computations."
     }
   ];
 
@@ -217,7 +217,7 @@ async function main() {
       points: 5,
       correctOptionIndex: 0,
       version: QuizQuestionVersion.A,
-      referenceAnswer: "Evaluate if the student accurately describes how their chosen example impacts daily life, industry/economy, or healthcare/education."
+      referenceAnswer: "Accept any logical explanation provided by the student for their chosen example. For example, if they chose 'Paying with a payment app on a smartphone', they can classify it as either (A) Changes in daily life or (B) Changes in industry and the economy, as long as a logical explanation is provided."
     }
   });
 
