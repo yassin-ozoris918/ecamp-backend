@@ -16,7 +16,10 @@ async function main() {
   
   // If not found by ID, try finding by title
   if (!quiz) {
-    quiz = await prisma.quiz.findFirst({ where: { title: identifier } });
+    quiz = await prisma.quiz.findFirst({ 
+      where: { title: identifier, deletedAt: null },
+      orderBy: { createdAt: 'desc' }
+    });
   }
 
   if (!quiz) {
