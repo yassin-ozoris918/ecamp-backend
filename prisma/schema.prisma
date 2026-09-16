@@ -479,7 +479,7 @@ model QuizQuestion {
   type               QuestionType         @default(MCQ)
   options            String[]
   correctOptionIndex Int
-  points             Int                  @default(1)
+  points             Float                @default(1)
   orderIndex         Int                  @default(0)
   version            QuizQuestionVersion  @default(A)
   createdAt          DateTime             @default(now())
@@ -502,7 +502,7 @@ model QuizAttempt {
   quizId       String
   startedAt    DateTime      @default(now())
   submittedAt  DateTime?
-  score        Int           @default(0)
+  score        Float         @default(0)
   status       AttemptStatus @default(PENDING)
   draftAnswers Json? // Stores partial answers for save-and-resume: { "questionId": selectedOptionIndex }
   createdAt    DateTime      @default(now())
@@ -594,7 +594,7 @@ model ExamQuestion {
   examId String
   text   String
   type   QuestionType @default(MCQ)
-  points Int          @default(1)
+  points Float        @default(1)
 
   options            String[]
   correctOptionIndex Int      @default(0)
@@ -619,7 +619,7 @@ model ExamAttempt {
   startedAt   DateTime  @default(now())
   submittedAt DateTime?
 
-  score  Int? // Stays null until fully graded
+  score  Float? // Stays null until fully graded
   status AttemptStatus @default(PENDING)
 
   createdAt DateTime @default(now())
@@ -644,7 +644,7 @@ model StudentExamResponse {
   matchAnswer         Json? // Used for MATCHING: { left: string, right: string }[]
   orderAnswer         String[] // Used for ORDERING
 
-  earnedPoints Int? // Populated automatically for MCQ, manually/AI for Essay
+  earnedPoints Float? // Populated automatically for MCQ, manually/AI for Essay
 
   aiScoreGuess            Float?
   aiConfidenceScore       Float?
@@ -670,7 +670,7 @@ model QuizAttemptResponse {
   matchAnswer         Json? // Used for MATCHING: { left: string, right: string }[]
   orderAnswer         String[] // Used for ORDERING
 
-  earnedPoints Int? // Populated automatically for objective, manually/AI for subjective
+  earnedPoints Float? // Populated automatically for objective, manually/AI for subjective
 
   aiScoreGuess            Float?
   aiConfidenceScore       Float?

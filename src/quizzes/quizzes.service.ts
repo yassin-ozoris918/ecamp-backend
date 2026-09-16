@@ -454,7 +454,7 @@ export class QuizzesService {
                if (isCorrect) correctPairs++;
             }
             correctPairs = Math.min(correctPairs, totalPairs);
-            earnedPoints = Math.round((correctPairs / totalPairs) * question.points);
+            earnedPoints = parseFloat(((correctPairs / totalPairs) * question.points).toFixed(2));
           }
         } else if (question.type === 'ORDERING' && orderAnswer && Array.isArray(orderAnswer) && Array.isArray(question.correctOrder)) {
           let correctPositions = 0;
@@ -466,7 +466,7 @@ export class QuizzesService {
                 correctPositions++;
               }
             }
-            earnedPoints = Math.round((correctPositions / totalItems) * question.points);
+            earnedPoints = parseFloat(((correctPositions / totalItems) * question.points).toFixed(2));
           }
         } else if (question.type === 'SHORT_ANSWER' || question.type === 'ESSAY') {
           if (textResponse && textResponse.trim() !== '') {
