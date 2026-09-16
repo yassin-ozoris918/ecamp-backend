@@ -164,13 +164,20 @@ export class QuizzesService {
 
         if (questions && questions.length > 0) {
           await tx.quizQuestion.createMany({
-            data: questions.map(q => ({
+            data: questions.map((q: any) => ({
               quizId,
               text: q.text,
               options: q.options || [],
               correctOptionIndex: q.correctOptionIndex || 0,
               points: q.points || 1,
-              type: q.type || 'MCQ'
+              type: q.type || 'MCQ',
+              referenceAnswer: q.referenceAnswer || null,
+              matchOptions:
+                q.matchOptions && Array.isArray(q.matchOptions)
+                  ? q.matchOptions
+                  : Prisma.JsonNull,
+              correctOrder: q.correctOrder || [],
+              version: q.version || 'A',
             }))
           });
         }
@@ -633,6 +640,7 @@ export class QuizzesService {
             ? 'quiz.messages.passed'
             : 'quiz.messages.failed',
       studentAnswers: studentAnswersRecord,
+      correctAnswers,
     };
   }
 
@@ -750,6 +758,7 @@ export class QuizzesService {
       maxAttempts: quiz?.maxAttempts || 1,
       message: 'Reviewing past attempt.',
       studentAnswers: attempt.draftAnswers || {},
+      correctAnswers,
       questions,
       activeVersion: questionVersion,
     };

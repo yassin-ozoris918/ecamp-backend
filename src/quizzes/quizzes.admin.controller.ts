@@ -2,6 +2,7 @@ import type { RequestWithUser } from '../auth/interfaces/request-with-user.inter
 import { QuizzesService } from './quizzes.service';
 import { Controller, Post, Body, UseGuards, Delete, Param, Put, Req, Get, Patch, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { Prisma } from '@prisma/client';
 import { CreateQuizQuestionDto } from './dto/create-quiz-question.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -41,6 +42,12 @@ export class QuizzesAdminController {
         correctOptionIndex: dto.correctOptionIndex ?? -1,
         points: dto.points,
         version: dto.version ?? 'A',
+        referenceAnswer: dto.referenceAnswer ?? null,
+        matchOptions:
+          dto.matchOptions && dto.matchOptions.length > 0
+            ? (dto.matchOptions as any)
+            : Prisma.JsonNull,
+        correctOrder: dto.correctOrder || [],
       },
     });
   }

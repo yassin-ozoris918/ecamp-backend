@@ -38,6 +38,10 @@ describe('QuizzesService (Objective Grading)', () => {
               findFirst: jest.fn().mockResolvedValue(null),
               update: jest.fn(),
             },
+            courseInstructor: {
+              findFirst: jest.fn(),
+            },
+            $transaction: jest.fn(),
           },
         },
         {
@@ -109,7 +113,7 @@ describe('QuizzesService (Objective Grading)', () => {
       (prisma.studentLectureAccess.update as jest.Mock).mockResolvedValue(null);
 
       // Submit Duplicate Matching to test the vulnerability patch
-      await service.submitQuiz({
+      const result = await service.submitQuiz({
         answers: [
           { questionId: 'q_mcq', selectedOptionIndex: 1 }, // Correct = 10 pts
           { questionId: 'q_matching', matchAnswer: [
@@ -119,6 +123,11 @@ describe('QuizzesService (Objective Grading)', () => {
           ] } // Correct = 1 out of 2 pairs = 10 pts
         ]
       }, studentId);
+
+      // Ensure the submitted result includes correctAnswers keyed by question id
+      expect(result.correctAnswers).toBeDefined();
+      expect(result.correctAnswers.q_mcq).toBe(1);
+      expect(result.correctAnswers.q_matching).toEqual(questions[1].matchOptions);
 
       // Ensure quizAttempt.update is called with correct score
       // Total Possible = 30
@@ -289,6 +298,73 @@ describe('QuizzesService (Objective Grading)', () => {
           })
         })
       );
+    });
+  });
+
+  describe('syncQuizQuestions - Persistence', () => {
+    let tx: any;
+
+    beforeEach(() => {
+      tx = {
+        quizQuestion: {
+          deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+          createMany: jest.fn().mockResolvedValue({ count: 3 }),
+        },
+      };
+      (prisma.$transaction as jest.Mock).mockImplementation(async (cb: any) => cb(tx));
+    });
+
+    it('should persist matchOptions, referenceAnswer, correctOrder and version', async () => {
+      await service.syncQuizQuestions(
+        'q_sync',
+        [
+          {
+            text: 'M1',
+            type: 'MATCHING',
+            points: 5,
+            matchOptions: [
+              { left: 'L1', right: 'R1' },
+              { left: 'L2', right: 'R2' },
+            ],
+            correctOrder: [],
+            version: 'A',
+          },
+          {
+            text: 'E1',
+            type: 'ESSAY',
+            points: 5,
+            referenceAnswer: 'Good essay',
+            correctOrder: [],
+            version: 'B',
+          },
+          {
+            text: 'O1',
+            type: 'ORDERING',
+            points: 5,
+            correctOrder: ['X', 'Y', 'Z'],
+            version: 'A',
+          },
+        ],
+        'instructor1',
+        'ADMIN',
+      );
+
+      const data = (tx.quizQuestion.createMany as jest.Mock).mock.calls[0][0].data;
+      expect(data).toHaveLength(3);
+
+      const matching = data.find((q: any) => q.type === 'MATCHING');
+      expect(matching.matchOptions).toEqual([
+        { left: 'L1', right: 'R1' },
+        { left: 'L2', right: 'R2' },
+      ]);
+      expect(matching.version).toBe('A');
+
+      const essay = data.find((q: any) => q.type === 'ESSAY');
+      expect(essay.referenceAnswer).toBe('Good essay');
+      expect(essay.version).toBe('B');
+
+      const ordering = data.find((q: any) => q.type === 'ORDERING');
+      expect(ordering.correctOrder).toEqual(['X', 'Y', 'Z']);
     });
   });
 });
