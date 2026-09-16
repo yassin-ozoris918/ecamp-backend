@@ -210,6 +210,8 @@ export class ExamsService {
             type: true,
             points: true,
             options: true,
+            matchOptions: true,
+            correctOrder: true,
           },
         },
       },
@@ -219,7 +221,22 @@ export class ExamsService {
     if (!exam.isPublished)
       throw new ForbiddenException('Exam is not published');
 
-    return exam;
+    const shuffledQuestions = exam.questions.map((q: any) => {
+      const out = { ...q };
+      if (out.type === 'MATCHING' && Array.isArray(out.matchOptions)) {
+        const rights = out.matchOptions.map((m: any) => m.right);
+        rights.sort(() => Math.random() - 0.5);
+        out.matchOptions = out.matchOptions.map((m: any, i: number) => ({ left: m.left, right: rights[i] }));
+      }
+      if (out.type === 'ORDERING' && Array.isArray(out.correctOrder)) {
+        const items = [...out.correctOrder];
+        items.sort(() => Math.random() - 0.5);
+        out.correctOrder = items;
+      }
+      return out;
+    });
+
+    return { ...exam, questions: shuffledQuestions };
   }
 
   private async verifyExamOwnership(
