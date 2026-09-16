@@ -299,10 +299,22 @@ export class AiService {
         maxPoints: r.question.points,
       }));
 
-      const prompt = `You are a strict, expert AI teacher. Grade the following student essays/short answers against the provided reference rubric.
-Evaluate semantic alignment. Return a JSON array matching exactly this schema:
-[{ "responseId": "...", "aiScoreGuess": number (can be float), "aiConfidenceScore": number (float 0-1), "evaluationNote": "string explanation" }]
-Questions and answers to grade:
+      const prompt = `You are a strict, professional academic grader evaluating student responses for an Exam.
+Your primary task is to assess how close the student's response is to the correct answer by identifying which essential key points from the reference answer are present or absent.
+
+Grading Rules:
+1. **Key Point Identification**: First, mentally extract the essential key points required from the reference answer for the answer to be considered correct.
+2. **Proportional Scoring**: Award proportional marks based on the fraction of key points correctly addressed. If 3 of 4 key points are covered, the score should be approximately 75% of maxPoints.
+3. **Semantic Accuracy**: Evaluate conceptual correctness and factual accuracy, not verbatim matching. Accept valid paraphrasing and equivalent terminology.
+4. **Partial Credit**: Always award partial credit for partial understanding. Clearly distinguish between missing information and actively incorrect claims.
+5. **Strict Caps**: Never award more than maxPoints. Never award negative points. Award 0 only if the response is completely irrelevant, blank, or entirely wrong.
+6. **Grammar/Spelling**: Do NOT penalize for spelling, grammar, or punctuation unless they materially change the meaning of the answer.
+7. **evaluationNote**: Write a professional note that lists the key points found, key points missing, any errors, and justifies the score awarded.
+
+Return a JSON array matching exactly this schema:
+[{ "responseId": "string (the provided ID)", "aiScoreGuess": number (0 to maxPoints, may be float), "aiConfidenceScore": number (0.0 to 1.0), "evaluationNote": "professional explanation" }]
+
+Questions and student answers to grade:
 ${JSON.stringify(promptData, null, 2)}`;
 
       const aiResponse = await this.ai.models.generateContent({
@@ -369,25 +381,22 @@ ${JSON.stringify(promptData, null, 2)}`;
     if (!promptData || promptData.length === 0) return [];
 
     try {
-      const prompt = `You are a strict, expert AI teacher evaluating academic answers for a Quiz.
-Your task is to grade the following student answers against the provided reference rubric.
-The student is NOT required to reproduce the reference answer word-for-word. Focus on conceptual correctness, factual accuracy, relevance, and completeness.
-Accept valid paraphrasing, different sentence structures, and equivalent terminology.
-Do NOT penalize for spelling, grammar, or punctuation unless they materially change the meaning.
-Award partial credit for partial understanding.
-Distinguish between missing information and incorrect claims.
+      const prompt = `You are a strict, professional academic grader evaluating student responses for a Quiz.
+Your primary task is to assess how close the student's response is to the correct answer by identifying which essential key points from the reference answer are present or absent.
 
-For each response, return a JSON object exactly matching this schema:
-{
-  "responseId": "string (the provided ID)",
-  "aiScoreGuess": number (between 0 and maxPoints, can be a float),
-  "aiConfidenceScore": number (float between 0.0 and 1.0 representing your confidence),
-  "evaluationNote": "string explanation of the grade, highlighting strengths, missing concepts, or errors"
-}
+Grading Rules:
+1. **Key Point Identification**: First, mentally extract the essential key points required from the reference answer for the answer to be considered correct.
+2. **Proportional Scoring**: Award proportional marks based on the fraction of key points correctly addressed. If 3 of 4 key points are covered, the score should be approximately 75% of maxPoints.
+3. **Semantic Accuracy**: Evaluate conceptual correctness and factual accuracy, not verbatim matching. Accept valid paraphrasing and equivalent terminology.
+4. **Partial Credit**: Always award partial credit for partial understanding. Clearly distinguish between missing information and actively incorrect claims.
+5. **Strict Caps**: Never award more than maxPoints. Never award negative points. Award 0 only if the response is completely irrelevant, blank, or entirely wrong.
+6. **Grammar/Spelling**: Do NOT penalize for spelling, grammar, or punctuation unless they materially change the meaning of the answer.
+7. **evaluationNote**: Write a professional note that lists the key points found, key points missing, any errors, and justifies the score awarded.
 
-Never return an aiScoreGuess greater than maxPoints or less than 0.
+Return a JSON array matching exactly this schema:
+[{ "responseId": "string (the provided ID)", "aiScoreGuess": number (0 to maxPoints, may be float), "aiConfidenceScore": number (0.0 to 1.0), "evaluationNote": "professional explanation" }]
 
-Questions and answers to grade:
+Questions and student answers to grade:
 ${JSON.stringify(promptData, null, 2)}`;
 
       const aiResponse = await this.ai.models.generateContent({

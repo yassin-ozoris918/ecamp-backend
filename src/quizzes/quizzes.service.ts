@@ -408,13 +408,6 @@ export class QuizzesService {
     const now = new Date();
     await this.resumeLectureAccess(studentId, quiz.lectureId, quiz.timeLimit);
 
-    let isCheating = false;
-    if (quiz.timeLimit) {
-      const minutesPassed = (now.getTime() - attempt.startedAt.getTime()) / 60000;
-      if (minutesPassed > quiz.timeLimit + 1) {
-        isCheating = true;
-      }
-    }
 
     let totalPossiblePoints = 0;
     let earnedObjectivePoints = 0;
@@ -438,7 +431,7 @@ export class QuizzesService {
       let matchAnswer = studentAnswer?.matchAnswer || null;
       let orderAnswer = studentAnswer?.orderAnswer || null;
 
-      if (!isCheating && studentAnswer) {
+      if (studentAnswer) {
         studentAnswersRecord[question.id] = {
            selectedOptionIndex, textResponse, matchAnswer, orderAnswer
         };
@@ -502,8 +495,8 @@ export class QuizzesService {
              earnedPoints
            });
         } else {
-           // For subjective, earnedPoints is initially null unless cheating/empty (0)
-           const pointsToSave = isCheating ? 0 : null;
+           // For subjective, earnedPoints is initially null — AI will fill it in after grading
+           const pointsToSave = null;
            responseRecords.push({
              attemptId: attempt.id,
              questionId: question.id,
@@ -517,14 +510,14 @@ export class QuizzesService {
       }
     }
 
-    // Call AI for subjective grading if not cheating
+    // Call AI for subjective grading
     let aiGrades: any[] = [];
     let hasAiFailure = false;
     
-    if (!isCheating && aiPromptData.length > 0) {
+    if (aiPromptData.length > 0) {
        aiGrades = await this.aiService.evaluateQuizEssays(aiPromptData);
        if (aiGrades.length === 0) {
-          hasAiFailure = true; // AI failed, responses remain pending
+          hasAiFailure = true; // AI failed, responses remain pending with null score
        }
     }
 
