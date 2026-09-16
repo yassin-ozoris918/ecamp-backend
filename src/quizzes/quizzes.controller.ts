@@ -64,8 +64,9 @@ export class QuizzesController {
   // --- STUDENT ENDPOINTS ---
 
   @Get(':id')
-  getQuizForStudent(@Param('id') id: string) {
-    return this.quizzesService.getQuizForStudent(id);
+  getQuizForStudent(@Param('id') id: string, @Req() req: RequestWithUser) {
+    const studentId = req.user?.sub;
+    return this.quizzesService.getQuizForStudent(id, studentId);
   }
 
   @Post(':id/start')

@@ -1,4 +1,4 @@
-import { IsArray, IsNotEmpty, IsNumber, IsString, ValidateNested } from 'class-validator';
+import { IsArray, IsNotEmpty, IsNumber, IsString, ValidateNested, IsOptional } from 'class-validator';
 import { Type } from 'class-transformer';
 
 class DraftAnswerDto {
@@ -6,8 +6,22 @@ class DraftAnswerDto {
   @IsNotEmpty()
   questionId: string;
 
+  @IsOptional()
   @IsNumber()
-  selectedOptionIndex: number;
+  selectedOptionIndex?: number;
+
+  @IsOptional()
+  @IsString()
+  textResponse?: string;
+
+  @IsOptional()
+  @IsArray()
+  matchAnswer?: any[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  orderAnswer?: string[];
 }
 
 export class SaveDraftDto {

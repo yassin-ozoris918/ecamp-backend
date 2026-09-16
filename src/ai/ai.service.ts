@@ -350,4 +350,98 @@ ${JSON.stringify(promptData, null, 2)}`;
       throw new InternalServerErrorException('AI Grading failed.');
     }
   }
+
+  // --- Quiz Subjective AI Grading ---
+  async evaluateQuizEssays(
+    promptData: {
+      responseId: string;
+      questionText: string;
+      referenceAnswer: string;
+      studentAnswer: string;
+      maxPoints: number;
+    }[]
+  ): Promise<{
+    responseId: string;
+    aiScoreGuess: number;
+    aiConfidenceScore: number;
+    evaluationNote: string;
+  }[]> {
+    if (!promptData || promptData.length === 0) return [];
+
+    try {
+      const prompt = `You are a strict, expert AI teacher evaluating academic answers for a Quiz.
+Your task is to grade the following student answers against the provided reference rubric.
+The student is NOT required to reproduce the reference answer word-for-word. Focus on conceptual correctness, factual accuracy, relevance, and completeness.
+Accept valid paraphrasing, different sentence structures, and equivalent terminology.
+Do NOT penalize for spelling, grammar, or punctuation unless they materially change the meaning.
+Award partial credit for partial understanding.
+Distinguish between missing information and incorrect claims.
+
+For each response, return a JSON object exactly matching this schema:
+{
+  "responseId": "string (the provided ID)",
+  "aiScoreGuess": number (between 0 and maxPoints, can be a float),
+  "aiConfidenceScore": number (float between 0.0 and 1.0 representing your confidence),
+  "evaluationNote": "string explanation of the grade, highlighting strengths, missing concepts, or errors"
+}
+
+Never return an aiScoreGuess greater than maxPoints or less than 0.
+
+Questions and answers to grade:
+${JSON.stringify(promptData, null, 2)}`;
+
+      const aiResponse = await this.ai.models.generateContent({
+        model: this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.5-pro',
+        contents: prompt,
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                responseId: { type: Type.STRING },
+                aiScoreGuess: { type: Type.NUMBER },
+                aiConfidenceScore: { type: Type.NUMBER },
+                evaluationNote: { type: Type.STRING },
+              },
+              required: ['responseId', 'aiScoreGuess', 'aiConfidenceScore', 'evaluationNote'],
+            },
+          },
+        },
+      });
+
+      const text = aiResponse.text || '[]';
+      let grades: any[] = [];
+      try {
+        grades = JSON.parse(text);
+      } catch (e) {
+        this.logger.error('Failed to parse AI grading JSON: ' + text);
+        return [];
+      }
+
+      // Validate grades
+      return grades.map((g) => {
+        const pd = promptData.find(p => p.responseId === g.responseId);
+        const maxPoints = pd ? pd.maxPoints : 1;
+        
+        let score = typeof g.aiScoreGuess === 'number' && !isNaN(g.aiScoreGuess) ? g.aiScoreGuess : 0;
+        score = Math.max(0, Math.min(score, maxPoints)); // Clamp
+        
+        let confidence = typeof g.aiConfidenceScore === 'number' && !isNaN(g.aiConfidenceScore) ? g.aiConfidenceScore : 0;
+        confidence = Math.max(0, Math.min(confidence, 1));
+        
+        return {
+          responseId: g.responseId,
+          aiScoreGuess: score,
+          aiConfidenceScore: confidence,
+          evaluationNote: g.evaluationNote || 'AI Evaluation',
+        };
+      });
+    } catch (error) {
+      this.logger.error('AI Quiz Grading Error:', error);
+      // Return empty array on failure so caller can handle gracefully
+      return [];
+    }
+  }
 }

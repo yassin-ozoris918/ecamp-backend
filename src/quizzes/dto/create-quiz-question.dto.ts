@@ -1,4 +1,5 @@
-import { IsNotEmpty, IsString, IsInt, IsUUID, IsArray, Min } from 'class-validator';
+import { IsNotEmpty, IsString, IsInt, IsUUID, IsArray, Min, IsOptional, IsEnum } from 'class-validator';
+import { QuizQuestionVersion } from '@prisma/client';
 
 export class CreateQuizQuestionDto {
   @IsNotEmpty()
@@ -9,17 +10,35 @@ export class CreateQuizQuestionDto {
   @IsString()
   text: string;
 
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  options: string[];
+  options?: string[];
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsInt()
   @Min(0)
-  correctOptionIndex: number;
+  correctOptionIndex?: number;
+
+  @IsOptional()
+  @IsString()
+  referenceAnswer?: string;
+
+  @IsOptional()
+  @IsArray()
+  matchOptions?: any[]; // [{left: string, right: string}]
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  correctOrder?: string[];
 
   @IsNotEmpty()
   @IsInt()
   @Min(1)
   points: number;
+
+  @IsOptional()
+  @IsEnum(QuizQuestionVersion)
+  version?: QuizQuestionVersion;
 }
