@@ -20,6 +20,11 @@ enum NotificationEventCategory {
   RISK_ALERT
 }
 
+enum QuizQuestionVersion {
+  A
+  B
+}
+
 enum NotificationChannelType {
   WHATSAPP
   SMS
@@ -468,18 +473,24 @@ model Quiz {
 }
 
 model QuizQuestion {
-  id                 String       @id @default(uuid())
+  id                 String               @id @default(uuid())
   quizId             String
   text               String
-  type               QuestionType @default(MCQ)
+  type               QuestionType         @default(MCQ)
   options            String[]
   correctOptionIndex Int
-  points             Int          @default(1)
-  orderIndex         Int          @default(0)
-  createdAt          DateTime     @default(now())
+  points             Int                  @default(1)
+  orderIndex         Int                  @default(0)
+  version            QuizQuestionVersion  @default(A)
+  createdAt          DateTime             @default(now())
+
+  referenceAnswer    String?
+  matchOptions       Json? // Used for MATCHING: { left: string, right: string }[]
+  correctOrder       String[] // Used for ORDERING
 
   // Relations
-  quiz Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  quiz      Quiz                  @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  responses QuizAttemptResponse[]
 
   @@index([quizId])
 }
@@ -498,6 +509,7 @@ model QuizAttempt {
 
   student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
   quiz    Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  responses QuizAttemptResponse[]
 
   @@index([studentId])
   @@index([quizId])
@@ -542,6 +554,8 @@ enum QuestionType {
   SHORT_ANSWER
   ESSAY
   READ_ONLY_TEXT
+  MATCHING
+  ORDERING
 }
 
 model Exam {
@@ -585,6 +599,8 @@ model ExamQuestion {
   options            String[]
   correctOptionIndex Int      @default(0)
   referenceAnswer    String?
+  matchOptions       Json? // Used for MATCHING: { left: string, right: string }[]
+  correctOrder       String[] // Used for ORDERING
 
   createdAt DateTime @default(now())
 
@@ -625,6 +641,8 @@ model StudentExamResponse {
   // They will use ONE of these depending on the QuestionType
   selectedOptionIndex Int? // Used for MCQ / True-False
   textResponse        String? // Used for Short Answer / Essay
+  matchAnswer         Json? // Used for MATCHING: { left: string, right: string }[]
+  orderAnswer         String[] // Used for ORDERING
 
   earnedPoints Int? // Populated automatically for MCQ, manually/AI for Essay
 
@@ -634,7 +652,33 @@ model StudentExamResponse {
   evaluationNote          String?
 
   attempt  ExamAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  question ExamQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  question ExamQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
+
+  @@index([attemptId])
+  @@index([questionId])
+}
+
+// Tracks the exact answer a student gave for a specific quiz question
+model QuizAttemptResponse {
+  id         String @id @default(uuid())
+  attemptId  String
+  questionId String
+
+  // They will use ONE of these depending on the QuestionType
+  selectedOptionIndex Int? // Used for MCQ / True-False
+  textResponse        String? // Used for Short Answer / Essay
+  matchAnswer         Json? // Used for MATCHING: { left: string, right: string }[]
+  orderAnswer         String[] // Used for ORDERING
+
+  earnedPoints Int? // Populated automatically for objective, manually/AI for subjective
+
+  aiScoreGuess            Float?
+  aiConfidenceScore       Float?
+  instructorOverrideScore Float?
+  evaluationNote          String?
+
+  attempt  QuizAttempt  @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  question QuizQuestion @relation(fields: [questionId], references: [id], onDelete: Restrict)
 
   @@index([attemptId])
   @@index([questionId])
