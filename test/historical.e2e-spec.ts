@@ -81,8 +81,8 @@ describe('Historical Immutability (e2e)', () => {
     
     // 3. Get attempt ID
     const attempt = await prisma.quizAttempt.findFirst({ where: { studentId, quizId }, include: { responses: true } });
-    expect(attempt.score).toBe(100);
-    expect(attempt.responses.length).toBe(1);
+    expect(attempt!.score).toBe(100);
+    expect(attempt!.responses.length).toBe(1);
     
     // 4. Instructor syncs questions (modifies the quiz structure by syncing a new question replacing the old one)
     await request(app.getHttpServer())
@@ -92,7 +92,7 @@ describe('Historical Immutability (e2e)', () => {
       .expect(400); // Because it is restricted by P2003 Catch Block
       
     // 5. Check if the historical response was deleted by Prisma Cascade
-    const responsesAfterSync = await prisma.quizAttemptResponse.findMany({ where: { attemptId: attempt.id } });
+    const responsesAfterSync = await prisma.quizAttemptResponse.findMany({ where: { attemptId: attempt!.id } });
     
     expect(responsesAfterSync.length).toBe(1);
     expect(responsesAfterSync[0].selectedOptionIndex).toBe(0);
@@ -100,7 +100,7 @@ describe('Historical Immutability (e2e)', () => {
 
     // 6. Ensure original question is fully intact
     const originalQuestion = await prisma.quizQuestion.findUnique({ where: { id: questionId } });
-    expect(originalQuestion.text).toBe('Original Text');
+    expect(originalQuestion!.text).toBe('Original Text');
   });
 
   afterAll(async () => {

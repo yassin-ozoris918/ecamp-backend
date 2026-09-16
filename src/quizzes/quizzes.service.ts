@@ -569,6 +569,11 @@ export class QuizzesService {
        });
     }
 
+    // Check if the student submitted after the time limit (cheating/auto-submit)
+    const isCheating = quiz.timeLimit != null
+      ? now.getTime() > (attempt.startedAt.getTime() + quiz.timeLimit * 60 * 1000 + 30_000) // 30s grace period
+      : false;
+
     // Final score calculation
     let finalEarnedPoints = earnedObjectivePoints + earnedSubjectivePoints;
     const scorePercentage = totalPossiblePoints > 0 ? Math.round((finalEarnedPoints / totalPossiblePoints) * 100) : 0;

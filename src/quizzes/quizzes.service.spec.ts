@@ -232,7 +232,7 @@ describe('QuizzesService (Objective Grading)', () => {
       ['N. large payload', Array.from({length: 1000}).map(() => ({left: 'A', right: '1'})), 30], // Deduplicated to 1 -> 30%
     ])('MATCHING: %s', async (name, payload, expectedScore) => {
       await service.submitQuiz({
-        answers: [{ questionId: 'q_matching', matchAnswer: payload }]
+        answers: [{ questionId: 'q_matching', matchAnswer: payload as any }]
       }, studentId);
       
       expect(prisma.quizAttempt.update).toHaveBeenCalledWith(
@@ -284,7 +284,7 @@ describe('QuizzesService (Objective Grading)', () => {
       ['K. extra items', ['A', 'B', 'C', 'D'], 0], // length mismatch => 0
     ])('ORDERING: %s', async (name, payload, expectedScore) => {
       await service.submitQuiz({
-        answers: [{ questionId: 'q_ordering', orderAnswer: payload }]
+        answers: [{ questionId: 'q_ordering', orderAnswer: payload as any }]
       }, studentId);
       
       let expected = expectedScore;
