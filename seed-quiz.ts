@@ -26,6 +26,15 @@ async function main() {
 
   console.log(`Adding questions to Quiz: ${quiz.title} (${quiz.id})`);
 
+  // Idempotency: remove previously seeded version-A questions so re-running
+  // the script does not create duplicates.
+  const removed = await prisma.quizQuestion.deleteMany({
+    where: { quizId: quiz.id, version: QuizQuestionVersion.A },
+  });
+  if (removed.count > 0) {
+    console.log(`Removed ${removed.count} previously seeded version-A question(s).`);
+  }
+
   // SECTION A: Theoretical Questions
   const essayQuestions = [
     {
@@ -221,6 +230,8 @@ async function main() {
     }
   });
 
+  const total = essayQuestions.length + mcqQuestions.length + tfQuestions.length + 2;
+  console.log(`Inserted ${total} questions (${essayQuestions.length} essay + ${mcqQuestions.length} MCQ + ${tfQuestions.length} True/False + 1 MATCHING + 1 essay).`);
   console.log("All questions successfully inserted!");
 }
 
