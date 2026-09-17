@@ -90,7 +90,7 @@ export class LecturesController {
   @Put(':id/reorder')
   reorder(
     @Param('id') id: string,
-    @Body('items') items: { id: string; type: string; newOrderIndex: number }[],
+    @Body('items') items: { id: string; type: string; orderIndex: number }[],
     @Req() req: RequestWithUser,
   ) {
     const user = req.user;

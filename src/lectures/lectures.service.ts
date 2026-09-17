@@ -118,7 +118,7 @@ export class LecturesService {
 
   async reorder(
     lectureId: string,
-    items: { id: string; type: string; newOrderIndex: number }[],
+    items: { id: string; type: string; orderIndex: number }[],
     userId: string,
     role: Role,
   ) {
@@ -130,17 +130,17 @@ export class LecturesService {
         if (item.type === 'SESSION') {
           await tx.session.update({
             where: { id: item.id, },
-            data: { orderIndex: item.newOrderIndex },
+            data: { sortOrder: item.orderIndex },
           });
         } else if (item.type === 'QUIZ') {
           await tx.quiz.update({
             where: { id: item.id, },
-            data: { orderIndex: item.newOrderIndex },
+            data: { sortOrder: item.orderIndex },
           });
         } else if (item.type === 'ATTACHMENT') {
           await tx.attachment.update({
             where: { id: item.id },
-            data: { orderIndex: item.newOrderIndex },
+            data: { sortOrder: item.orderIndex },
           });
         }
       }
