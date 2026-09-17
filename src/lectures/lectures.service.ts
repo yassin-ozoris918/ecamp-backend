@@ -140,7 +140,7 @@ export class LecturesService {
         } else if (item.type === 'ATTACHMENT') {
           await tx.attachment.update({
             where: { id: item.id },
-            data: { sortOrder: item.orderIndex },
+            data: { orderIndex: item.orderIndex },
           });
         }
       }
