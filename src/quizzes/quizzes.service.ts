@@ -620,7 +620,16 @@ export class QuizzesService {
       if (q.type === 'MCQ' || q.type === 'TRUE_FALSE') correctAnswers[q.id] = q.correctOptionIndex;
       else if (q.type === 'MATCHING') correctAnswers[q.id] = q.matchOptions;
       else if (q.type === 'ORDERING') correctAnswers[q.id] = q.correctOrder;
-      // text responses don't have a strict client-side correct answer
+    }
+
+    // Build per-question feedback map for the frontend
+    // Keyed by questionId: { points: number | null, feedback: string | null }
+    const feedback: Record<string, { points: number | null; feedback: string | null }> = {};
+    for (const record of responseRecords) {
+      feedback[record.questionId] = {
+        points: record.earnedPoints ?? null,
+        feedback: record.evaluationNote ?? null,
+      };
     }
 
     return {
@@ -639,6 +648,7 @@ export class QuizzesService {
             : 'quiz.messages.failed',
       studentAnswers: studentAnswersRecord,
       correctAnswers,
+      feedback,
     };
   }
 
