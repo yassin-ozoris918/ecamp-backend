@@ -243,7 +243,7 @@ export class ProgressService {
           id: s.id,
           type: 'SESSION',
           title: s.title,
-          orderIndex: s.orderIndex,
+          orderIndex: s.sortOrder,
           isCompleted: false,
           isLocked: true,
           video_url: null, // Hardcoded
@@ -253,7 +253,7 @@ export class ProgressService {
           id: q.id,
           type: 'QUIZ',
           title: q.title,
-          orderIndex: q.orderIndex,
+          orderIndex: q.sortOrder,
           isCompleted: false,
           isLocked: true,
           questions: null, // Hardcoded
@@ -267,7 +267,7 @@ export class ProgressService {
           id: s.id,
           type: 'SESSION',
           title: s.title,
-          orderIndex: s.orderIndex,
+          orderIndex: s.sortOrder,
           isCompleted: s.progress.length > 0 ? s.progress[0].isCompleted : false,
           video_url: s.videoUrl,
           duration: s.duration,
@@ -286,7 +286,7 @@ export class ProgressService {
             id: q.id,
             type: 'QUIZ',
             title: q.title,
-            orderIndex: q.orderIndex,
+            orderIndex: q.sortOrder,
             isCompleted,
             timeLimit: q.timeLimit,
             passGrade: q.passGrade,
@@ -327,8 +327,8 @@ export class ProgressService {
               lockSubsequentItems = true;
             }
           } else if (item.type === 'QUIZ' && item.passGrade > 0) {
-            // Graded quiz: blocks if NOT passed AND maxAttempts NOT exhausted
-            if (!item.isCompleted && !item.isExhausted) {
+            // Graded quiz: blocks permanently if NOT passed
+            if (!item.isCompleted) {
               lockSubsequentItems = true;
             }
           }

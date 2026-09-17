@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Param, Patch, UseGuards, Req, ForbiddenException, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Body, Param, Patch, Put, UseGuards, Req, ForbiddenException, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { attachmentFileFilter, UPLOAD_LIMITS } from '../common/config/upload.config';
 import { AuthGuard } from '@nestjs/passport';
@@ -7,6 +7,8 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import { AiService } from '../ai/ai.service';
 import { PrismaService } from '../prisma/prisma.service';
+import { ExamsService } from './exams.service';
+import { UpdateExamDto } from './dto/update-exam.dto';
 import type { RequestWithUser } from '../auth/interfaces/request-with-user.interface';
 
 @Controller('admin/exams')
@@ -15,7 +17,14 @@ export class ExamsAdminController {
   constructor(
     private readonly aiService: AiService,
     private readonly prisma: PrismaService,
+    private readonly examsService: ExamsService,
   ) {}
+
+  @Put(':id')
+  @Roles(Role.ADMIN, Role.INSTRUCTOR)
+  async updateExam(@Param('id') id: string, @Body() dto: UpdateExamDto, @Req() req: RequestWithUser) {
+    return this.examsService.updateExam(id, dto, req.user.sub, req.user.role);
+  }
 
   @Post(':id/extract')
   @Roles(Role.ADMIN, Role.INSTRUCTOR)

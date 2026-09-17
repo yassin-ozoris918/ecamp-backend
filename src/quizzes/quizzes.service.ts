@@ -492,7 +492,8 @@ export class QuizzesService {
              matchAnswer: matchAnswer ? JSON.stringify(matchAnswer) : null,
              orderAnswer: orderAnswer ? orderAnswer : [],
              textResponse: null,
-             earnedPoints
+             earnedPoints,
+             questionPoints: question.points,
            });
         } else {
            // For subjective, earnedPoints is initially null — AI will fill it in after grading
@@ -504,7 +505,8 @@ export class QuizzesService {
              matchAnswer: null,
              orderAnswer: [],
              textResponse,
-             earnedPoints: pointsToSave
+             earnedPoints: pointsToSave,
+             questionPoints: question.points,
            });
         }
       }
@@ -514,13 +516,14 @@ export class QuizzesService {
     let aiGrades: any[] = [];
     let hasAiFailure = false;
     
+    console.log("SUBMIT_QUIZ responseRecords:", JSON.stringify(responseRecords, null, 2));
+
     if (aiPromptData.length > 0) {
        aiGrades = await this.aiService.evaluateQuizEssays(aiPromptData);
        if (aiGrades.length === 0) {
-          hasAiFailure = true; // AI failed, responses remain pending with null score
+           hasAiFailure = true;
        }
     }
-
     let earnedSubjectivePoints = 0;
 
     // We must map aiGrades back to responseRecords using questionId
@@ -562,6 +565,7 @@ export class QuizzesService {
            matchAnswer: matchAnswerObj ? matchAnswerObj : Prisma.JsonNull,
            orderAnswer: record.orderAnswer,
            earnedPoints: record.earnedPoints,
+           questionPoints: record.questionPoints,
            aiScoreGuess: record.aiScoreGuess,
            aiConfidenceScore: record.aiConfidenceScore,
            evaluationNote: record.evaluationNote,
@@ -674,21 +678,38 @@ export class QuizzesService {
       throw new BadRequestException('No completed attempts to surrender.');
     }
 
+    const lastAttemptResponses = await this.prisma.quizAttemptResponse.findMany({
+      where: { attemptId: lastAttempt.id }
+    });
+
     const attemptsToCreate = quiz.maxAttempts - attemptsCount;
     
-    const dummyAttempts = Array.from({ length: attemptsToCreate }).map(() => ({
-      quizId,
-      studentId,
-      score: lastAttempt.score,
-      status: AttemptStatus.FAILED,
-      startedAt: lastAttempt.startedAt,
-      submittedAt: lastAttempt.submittedAt,
-      draftAnswers: lastAttempt.draftAnswers as any,
-    }));
-
-    await this.prisma.quizAttempt.createMany({
-      data: dummyAttempts,
-    });
+    for (let i = 0; i < attemptsToCreate; i++) {
+      const newAttempt = await this.prisma.quizAttempt.create({
+        data: {
+          quizId,
+          studentId,
+          score: lastAttempt.score,
+          status: AttemptStatus.FAILED,
+          startedAt: lastAttempt.startedAt,
+          submittedAt: lastAttempt.submittedAt,
+          draftAnswers: lastAttempt.draftAnswers as any,
+        }
+      });
+      
+      if (lastAttemptResponses.length > 0) {
+        await this.prisma.quizAttemptResponse.createMany({
+          data: lastAttemptResponses.map((r) => {
+            const { id, attemptId, matchAnswer, ...rest } = r;
+            return {
+              ...rest,
+              matchAnswer: matchAnswer === null ? Prisma.JsonNull : matchAnswer,
+              attemptId: newAttempt.id
+            };
+          })
+        });
+      }
+    }
 
     return { message: 'Quiz surrendered successfully.', isExhausted: true };
   }
@@ -697,7 +718,11 @@ export class QuizzesService {
     const attempt = await this.prisma.quizAttempt.findFirst({
       where: { studentId, quizId },
       orderBy: { createdAt: 'desc' },
-      include: { responses: true },
+      include: { 
+        responses: {
+          include: { question: true }
+        }
+      },
     });
 
     if (!attempt) return null;
@@ -760,13 +785,20 @@ export class QuizzesService {
         });
     }
 
+    let earnedPoints = 0;
+    let totalPoints = 0;
     const feedback: Record<string, { points: number | null; feedback: string | null }> = {};
+    
     if (attempt.responses) {
       for (const record of attempt.responses) {
         feedback[record.questionId] = {
           points: record.earnedPoints ?? null,
           feedback: record.evaluationNote ?? null,
         };
+        if (record.earnedPoints != null) {
+          earnedPoints += record.earnedPoints;
+        }
+        totalPoints += record.questionPoints ?? (record.question?.points || 1);
       }
     }
 
@@ -781,6 +813,8 @@ export class QuizzesService {
       feedback,
       questions,
       activeVersion: questionVersion,
+      earnedPoints,
+      totalPoints,
     };
   }
 

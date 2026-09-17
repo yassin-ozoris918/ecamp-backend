@@ -670,7 +670,8 @@ model QuizAttemptResponse {
   matchAnswer         Json? // Used for MATCHING: { left: string, right: string }[]
   orderAnswer         String[] // Used for ORDERING
 
-  earnedPoints Float? // Populated automatically for objective, manually/AI for subjective
+  earnedPoints   Float? // Populated automatically for objective, manually/AI for subjective
+  questionPoints Float? @default(1) // Historical max points for immutability
 
   aiScoreGuess            Float?
   aiConfidenceScore       Float?
