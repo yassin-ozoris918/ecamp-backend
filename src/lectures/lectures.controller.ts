@@ -17,6 +17,7 @@ import { imageFileFilter, UPLOAD_LIMITS } from '../common/config/upload.config';
 import { StorageService } from '../storage/storage.service';
 import { LecturesService } from './lectures.service';
 import { CreateLectureDto } from './dto/create-lecture.dto';
+import { ReorderItemsPayloadDto } from './dto/reorder-items.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -90,11 +91,11 @@ export class LecturesController {
   @Put(':id/reorder')
   reorder(
     @Param('id') id: string,
-    @Body('items') items: { id: string; type: string; orderIndex: number }[],
+    @Body() dto: ReorderItemsPayloadDto,
     @Req() req: RequestWithUser,
   ) {
     const user = req.user;
-    return this.lecturesService.reorder(id, items, user.sub, user.role);
+    return this.lecturesService.reorder(id, dto.items, user.sub, user.role);
   }
 
   @Roles(Role.INSTRUCTOR, Role.ADMIN)
