@@ -400,7 +400,7 @@ Questions and student answers to grade:
 ${JSON.stringify(promptData, null, 2)}`;
 
       const aiResponse = await this.ai.models.generateContent({
-        model: this.configService.get<string>('GEMINI_MODEL') || 'gemini-3.6-flash',
+        model: this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.0-flash',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
@@ -448,7 +448,8 @@ ${JSON.stringify(promptData, null, 2)}`;
         };
       });
     } catch (error) {
-      this.logger.error('AI Quiz Grading Error:', error);
+      this.logger.error('AI Quiz Grading Error: ' + (error?.message || error));
+      this.logger.error('AI Quiz Grading Error details: ' + JSON.stringify(error?.response?.data || error));
       // Return empty array on failure so caller can handle gracefully
       return [];
     }
