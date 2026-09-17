@@ -697,6 +697,7 @@ export class QuizzesService {
     const attempt = await this.prisma.quizAttempt.findFirst({
       where: { studentId, quizId, status: { not: AttemptStatus.PENDING } },
       orderBy: { createdAt: 'desc' },
+      include: { responses: true },
     });
 
     if (!attempt) return null;
@@ -712,9 +713,9 @@ export class QuizzesService {
 
     if (quiz) {
       for (const q of quiz.questions) {
-        if (q.correctOptionIndex !== null) {
-          correctAnswers[q.id] = q.correctOptionIndex;
-        }
+        if (q.type === 'MCQ' || q.type === 'TRUE_FALSE') correctAnswers[q.id] = q.correctOptionIndex;
+        else if (q.type === 'MATCHING') correctAnswers[q.id] = q.matchOptions;
+        else if (q.type === 'ORDERING') correctAnswers[q.id] = q.correctOrder;
       }
 
       // --- Version selection (server-side) ---
@@ -759,6 +760,16 @@ export class QuizzesService {
         });
     }
 
+    const feedback: Record<string, { points: number | null; feedback: string | null }> = {};
+    if (attempt.responses) {
+      for (const record of attempt.responses) {
+        feedback[record.questionId] = {
+          points: record.earnedPoints ?? null,
+          feedback: record.evaluationNote ?? null,
+        };
+      }
+    }
+
     return {
       score: attempt.score,
       status: attempt.status,
@@ -767,6 +778,7 @@ export class QuizzesService {
       message: 'Reviewing past attempt.',
       studentAnswers: attempt.draftAnswers || {},
       correctAnswers,
+      feedback,
       questions,
       activeVersion: questionVersion,
     };
