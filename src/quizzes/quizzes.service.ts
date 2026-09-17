@@ -653,6 +653,8 @@ export class QuizzesService {
       studentAnswers: studentAnswersRecord,
       correctAnswers,
       feedback,
+      earnedPoints: finalEarnedPoints,
+      totalPoints: totalPossiblePoints,
     };
   }
 
