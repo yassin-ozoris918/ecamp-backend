@@ -400,7 +400,7 @@ Questions and student answers to grade:
 ${JSON.stringify(promptData, null, 2)}`;
 
       const aiResponse = await this.ai.models.generateContent({
-        model: this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.5-pro',
+        model: this.configService.get<string>('GEMINI_MODEL') || 'gemini-3.1-pro-preview',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
