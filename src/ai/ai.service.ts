@@ -399,26 +399,40 @@ Return a JSON array matching exactly this schema:
 Questions and student answers to grade:
 ${JSON.stringify(promptData, null, 2)}`;
 
-      const aiResponse = await this.ai.models.generateContent({
-        model: this.configService.get<string>('GEMINI_MODEL') || 'gemini-3.6-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                responseId: { type: Type.STRING },
-                aiScoreGuess: { type: Type.NUMBER },
-                aiConfidenceScore: { type: Type.NUMBER },
-                evaluationNote: { type: Type.STRING },
+      let aiResponse;
+      let retries = 3;
+      while (retries > 0) {
+        try {
+          aiResponse = await this.ai.models.generateContent({
+            model: this.configService.get<string>('GEMINI_MODEL') || 'gemini-3.6-flash',
+            contents: prompt,
+            config: {
+              responseMimeType: 'application/json',
+              responseSchema: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    responseId: { type: Type.STRING },
+                    aiScoreGuess: { type: Type.NUMBER },
+                    aiConfidenceScore: { type: Type.NUMBER },
+                    evaluationNote: { type: Type.STRING },
+                  },
+                  required: ['responseId', 'aiScoreGuess', 'aiConfidenceScore', 'evaluationNote'],
+                },
               },
-              required: ['responseId', 'aiScoreGuess', 'aiConfidenceScore', 'evaluationNote'],
-            },
-          },
-        },
-      });
+            }
+          });
+          break; // success
+        } catch (error) {
+          retries--;
+          if (retries === 0 || error?.status !== 503) {
+            throw error;
+          }
+          this.logger.warn(`AI API returned 503, retrying in 2 seconds... (${retries} retries left)`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      }
 
       const text = aiResponse.text || '[]';
       let grades: any[] = [];
