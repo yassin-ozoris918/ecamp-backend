@@ -707,7 +707,7 @@ export class QuizzesService {
       include: { questions: true },
     });
 
-    const correctAnswers: Record<string, number> = {};
+    const correctAnswers: Record<string, any> = {};
     let questionVersion: 'A' | 'B' = 'A';
     let questions: any[] = [];
 
