@@ -695,7 +695,7 @@ export class QuizzesService {
 
   async getLastSubmittedAttempt(quizId: string, studentId: string) {
     const attempt = await this.prisma.quizAttempt.findFirst({
-      where: { studentId, quizId, status: { not: AttemptStatus.PENDING } },
+      where: { studentId, quizId },
       orderBy: { createdAt: 'desc' },
       include: { responses: true },
     });
