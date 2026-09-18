@@ -416,6 +416,7 @@ export class AdminService {
       where: { studentId },
       include: {
         quiz: { select: { id: true, title: true, passGrade: true } },
+        responses: { select: { earnedPoints: true, questionPoints: true } },
       },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -425,6 +426,7 @@ export class AdminService {
       where: { studentId },
       include: {
         exam: { select: { id: true, title: true, passGrade: true } },
+        responses: { select: { earnedPoints: true, question: { select: { points: true } } } },
       },
       orderBy: { createdAt: 'desc' },
       take: 50,
@@ -438,22 +440,42 @@ export class AdminService {
         activatedAt: l.activatedAt,
         expiresAt: l.expiresAt,
       })),
-      quizAttempts: quizAttempts.map((a) => ({
-        quizId: a.quizId,
-        quizTitle: a.quiz?.title,
-        score: a.score,
-        status: a.status,
-        passGrade: a.quiz?.passGrade,
-        submittedAt: a.submittedAt,
-      })),
-      examAttempts: examAttempts.map((a) => ({
-        examId: a.examId,
-        examTitle: a.exam?.title,
-        score: a.score,
-        status: a.status,
-        passGrade: a.exam?.passGrade,
-        submittedAt: a.submittedAt,
-      })),
+      quizAttempts: quizAttempts.map((a) => {
+        let earnedPoints = 0;
+        let totalPoints = 0;
+        for (const r of a.responses) {
+          if (r.earnedPoints != null) earnedPoints += r.earnedPoints;
+          if (r.questionPoints != null) totalPoints += r.questionPoints;
+        }
+        return {
+          quizId: a.quizId,
+          quizTitle: a.quiz?.title,
+          score: a.score,
+          status: a.status,
+          passGrade: a.quiz?.passGrade,
+          submittedAt: a.submittedAt,
+          earnedPoints,
+          totalPoints,
+        };
+      }),
+      examAttempts: examAttempts.map((a) => {
+        let earnedPoints = 0;
+        let totalPoints = 0;
+        for (const r of a.responses) {
+          if (r.earnedPoints != null) earnedPoints += r.earnedPoints;
+          if (r.question?.points != null) totalPoints += r.question.points;
+        }
+        return {
+          examId: a.examId,
+          examTitle: a.exam?.title,
+          score: a.score,
+          status: a.status,
+          passGrade: a.exam?.passGrade,
+          submittedAt: a.submittedAt,
+          earnedPoints,
+          totalPoints,
+        };
+      }),
     };
   }
 
