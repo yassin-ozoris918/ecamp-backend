@@ -918,6 +918,268 @@ export class QuizzesService {
       });
     }
   }
+
+  // ─── INSTRUCTOR / ADMIN REVIEW METHODS ────────────────────────────────────
+
+  /**
+   * Lightweight paginated list of all attempts for a given quiz.
+   * Does NOT load per-question responses – those are fetched only when
+   * the instructor opens a specific attempt via getAttemptReview.
+   */
+  async getQuizAttempts(
+    quizId: string,
+    instructorId: string,
+    role: Role,
+    query: {
+      skip?: number;
+      take?: number;
+      status?: string;
+      version?: string;
+      search?: string;
+    } = {},
+  ) {
+    // Authorise: instructor must own the quiz's lecture/course
+    const quiz = await this.prisma.quiz.findFirst({
+      where: { id: quizId },
+      include: { lecture: true },
+    });
+    if (!quiz || quiz.deletedAt) throw new NotFoundException('Quiz not found');
+    await this.verifyLectureOwnership(quiz.lectureId, instructorId, role);
+
+    const { skip = 0, take = 25, status, version, search } = query;
+
+    // Build attempt-level where clause
+    const attemptWhere: any = { quizId, submittedAt: { not: null } };
+    if (status && status !== 'ALL') attemptWhere.status = status;
+
+    // We cannot filter by version at attempt level; version is determined
+    // by which questions were served. We filter post-query when version is set,
+    // OR we join draftAnswers/responses questionId and check version.
+    // Simpler: keep version filter for the frontend; not exposed in DB directly.
+
+    // Student search: join through student relation
+    const studentWhere: any = {};
+    if (search) {
+      studentWhere.OR = [
+        { fullName: { contains: search, mode: 'insensitive' } },
+        { email: { contains: search, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, attempts] = await Promise.all([
+      this.prisma.quizAttempt.count({
+        where: {
+          ...attemptWhere,
+          ...(search ? { student: studentWhere } : {}),
+        },
+      }),
+      this.prisma.quizAttempt.findMany({
+        where: {
+          ...attemptWhere,
+          ...(search ? { student: studentWhere } : {}),
+        },
+        include: {
+          student: { select: { id: true, fullName: true, email: true, profilePictureUrl: true } },
+          // Load only aggregated point totals from responses, not full detail
+          responses: { select: { earnedPoints: true, questionPoints: true, orderAnswer: true } },
+        },
+        orderBy: { submittedAt: 'desc' },
+        skip,
+        take,
+      }),
+    ]);
+
+    // Compute attempt number per student, version from responses,
+    // earned/total points from persisted data
+    // Collect all attempts for this quiz to determine attempt number
+    const allStudentAttempts = await this.prisma.quizAttempt.groupBy({
+      by: ['studentId'],
+      where: { quizId },
+      _count: { id: true },
+    });
+    const studentAttemptCountMap = new Map<string, number>();
+    allStudentAttempts.forEach(a => studentAttemptCountMap.set(a.studentId, a._count.id));
+
+    // For each attempt, figure out attempt number
+    const attemptsByStudentBeforeThis: Map<string, number> = new Map();
+
+    // Re-query in chronological order per student for attempt number
+    const chronoAttempts = await this.prisma.quizAttempt.findMany({
+      where: { quizId },
+      orderBy: [{ studentId: 'asc' }, { createdAt: 'asc' }],
+      select: { id: true, studentId: true },
+    });
+    const attemptNumberMap = new Map<string, number>();
+    const studentOrderCounter = new Map<string, number>();
+    for (const a of chronoAttempts) {
+      const prev = studentOrderCounter.get(a.studentId) ?? 0;
+      const num = prev + 1;
+      studentOrderCounter.set(a.studentId, num);
+      attemptNumberMap.set(a.id, num);
+    }
+
+    const items = attempts.map((a) => {
+      let earned = 0;
+      let total = 0;
+      for (const r of a.responses) {
+        if (r.earnedPoints != null) earned += r.earnedPoints;
+        if (r.questionPoints != null) total += r.questionPoints;
+      }
+      return {
+        attemptId: a.id,
+        studentId: a.studentId,
+        studentName: a.student.fullName,
+        studentEmail: a.student.email,
+        studentProfilePicture: a.student.profilePictureUrl,
+        attemptNumber: attemptNumberMap.get(a.id) ?? 1,
+        score: a.score,
+        earnedPoints: earned,
+        totalPoints: total,
+        status: a.status,
+        submittedAt: a.submittedAt,
+        startedAt: a.startedAt,
+      };
+    });
+
+    return { items, total, skip, take };
+  }
+
+  /**
+   * Full review of a single attempt for instructor/admin.
+   * Returns question text, student answer, correct answer, AI data, and override.
+   * SECURITY NOTE: The correct answers (correctOptionIndex, referenceAnswer,
+   * correctOrder, matchOptions) are included here because this endpoint is
+   * gated behind instructor/admin authorization.
+   *
+   * HISTORICAL INTEGRITY NOTE: Question text, options, and correct answers
+   * are read from the live QuizQuestion record. The schema does NOT snapshot
+   * question content at submission time; only questionPoints is snapshotted
+   * in QuizAttemptResponse. This means question text edits could affect the
+   * review display, but the grading is immutable because earnedPoints is
+   * persisted directly in QuizAttemptResponse and NOT recalculated from the
+   * current QuizQuestion data. Correctness display for MCQ/TRUE_FALSE could
+   * theoretically drift if correctOptionIndex is changed after submission —
+   * this is a known architectural limitation documented in the final report.
+   * We do NOT alter existing data to mitigate; we surface the limitation.
+   */
+  async getAttemptReview(
+    attemptId: string,
+    instructorId: string,
+    role: Role,
+  ) {
+    const attempt = await this.prisma.quizAttempt.findUnique({
+      where: { id: attemptId },
+      include: {
+        quiz: {
+          include: {
+            lecture: { select: { id: true, courseId: true } },
+          },
+        },
+        student: { select: { id: true, fullName: true, email: true, profilePictureUrl: true } },
+        responses: {
+          include: {
+            question: true,
+          },
+          orderBy: { question: { orderIndex: 'asc' } },
+        },
+      },
+    });
+
+    if (!attempt) throw new NotFoundException('Attempt not found');
+
+    // Authorise via the existing ownership chain
+    await this.verifyLectureOwnership(attempt.quiz.lectureId, instructorId, role);
+
+    // Compute attempt number
+    const priorAttempts = await this.prisma.quizAttempt.count({
+      where: {
+        quizId: attempt.quizId,
+        studentId: attempt.studentId,
+        createdAt: { lte: attempt.createdAt },
+      },
+    });
+
+    // Compute totals from persisted (historical) data
+    let earnedPoints = 0;
+    let totalPoints = 0;
+    for (const r of attempt.responses) {
+      if (r.earnedPoints != null) earnedPoints += r.earnedPoints;
+      if (r.questionPoints != null) totalPoints += r.questionPoints;
+    }
+
+    const percentage = totalPoints > 0
+      ? Math.round((earnedPoints / totalPoints) * 100)
+      : attempt.score;
+
+    // Build question-by-question review
+    const questions = attempt.responses.map((r, idx) => {
+      const q = r.question;
+      
+      // Determine correctness label from persisted data
+      let correctnessStatus: string;
+      if (q.type === 'READ_ONLY_TEXT') {
+        correctnessStatus = 'READ_ONLY';
+      } else if (r.earnedPoints === null) {
+        correctnessStatus = 'PENDING';
+      } else if (r.earnedPoints === 0) {
+        correctnessStatus = 'INCORRECT';
+      } else if (r.questionPoints != null && r.earnedPoints >= r.questionPoints) {
+        correctnessStatus = 'CORRECT';
+      } else {
+        correctnessStatus = 'PARTIAL';
+      }
+
+      return {
+        questionNumber: idx + 1,
+        questionId: q.id,
+        questionText: q.text,
+        questionType: q.type,
+        // Persisted historical max (from response record – immutable)
+        maxPoints: r.questionPoints ?? q.points,
+        // Persisted earned (immutable, server-calculated at submit time)
+        earnedPoints: r.earnedPoints,
+        correctnessStatus,
+        // Student's persisted answer (immutable)
+        studentAnswer: {
+          selectedOptionIndex: r.selectedOptionIndex,
+          textResponse: r.textResponse,
+          matchAnswer: r.matchAnswer,
+          orderAnswer: r.orderAnswer,
+        },
+        // Instructor-only: correct answer keys from current QuizQuestion
+        // (See historical integrity note above)
+        correctAnswer: {
+          correctOptionIndex: q.correctOptionIndex,
+          correctOrder: q.correctOrder,
+          matchOptions: q.matchOptions,      // canonical left→right pairs
+          referenceAnswer: q.referenceAnswer,
+          options: q.options,                // label array for MCQ/TRUE_FALSE
+        },
+        // AI grading data
+        aiScoreGuess: r.aiScoreGuess,
+        aiConfidenceScore: r.aiConfidenceScore,
+        evaluationNote: r.evaluationNote,
+        // Instructor override
+        instructorOverrideScore: r.instructorOverrideScore,
+        responseId: r.id,
+      };
+    });
+
+    return {
+      attemptId: attempt.id,
+      quizId: attempt.quizId,
+      quizTitle: attempt.quiz.title,
+      student: attempt.student,
+      attemptNumber: priorAttempts,
+      status: attempt.status,
+      score: attempt.score,
+      earnedPoints,
+      totalPoints,
+      percentage,
+      submittedAt: attempt.submittedAt,
+      startedAt: attempt.startedAt,
+      passGrade: attempt.quiz.passGrade,
+      questions,
+    };
+  }
 }
-
-

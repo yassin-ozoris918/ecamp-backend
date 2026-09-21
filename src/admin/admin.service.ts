@@ -448,6 +448,7 @@ export class AdminService {
           if (r.questionPoints != null) totalPoints += r.questionPoints;
         }
         return {
+          attemptId: a.id,
           quizId: a.quizId,
           quizTitle: a.quiz?.title,
           score: a.score,

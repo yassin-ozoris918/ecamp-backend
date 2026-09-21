@@ -20,12 +20,16 @@ describe('QuizzesService (Objective Grading)', () => {
           useValue: {
             quizAttempt: {
               findFirst: jest.fn(),
+              findUnique: jest.fn(),
               update: jest.fn(),
               count: jest.fn().mockResolvedValue(0),
               create: jest.fn(),
             },
             quiz: {
               findFirst: jest.fn(),
+            },
+            lecture: {
+              findUnique: jest.fn(),
             },
             quizQuestion: {
               findUnique: jest.fn(),
@@ -217,19 +221,19 @@ describe('QuizzesService (Objective Grading)', () => {
 
     test.each([
       ['A. all correct unique pairs', [{ left: 'A', right: '1' }, { left: 'B', right: '2' }, { left: 'C', right: '3' }], 100], // 10/10 = 100%
-      ['B. one correct pair', [{ left: 'A', right: '1' }, { left: 'B', right: '9' }, { left: 'C', right: '9' }], 30], // 3.33/10 => 33% (Wait, 1/3 correct -> Math.round((1/3)*10) = 3 -> 3/10 = 30%)
+      ['B. one correct pair', [{ left: 'A', right: '1' }, { left: 'B', right: '9' }, { left: 'C', right: '9' }], 33],
       ['C. zero correct', [{ left: 'A', right: '9' }], 0],
-      ['D. duplicate identical pair', [{ left: 'A', right: '1' }, { left: 'A', right: '1' }], 30], // duplicate stripped, 1/3 correct -> 30%
-      ['E. same LEFT mapped to multiple RIGHT values', [{ left: 'A', right: '1' }, { left: 'A', right: '2' }], 30], // duplicate stripped, only first taken -> 1/3 correct -> 30%
-      ['F. same RIGHT mapped to multiple LEFT values', [{ left: 'A', right: '1' }, { left: 'B', right: '1' }], 30], // B-1 is wrong, A-1 is correct -> 1/3 -> 30%
+      ['D. duplicate identical pair', [{ left: 'A', right: '1' }, { left: 'A', right: '1' }], 33],
+      ['E. same LEFT mapped to multiple RIGHT values', [{ left: 'A', right: '1' }, { left: 'A', right: '2' }], 33],
+      ['F. same RIGHT mapped to multiple LEFT values', [{ left: 'A', right: '1' }, { left: 'B', right: '1' }], 33],
       ['G. unknown LEFT', [{ left: 'Z', right: '1' }], 0],
       ['H. unknown RIGHT', [{ left: 'A', right: 'Z' }], 0],
-      ['I. missing pair', [{ left: 'A', right: '1' }, { left: 'B', right: '2' }], 70], // 2/3 correct -> 6.66 -> 7/10 = 70%
+      ['I. missing pair', [{ left: 'A', right: '1' }, { left: 'B', right: '2' }], 67],
       ['J. empty array', [], 0],
       ['K. null', null, 0],
       ['L. malformed object', [{ oops: 'A' }], 0],
-      ['M. extra properties', [{ left: 'A', right: '1', extra: true }], 30], // Still extracts left/right
-      ['N. large payload', Array.from({length: 1000}).map(() => ({left: 'A', right: '1'})), 30], // Deduplicated to 1 -> 30%
+      ['M. extra properties', [{ left: 'A', right: '1', extra: true }], 33],
+      ['N. large payload', Array.from({length: 1000}).map(() => ({left: 'A', right: '1'})), 33],
     ])('MATCHING: %s', async (name, payload, expectedScore) => {
       await service.submitQuiz({
         answers: [{ questionId: 'q_matching', matchAnswer: payload as any }]
@@ -272,24 +276,22 @@ describe('QuizzesService (Objective Grading)', () => {
 
     test.each([
       ['A. completely correct order', ['A', 'B', 'C'], 100],
-      ['B. one correctly positioned item', ['A', 'C', 'B'], 30], // A is correct -> 1/3 -> 30%
-      ['C. partially correct order', ['A', 'B', 'Z'], 67], // 2/3 -> 70%
+      ['B. one correctly positioned item', ['A', 'C', 'B'], 33],
+      ['C. partially correct order', ['A', 'B', 'Z'], 67],
       ['D. completely incorrect order', ['C', 'A', 'B'], 0],
-      ['E. duplicate item', ['A', 'A', 'C'], 67], // A is correct, A is wrong, C is correct -> 2/3 -> 70%
-      ['F. missing item', ['A', 'B'], 0], // length mismatch => 0 points
-      ['G. unknown item', ['A', 'B', 'Z'], 67], // 2/3 correct -> 70%
+      ['E. duplicate item', ['A', 'A', 'C'], 67],
+      ['F. missing item', ['A', 'B'], 0],
+      ['G. unknown item', ['A', 'B', 'Z'], 67],
       ['H. empty order', [], 0],
       ['I. null', null, 0],
-      ['J. malformed payload', [{a: 1}], 0], // length mismatch => 0
-      ['K. extra items', ['A', 'B', 'C', 'D'], 0], // length mismatch => 0
+      ['J. malformed payload', [{a: 1}], 0],
+      ['K. extra items', ['A', 'B', 'C', 'D'], 0],
     ])('ORDERING: %s', async (name, payload, expectedScore) => {
       await service.submitQuiz({
         answers: [{ questionId: 'q_ordering', orderAnswer: payload as any }]
       }, studentId);
       
       let expected = expectedScore;
-      if (name === 'I. missing pair') expected = 70; // 7/10
-      if (name === 'C. partially correct order' || name === 'E. duplicate item' || name === 'G. unknown item') expected = 70;
       
       expect(prisma.quizAttempt.update).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -365,6 +367,55 @@ describe('QuizzesService (Objective Grading)', () => {
 
       const ordering = data.find((q: any) => q.type === 'ORDERING');
       expect(ordering.correctOrder).toEqual(['X', 'Y', 'Z']);
+    });
+  });
+
+  describe('getAttemptReview (Instructor Review)', () => {
+    it('should include correct answers for instructor and verify ownership', async () => {
+      // Mock data
+      const quizId = 'q1';
+      const attemptId = 'a1';
+      const lectureId = 'l1';
+      
+      const mockAttempt = {
+        id: attemptId,
+        quizId,
+        studentId: 's1',
+        score: 80,
+        status: 'PASSED',
+        quiz: { id: quizId, title: 'Test Quiz', passGrade: 50, lectureId, lecture: { id: lectureId, courseId: 'c1' } },
+        student: { id: 's1', fullName: 'John Doe', email: 'john@example.com', profilePictureUrl: null },
+        responses: [
+          {
+            id: 'r1',
+            earnedPoints: 5,
+            questionPoints: 5,
+            selectedOptionIndex: 1,
+            question: {
+              id: 'q1',
+              type: 'MCQ',
+              text: 'What is 2+2?',
+              points: 5,
+              correctOptionIndex: 1,
+              options: ['3', '4', '5'],
+            }
+          }
+        ]
+      };
+
+      (prisma.quizAttempt.findUnique as jest.Mock).mockResolvedValue(mockAttempt);
+      (prisma.quizAttempt.count as jest.Mock).mockResolvedValue(1);
+      (prisma.lecture.findUnique as jest.Mock).mockResolvedValue({ courseId: 'c1' });
+      (prisma.courseInstructor.findFirst as jest.Mock).mockResolvedValue({ id: 'ci1' }); // Mock ownership success
+
+      const result = await service.getAttemptReview(attemptId, 'instructor1', 'INSTRUCTOR');
+
+      expect(prisma.courseInstructor.findFirst).toHaveBeenCalled(); // verified ownership
+      expect(result.attemptId).toBe(attemptId);
+      expect(result.questions).toHaveLength(1);
+      expect(result.questions[0].correctAnswer.correctOptionIndex).toBe(1); // instructor sees correct answer
+      expect(result.questions[0].correctAnswer.options).toEqual(['3', '4', '5']);
+      expect(result.questions[0].studentAnswer.selectedOptionIndex).toBe(1);
     });
   });
 });
