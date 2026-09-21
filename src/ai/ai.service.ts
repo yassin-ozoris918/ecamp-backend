@@ -423,7 +423,7 @@ Return a JSON object exactly matching this schema (do NOT use chain-of-thought f
 Questions and student answers to grade:
 ${JSON.stringify(promptData, null, 2)}`;
 
-      const modelName = this.configService.get<string>('GROQ_GRADING_MODEL') || 'llama-3.1-70b-versatile';
+      const modelName = this.configService.get<string>('GROQ_GRADING_MODEL') || 'llama3-8b-8192';
 
       let aiResponseText = '{"grades":[]}';
       let retries = 3;
