@@ -55,20 +55,24 @@ async function main() {
   await getOrCreateProgram(scuEng.id, scuEngElec.id, 'هندسة القوى والآلات الكهربائية', 'Power & Electrical Machines', 1);
   await getOrCreateProgram(scuEng.id, scuEngElec.id, 'هندسة الاتصالات والإلكترونيات', 'Communications & Electronics', 2);
   await getOrCreateProgram(scuEng.id, scuEngElec.id, 'هندسة الحاسبات والتحكم', 'Computer & Control Engineering', 3);
+  await getOrCreateProgram(scuEng.id, scuEngElec.id, 'برامج خاصة (Credit Programs)', 'Credit Programs', 99);
   
   const scuEngCivil = await getOrCreateDepartment(scu.id, scuEng.id, 'الهندسة المدنية', 'Civil Engineering', 2);
   await getOrCreateProgram(scuEng.id, scuEngCivil.id, 'هندسة الإنشاءات', 'Structural', 1);
   await getOrCreateProgram(scuEng.id, scuEngCivil.id, 'هندسة الأشغال العامة', 'Public Works', 2);
   await getOrCreateProgram(scuEng.id, scuEngCivil.id, 'هندسة الري والموارد المائية', 'Irrigation & Water Resources', 3);
   await getOrCreateProgram(scuEng.id, scuEngCivil.id, 'هندسة التشييد وإدارة المشروعات', 'Construction & Project Management', 4);
+  await getOrCreateProgram(scuEng.id, scuEngCivil.id, 'برامج خاصة (Credit Programs)', 'Credit Programs', 99);
 
   const scuEngMech = await getOrCreateDepartment(scu.id, scuEng.id, 'الهندسة الميكانيكية', 'Mechanical Engineering', 3);
   await getOrCreateProgram(scuEng.id, scuEngMech.id, 'هندسة الإنتاج والتصميم الميكانيكي', 'Production & Mechanical Design', 1);
   await getOrCreateProgram(scuEng.id, scuEngMech.id, 'هندسة القوى الميكانيكية', 'Mechanical Power', 2);
+  await getOrCreateProgram(scuEng.id, scuEngMech.id, 'برامج خاصة (Credit Programs)', 'Credit Programs', 99);
   
   const scuEngArch = await getOrCreateDepartment(scu.id, scuEng.id, 'هندسة العمارة والتخطيط العمراني', 'Architecture & Urban Planning', 4);
   await getOrCreateProgram(scuEng.id, scuEngArch.id, 'هندسة العمارة', 'Architecture', 1);
   await getOrCreateProgram(scuEng.id, scuEngArch.id, 'هندسة تخطيط المدن', 'Urban Planning', 2);
+  await getOrCreateProgram(scuEng.id, scuEngArch.id, 'برامج خاصة (Credit Programs)', 'Credit Programs', 99);
 
   const scuComp = await getOrCreateFaculty(scu.id, 'كلية الحاسبات والمعلومات', 'Faculty of Computers & Information', 2);
   const scuCompCs = await getOrCreateDepartment(scu.id, scuComp.id, 'علوم الحاسب', 'Computer Science', 1);
