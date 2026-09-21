@@ -11,9 +11,11 @@ import { ConfigService } from '@nestjs/config';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import * as bcrypt from 'bcrypt';
-import { Role } from '@prisma/client';
+import { Role, EducationLevel } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MaintenancePolicy } from './policies/maintenance.policy';
+
+import { validateUniversitySegmentation, validateStudentSegmentation } from '../common/utils/segmentation-validation.util';
 
 @Injectable()
 export class AuthService {
@@ -46,6 +48,13 @@ export class AuthService {
     // Determine the deviceId
     const finalDeviceId = headerDeviceId || dto.deviceId;
     
+    // Validate university hierarchy
+    if (dto.educationLevel === EducationLevel.UNIVERSITY) {
+      await validateUniversitySegmentation(this.prisma, dto);
+    } else {
+      validateStudentSegmentation(dto);
+    }
+
     let user;
     try {
       user = await this.prisma.user.create({
@@ -60,10 +69,14 @@ export class AuthService {
           highSchoolGrade: dto.highSchoolGrade,
           traditionalBranch: dto.traditionalBranch,
           baccalaureatePath: dto.baccalaureatePath,
-          university: dto.university,
-          faculty: dto.faculty,
-          department: dto.department,
-          academicYear: dto.academicYear,
+          universityId: dto.universityId,
+          facultyId: dto.facultyId,
+          departmentId: dto.departmentId,
+          programId: dto.programId,
+          otherUniversityName: dto.otherUniversityName,
+          otherFacultyName: dto.otherFacultyName,
+          otherDepartmentName: dto.otherDepartmentName,
+          otherProgramName: dto.otherProgramName,
           phoneNumber: dto.phoneNumber,
           parentPhoneNumber: dto.parentPhoneNumber,
           profilePictureUrl: dto.profilePictureUrl,
@@ -278,10 +291,14 @@ export class AuthService {
         highSchoolGrade: user.highSchoolGrade,
         traditionalBranch: user.traditionalBranch,
         baccalaureatePath: user.baccalaureatePath,
-        university: user.university,
-        faculty: user.faculty,
-        department: user.department,
-        academicYear: user.academicYear,
+        universityId: user.universityId,
+        facultyId: user.facultyId,
+        departmentId: user.departmentId,
+        programId: user.programId,
+        otherUniversityName: user.otherUniversityName,
+        otherFacultyName: user.otherFacultyName,
+        otherDepartmentName: user.otherDepartmentName,
+        otherProgramName: user.otherProgramName,
       },
     };
   }
@@ -343,10 +360,14 @@ export class AuthService {
         highSchoolGrade: user.highSchoolGrade,
         traditionalBranch: user.traditionalBranch,
         baccalaureatePath: user.baccalaureatePath,
-        university: user.university,
-        faculty: user.faculty,
-        department: user.department,
-        academicYear: user.academicYear,
+        universityId: user.universityId,
+        facultyId: user.facultyId,
+        departmentId: user.departmentId,
+        programId: user.programId,
+        otherUniversityName: user.otherUniversityName,
+        otherFacultyName: user.otherFacultyName,
+        otherDepartmentName: user.otherDepartmentName,
+        otherProgramName: user.otherProgramName,
       },
     };
   }

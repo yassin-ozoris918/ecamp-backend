@@ -76,10 +76,14 @@ export class UsersController {
       highSchoolGrade?: any;
       traditionalBranch?: any;
       baccalaureatePath?: any;
-      university?: string;
-      faculty?: string;
-      department?: string;
-      academicYear?: string;
+      universityId?: string;
+      facultyId?: string;
+      departmentId?: string;
+      programId?: string;
+      otherUniversityName?: string;
+      otherFacultyName?: string;
+      otherDepartmentName?: string;
+      otherProgramName?: string;
     },
     @Req() req: RequestWithUser,
   ) {

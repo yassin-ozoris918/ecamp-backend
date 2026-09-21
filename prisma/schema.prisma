@@ -122,13 +122,20 @@ model User {
   traditionalBranch     TraditionalBranch?
   baccalaureatePath     BaccalaureatePath?
 
-  // --- University Dimensions ---
-  university            String?
-  faculty               String?
-  department            String?
+  // --- University Dimensions (FK-based) ---
+  universityId          String?
+  facultyId             String?
+  departmentId          String?
+  programId             String?
+  otherUniversityName   String?
+  otherFacultyName      String?
+  otherDepartmentName   String?
+  otherProgramName      String?
 
-  // --- Shared / Master Data ---
-  academicYear          String?
+  academicUniversity    AcademicUniversity? @relation("StudentUniversity", fields: [universityId], references: [id], onDelete: Restrict)
+  academicFaculty       AcademicFaculty?    @relation("StudentFaculty", fields: [facultyId], references: [id], onDelete: Restrict)
+  academicDepartment    AcademicDepartment? @relation("StudentDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
+  academicProgram       AcademicProgram?    @relation("StudentProgram", fields: [programId], references: [id], onDelete: Restrict)
 
   refreshToken          String?
   createdAt             DateTime       @default(now())
@@ -172,6 +179,11 @@ model User {
 
   profileUpdateRequests  ProfileUpdateRequest[] @relation("ProfileUpdateStudent")
   profileUpdatesReviewed ProfileUpdateRequest[] @relation("ProfileUpdateReviewer")
+
+  @@index([universityId])
+  @@index([facultyId])
+  @@index([departmentId])
+  @@index([programId])
 }
 
 model Course {
@@ -193,10 +205,15 @@ model Course {
   targetHighSchoolGrade    HighSchoolGrade?
   targetTraditionalBranch  TraditionalBranch?
   targetBaccalaureatePath  BaccalaureatePath?
-  targetUniversity         String?
-  targetFaculty            String?
-  targetDepartment         String?
-  targetAcademicYear       String?
+  targetUniversityId       String?
+  targetFacultyId          String?
+  targetDepartmentId       String?
+  targetProgramId          String?
+
+  targetUniversityRel      AcademicUniversity?  @relation("CourseTargetUniversity", fields: [targetUniversityId], references: [id], onDelete: Restrict)
+  targetFacultyRel         AcademicFaculty?     @relation("CourseTargetFaculty", fields: [targetFacultyId], references: [id], onDelete: Restrict)
+  targetDepartmentRel      AcademicDepartment?  @relation("CourseTargetDepartment", fields: [targetDepartmentId], references: [id], onDelete: Restrict)
+  targetProgramRel         AcademicProgram?     @relation("CourseTargetProgram", fields: [targetProgramId], references: [id], onDelete: Restrict)
 
   validityDays             Int?
   isFree                   Boolean        @default(false)
@@ -217,6 +234,11 @@ model Course {
   studentAccess StudentCourseAccess[]
   redeemedCodes ActivationCode[]
   codeHistory   ActivationCodeHistory[]
+
+  @@index([targetUniversityId])
+  @@index([targetFacultyId])
+  @@index([targetDepartmentId])
+  @@index([targetProgramId])
 }
 
 model Chapter {
@@ -925,4 +947,79 @@ model ProfileUpdateRequest {
 
   @@index([studentId])
   @@index([status])
+}
+
+// --- Academic Master Data ---
+
+model AcademicUniversity {
+  id        String   @id @default(uuid())
+  nameAr    String
+  nameEn    String
+  sortOrder Int      @default(0)
+  isOther   Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  faculties   AcademicFaculty[]
+  departments AcademicDepartment[]
+  students    User[]   @relation("StudentUniversity")
+  courses     Course[] @relation("CourseTargetUniversity")
+
+  @@index([sortOrder])
+}
+
+model AcademicFaculty {
+  id           String   @id @default(uuid())
+  universityId String
+  nameAr       String
+  nameEn       String
+  sortOrder    Int      @default(0)
+  isOther      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  university  AcademicUniversity   @relation(fields: [universityId], references: [id], onDelete: Restrict)
+  departments AcademicDepartment[]
+  programs    AcademicProgram[]    @relation("FacultyPrograms")
+  students    User[]               @relation("StudentFaculty")
+  courses     Course[]             @relation("CourseTargetFaculty")
+
+  @@index([universityId])
+}
+
+model AcademicDepartment {
+  id           String   @id @default(uuid())
+  facultyId    String
+  universityId String
+  nameAr       String
+  nameEn       String
+  sortOrder    Int      @default(0)
+  isOther      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  faculty    AcademicFaculty    @relation(fields: [facultyId], references: [id], onDelete: Restrict)
+  university AcademicUniversity @relation(fields: [universityId], references: [id], onDelete: Restrict)
+  programs   AcademicProgram[]  @relation("DepartmentPrograms")
+  students   User[]             @relation("StudentDepartment")
+  courses    Course[]           @relation("CourseTargetDepartment")
+
+  @@index([facultyId])
+  @@index([universityId])
+}
+
+model AcademicProgram {
+  id           String   @id @default(uuid())
+  departmentId String?
+  facultyId    String
+  nameAr       String
+  nameEn       String
+  sortOrder    Int      @default(0)
+  isOther      Boolean  @default(false)
+  createdAt    DateTime @default(now())
+
+  department AcademicDepartment? @relation("DepartmentPrograms", fields: [departmentId], references: [id], onDelete: Restrict)
+  faculty    AcademicFaculty     @relation("FacultyPrograms", fields: [facultyId], references: [id], onDelete: Restrict)
+  students   User[]              @relation("StudentProgram")
+  courses    Course[]            @relation("CourseTargetProgram")
+
+  @@index([departmentId])
+  @@index([facultyId])
 }

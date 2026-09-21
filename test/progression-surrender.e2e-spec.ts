@@ -89,6 +89,7 @@ describe('Progression & Surrender (e2e)', () => {
       expect(resStart.status).toBe(201);
       
       const q = await prisma.quizQuestion.findFirst({ where: { quizId } });
+      if (!q) throw new Error('Question not found');
       await request(app.getHttpServer())
         .post(`/quizzes/submit`)
         .set('Authorization', `Bearer ${studentToken}`)
@@ -137,6 +138,7 @@ describe('Progression & Surrender (e2e)', () => {
 
     it('should allow admin intervention to unblock (by setting status to PASSED manually)', async () => {
       const lastAttempt = await prisma.quizAttempt.findFirst({ where: { studentId, quizId }, orderBy: { createdAt: 'desc' } });
+      if (!lastAttempt) throw new Error('Last attempt not found');
       await prisma.quizAttempt.update({
         where: { id: lastAttempt.id },
         data: { status: AttemptStatus.PASSED, score: 100 }

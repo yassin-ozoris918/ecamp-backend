@@ -21,7 +21,13 @@ export class CoursesProvider implements DataProvider {
 
     const courses = await this.prisma.course.findMany({
       where,
-      include: { _count: { select: { lectures: true, chapters: true, exams: true } } },
+      include: { 
+        _count: { select: { lectures: true, chapters: true, exams: true } },
+        targetUniversityRel: { select: { nameAr: true } },
+        targetFacultyRel: { select: { nameAr: true } },
+        targetDepartmentRel: { select: { nameAr: true } },
+        targetProgramRel: { select: { nameAr: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -40,7 +46,7 @@ export class CoursesProvider implements DataProvider {
         { key: 'targetUniversity', label: 'Target University' },
         { key: 'targetFaculty', label: 'Target Faculty' },
         { key: 'targetDepartment', label: 'Target Department' },
-        { key: 'targetAcademicYear', label: 'Target Academic Year' },
+        { key: 'targetProgram', label: 'Target Program' },
         { key: 'lecturesCount', label: 'Lectures' },
         { key: 'chaptersCount', label: 'Chapters' },
         { key: 'examsCount', label: 'Exams' },
@@ -57,10 +63,10 @@ export class CoursesProvider implements DataProvider {
         targetHighSchoolGrade: c.targetHighSchoolGrade,
         targetTraditionalBranch: c.targetTraditionalBranch,
         targetBaccalaureatePath: c.targetBaccalaureatePath,
-        targetUniversity: c.targetUniversity,
-        targetFaculty: c.targetFaculty,
-        targetDepartment: c.targetDepartment,
-        targetAcademicYear: c.targetAcademicYear,
+        targetUniversity: c.targetUniversityRel?.nameAr || '',
+        targetFaculty: c.targetFacultyRel?.nameAr || '',
+        targetDepartment: c.targetDepartmentRel?.nameAr || '',
+        targetProgram: c.targetProgramRel?.nameAr || '',
         lecturesCount: c._count.lectures,
         chaptersCount: c._count.chapters,
         examsCount: c._count.exams,

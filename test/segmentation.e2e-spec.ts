@@ -101,17 +101,17 @@ describe('Segmentation (e2e)', () => {
 
     it('Explicit null clears the field', async () => {
       // Set a faculty first
-      await prisma.user.update({ where: { id: studentId }, data: { university: 'Cairo Univ', faculty: 'Engineering' } });
+      await prisma.user.update({ where: { id: studentId }, data: { otherUniversityName: 'Cairo Univ', otherFacultyName: 'Engineering' } });
 
       await request(app.getHttpServer())
         .patch(`/users/profile`)
         .set('Authorization', `Bearer ${studentToken}`)
-        .send({ faculty: null, university: null })
+        .send({ otherFacultyName: null, otherUniversityName: null })
         .expect(200);
 
       const user = await prisma.user.findUnique({ where: { id: studentId } });
-      expect(user?.university).toBeNull();
-      expect(user?.faculty).toBeNull();
+      expect(user?.otherUniversityName).toBeNull();
+      expect(user?.otherFacultyName).toBeNull();
     });
 
     it('Invalid merged state returns 400 and preserves database', async () => {

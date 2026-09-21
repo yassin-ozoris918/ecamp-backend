@@ -49,10 +49,10 @@ export class LevelIsolationGuard implements CanActivate {
           highSchoolGrade: true,
           traditionalBranch: true,
           baccalaureatePath: true,
-          university: true,
-          faculty: true,
-          department: true,
-          academicYear: true,
+          universityId: true,
+          facultyId: true,
+          departmentId: true,
+          programId: true,
         },
       });
 
@@ -83,10 +83,10 @@ export class LevelIsolationGuard implements CanActivate {
         if (fullCourse.targetTraditionalBranch && fullCourse.targetTraditionalBranch !== dbUser.traditionalBranch) throw new ForbiddenException('Course restricted by branch.');
         if (fullCourse.targetBaccalaureatePath && fullCourse.targetBaccalaureatePath !== dbUser.baccalaureatePath) throw new ForbiddenException('Course restricted by path.');
       } else if (fullCourse.audienceType === 'UNIVERSITY') {
-        if (fullCourse.targetUniversity && fullCourse.targetUniversity !== dbUser.university) throw new ForbiddenException('Course restricted by university.');
-        if (fullCourse.targetFaculty && fullCourse.targetFaculty !== dbUser.faculty) throw new ForbiddenException('Course restricted by faculty.');
-        if (fullCourse.targetDepartment && fullCourse.targetDepartment !== dbUser.department) throw new ForbiddenException('Course restricted by department.');
-        if (fullCourse.targetAcademicYear && fullCourse.targetAcademicYear !== dbUser.academicYear) throw new ForbiddenException('Course restricted by academic year.');
+        if (fullCourse.targetUniversityId && fullCourse.targetUniversityId !== dbUser.universityId) throw new ForbiddenException('Course restricted by university.');
+        if (fullCourse.targetFacultyId && fullCourse.targetFacultyId !== dbUser.facultyId) throw new ForbiddenException('Course restricted by faculty.');
+        if (fullCourse.targetDepartmentId && fullCourse.targetDepartmentId !== dbUser.departmentId) throw new ForbiddenException('Course restricted by department.');
+        if (fullCourse.targetProgramId && fullCourse.targetProgramId !== dbUser.programId) throw new ForbiddenException('Course restricted by program.');
       }
     }
 

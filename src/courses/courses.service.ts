@@ -8,7 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { Role } from '@prisma/client';
-import { validateCourseTargeting } from '../common/utils/segmentation-validation.util';
+import { validateCourseTargeting, validateCourseTargetingAsync } from '../common/utils/segmentation-validation.util';
 @Injectable()
 export class CoursesService {
   constructor(private prisma: PrismaService) {}
@@ -40,9 +40,13 @@ export class CoursesService {
       highSchoolGrade: dto.targetHighSchoolGrade !== undefined ? normalize(dto.targetHighSchoolGrade) : null,
       traditionalBranch: dto.targetTraditionalBranch !== undefined ? normalize(dto.targetTraditionalBranch) : null,
       baccalaureatePath: dto.targetBaccalaureatePath !== undefined ? normalize(dto.targetBaccalaureatePath) : null,
+      targetUniversityId: dto.targetUniversityId !== undefined ? normalize(dto.targetUniversityId) : null,
+      targetFacultyId: dto.targetFacultyId !== undefined ? normalize(dto.targetFacultyId) : null,
+      targetDepartmentId: dto.targetDepartmentId !== undefined ? normalize(dto.targetDepartmentId) : null,
+      targetProgramId: dto.targetProgramId !== undefined ? normalize(dto.targetProgramId) : null,
     };
 
-    validateCourseTargeting(finalState);
+    await validateCourseTargetingAsync(this.prisma, finalState);
 
     return this.prisma.course.create({
       data: {
@@ -56,10 +60,10 @@ export class CoursesService {
         targetHighSchoolGrade: finalState.highSchoolGrade,
         targetTraditionalBranch: finalState.traditionalBranch,
         targetBaccalaureatePath: finalState.baccalaureatePath,
-        targetUniversity: dto.targetUniversity !== undefined ? normalize(dto.targetUniversity) : null,
-        targetFaculty: dto.targetFaculty !== undefined ? normalize(dto.targetFaculty) : null,
-        targetDepartment: dto.targetDepartment !== undefined ? normalize(dto.targetDepartment) : null,
-        targetAcademicYear: dto.targetAcademicYear !== undefined ? normalize(dto.targetAcademicYear) : null,
+        targetUniversityId: dto.targetUniversityId !== undefined ? normalize(dto.targetUniversityId) : null,
+        targetFacultyId: dto.targetFacultyId !== undefined ? normalize(dto.targetFacultyId) : null,
+        targetDepartmentId: dto.targetDepartmentId !== undefined ? normalize(dto.targetDepartmentId) : null,
+        targetProgramId: dto.targetProgramId !== undefined ? normalize(dto.targetProgramId) : null,
         ...(role === Role.INSTRUCTOR && {
           instructors: {
             create: {
@@ -113,10 +117,10 @@ export class CoursesService {
             { OR: [{ targetTraditionalBranch: null }, { targetTraditionalBranch: dbUser.traditionalBranch }] },
             { OR: [{ targetBaccalaureatePath: null }, { targetBaccalaureatePath: dbUser.baccalaureatePath }] },
           ] : [
-            { OR: [{ targetUniversity: null }, { targetUniversity: dbUser.university }] },
-            { OR: [{ targetFaculty: null }, { targetFaculty: dbUser.faculty }] },
-            { OR: [{ targetDepartment: null }, { targetDepartment: dbUser.department }] },
-            { OR: [{ targetAcademicYear: null }, { targetAcademicYear: dbUser.academicYear }] },
+            { OR: [{ targetUniversityId: null }, { targetUniversityId: dbUser.universityId }] },
+            { OR: [{ targetFacultyId: null }, { targetFacultyId: dbUser.facultyId }] },
+            { OR: [{ targetDepartmentId: null }, { targetDepartmentId: dbUser.departmentId }] },
+            { OR: [{ targetProgramId: null }, { targetProgramId: dbUser.programId }] },
           ])
         ];
       }
@@ -355,9 +359,13 @@ export class CoursesService {
       highSchoolGrade: dto.targetHighSchoolGrade !== undefined ? normalize(dto.targetHighSchoolGrade) : course.targetHighSchoolGrade,
       traditionalBranch: dto.targetTraditionalBranch !== undefined ? normalize(dto.targetTraditionalBranch) : course.targetTraditionalBranch,
       baccalaureatePath: dto.targetBaccalaureatePath !== undefined ? normalize(dto.targetBaccalaureatePath) : course.targetBaccalaureatePath,
+      targetUniversityId: dto.targetUniversityId !== undefined ? normalize(dto.targetUniversityId) : course.targetUniversityId,
+      targetFacultyId: dto.targetFacultyId !== undefined ? normalize(dto.targetFacultyId) : course.targetFacultyId,
+      targetDepartmentId: dto.targetDepartmentId !== undefined ? normalize(dto.targetDepartmentId) : course.targetDepartmentId,
+      targetProgramId: dto.targetProgramId !== undefined ? normalize(dto.targetProgramId) : course.targetProgramId,
     };
 
-    validateCourseTargeting(finalState);
+    await validateCourseTargetingAsync(this.prisma, finalState);
 
     return this.prisma.course.update({
       where: { id },
@@ -372,10 +380,10 @@ export class CoursesService {
         targetHighSchoolGrade: finalState.highSchoolGrade,
         targetTraditionalBranch: finalState.traditionalBranch,
         targetBaccalaureatePath: finalState.baccalaureatePath,
-        targetUniversity: dto.targetUniversity !== undefined ? normalize(dto.targetUniversity) : course.targetUniversity,
-        targetFaculty: dto.targetFaculty !== undefined ? normalize(dto.targetFaculty) : course.targetFaculty,
-        targetDepartment: dto.targetDepartment !== undefined ? normalize(dto.targetDepartment) : course.targetDepartment,
-        targetAcademicYear: dto.targetAcademicYear !== undefined ? normalize(dto.targetAcademicYear) : course.targetAcademicYear,
+        targetUniversityId: dto.targetUniversityId !== undefined ? normalize(dto.targetUniversityId) : course.targetUniversityId,
+        targetFacultyId: dto.targetFacultyId !== undefined ? normalize(dto.targetFacultyId) : course.targetFacultyId,
+        targetDepartmentId: dto.targetDepartmentId !== undefined ? normalize(dto.targetDepartmentId) : course.targetDepartmentId,
+        targetProgramId: dto.targetProgramId !== undefined ? normalize(dto.targetProgramId) : course.targetProgramId,
       },
     });
   }
@@ -509,10 +517,10 @@ export class CoursesService {
             { OR: [{ targetTraditionalBranch: null }, { targetTraditionalBranch: user.traditionalBranch }] },
             { OR: [{ targetBaccalaureatePath: null }, { targetBaccalaureatePath: user.baccalaureatePath }] },
           ] : [
-            { OR: [{ targetUniversity: null }, { targetUniversity: user.university }] },
-            { OR: [{ targetFaculty: null }, { targetFaculty: user.faculty }] },
-            { OR: [{ targetDepartment: null }, { targetDepartment: user.department }] },
-            { OR: [{ targetAcademicYear: null }, { targetAcademicYear: user.academicYear }] },
+            { OR: [{ targetUniversityId: null }, { targetUniversityId: user.universityId }] },
+            { OR: [{ targetFacultyId: null }, { targetFacultyId: user.facultyId }] },
+            { OR: [{ targetDepartmentId: null }, { targetDepartmentId: user.departmentId }] },
+            { OR: [{ targetProgramId: null }, { targetProgramId: user.programId }] },
           ])
         ]
       },

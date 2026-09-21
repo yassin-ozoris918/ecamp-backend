@@ -27,10 +27,10 @@ export class AdminService {
       highSchoolGrade,
       traditionalBranch,
       baccalaureatePath,
-      university,
-      faculty,
-      department,
-      academicYear,
+      universityId,
+      facultyId,
+      departmentId,
+      programId,
       sortBy = 'createdAt',
       sortOrder = 'desc',
       skip = 0,
@@ -57,10 +57,10 @@ export class AdminService {
     if (highSchoolGrade) where.highSchoolGrade = highSchoolGrade;
     if (traditionalBranch) where.traditionalBranch = traditionalBranch;
     if (baccalaureatePath) where.baccalaureatePath = baccalaureatePath;
-    if (university) where.university = university;
-    if (faculty) where.faculty = faculty;
-    if (department) where.department = department;
-    if (academicYear) where.academicYear = academicYear;
+    if (universityId) where.universityId = universityId;
+    if (facultyId) where.facultyId = facultyId;
+    if (departmentId) where.departmentId = departmentId;
+    if (programId) where.programId = programId;
     if (isActive !== undefined) where.isActive = isActive;
 
     // Date range filter
@@ -104,10 +104,18 @@ export class AdminService {
           highSchoolGrade: true,
           traditionalBranch: true,
           baccalaureatePath: true,
-          university: true,
-          faculty: true,
-          department: true,
-          academicYear: true,
+          universityId: true,
+          facultyId: true,
+          departmentId: true,
+          programId: true,
+          otherUniversityName: true,
+          otherFacultyName: true,
+          otherDepartmentName: true,
+          otherProgramName: true,
+          academicUniversity: { select: { id: true, nameAr: true, nameEn: true, isOther: true } },
+          academicFaculty: { select: { id: true, nameAr: true, nameEn: true, isOther: true } },
+          academicDepartment: { select: { id: true, nameAr: true, nameEn: true, isOther: true } },
+          academicProgram: { select: { id: true, nameAr: true, nameEn: true, isOther: true } },
         },
         orderBy: { [sortBy]: sortOrder },
         skip,

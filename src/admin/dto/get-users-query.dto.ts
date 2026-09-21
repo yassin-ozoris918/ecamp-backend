@@ -41,19 +41,19 @@ export class GetUsersQueryDto {
 
   @IsOptional()
   @IsString()
-  university?: string;
+  universityId?: string;
 
   @IsOptional()
   @IsString()
-  faculty?: string;
+  facultyId?: string;
 
   @IsOptional()
   @IsString()
-  department?: string;
+  departmentId?: string;
 
   @IsOptional()
   @IsString()
-  academicYear?: string;
+  programId?: string;
 
   @IsOptional()
   @Transform(({ value }: { value: string }) => value === 'true' ? true : value === 'false' ? false : undefined)

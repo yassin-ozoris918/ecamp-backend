@@ -44,17 +44,17 @@ export class CreateCourseDto {
 
   @IsOptional()
   @IsString()
-  targetUniversity?: string | null;
+  targetUniversityId?: string | null;
 
   @IsOptional()
   @IsString()
-  targetFaculty?: string | null;
+  targetFacultyId?: string | null;
 
   @IsOptional()
   @IsString()
-  targetDepartment?: string | null;
+  targetDepartmentId?: string | null;
 
   @IsOptional()
   @IsString()
-  targetAcademicYear?: string | null;
+  targetProgramId?: string | null;
 }

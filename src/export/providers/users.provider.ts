@@ -37,7 +37,12 @@ export class UsersProvider implements DataProvider {
         id: true, fullName: true, email: true, role: true, isActive: true, 
         educationLevel: true, highSchoolSystem: true, studyMode: true, studyLanguage: true,
         highSchoolGrade: true, traditionalBranch: true, baccalaureatePath: true,
-        university: true, faculty: true, department: true, academicYear: true,
+        universityId: true, facultyId: true, departmentId: true, programId: true,
+        otherUniversityName: true, otherFacultyName: true, otherDepartmentName: true, otherProgramName: true,
+        academicUniversity: { select: { nameAr: true } },
+        academicFaculty: { select: { nameAr: true } },
+        academicDepartment: { select: { nameAr: true } },
+        academicProgram: { select: { nameAr: true } },
         phoneNumber: true, createdAt: true, lastLoginAt: true, xp: true 
       },
       orderBy: { createdAt: 'desc' },
@@ -60,7 +65,7 @@ export class UsersProvider implements DataProvider {
         { key: 'university', label: 'University' },
         { key: 'faculty', label: 'Faculty' },
         { key: 'department', label: 'Department' },
-        { key: 'academicYear', label: 'Academic Year' },
+        { key: 'program', label: 'Program' },
         { key: 'phoneNumber', label: 'Phone' },
         { key: 'createdAt', label: 'Created At' },
         { key: 'lastLoginAt', label: 'Last Login' },
@@ -71,6 +76,10 @@ export class UsersProvider implements DataProvider {
         isActive: u.isActive ? 'Yes' : 'No',
         createdAt: u.createdAt.toISOString(),
         lastLoginAt: u.lastLoginAt?.toISOString() || '',
+        university: u.academicUniversity?.nameAr || u.otherUniversityName || '',
+        faculty: u.academicFaculty?.nameAr || u.otherFacultyName || '',
+        department: u.academicDepartment?.nameAr || u.otherDepartmentName || '',
+        program: u.academicProgram?.nameAr || u.otherProgramName || '',
       })),
     };
   }

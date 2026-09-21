@@ -41,6 +41,7 @@ import { MediaModule } from './media/media.module';
 import { ReorderModule } from './reorder/reorder.module';
 import { ExportModule } from './export/export.module';
 import { ProfileUpdateRequestsModule } from './profile-update-requests/profile-update-requests.module';
+import { AcademicDataModule } from './academic-data/academic-data.module';
 
 @Module({
   imports: [
@@ -140,6 +141,7 @@ import { ProfileUpdateRequestsModule } from './profile-update-requests/profile-u
     ReorderModule,
     ExportModule,
     ProfileUpdateRequestsModule,
+    AcademicDataModule,
   ],
   controllers: [AppController],
   providers: [

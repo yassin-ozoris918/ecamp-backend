@@ -106,23 +106,40 @@ export class RegisterDto {
   @IsNotEmpty()
   baccalaureatePath?: BaccalaureatePath;
 
-  // --- University Dimensions ---
+  // --- University Dimensions (FK-based) ---
   @ValidateIf((o: RegisterDto) => o.educationLevel === EducationLevel.UNIVERSITY)
   @IsString()
   @IsOptional()
-  university?: string;
+  universityId?: string;
 
   @ValidateIf((o: RegisterDto) => o.educationLevel === EducationLevel.UNIVERSITY)
   @IsString()
   @IsOptional()
-  faculty?: string;
+  facultyId?: string;
 
   @ValidateIf((o: RegisterDto) => o.educationLevel === EducationLevel.UNIVERSITY)
   @IsString()
   @IsOptional()
-  department?: string;
+  departmentId?: string;
+
+  @ValidateIf((o: RegisterDto) => o.educationLevel === EducationLevel.UNIVERSITY)
+  @IsString()
+  @IsOptional()
+  programId?: string;
 
   @IsString()
   @IsOptional()
-  academicYear?: string;
+  otherUniversityName?: string;
+
+  @IsString()
+  @IsOptional()
+  otherFacultyName?: string;
+
+  @IsString()
+  @IsOptional()
+  otherDepartmentName?: string;
+
+  @IsString()
+  @IsOptional()
+  otherProgramName?: string;
 }

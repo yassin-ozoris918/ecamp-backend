@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { HighSchoolSystem, HighSchoolGrade, EducationLevel } from '@prisma/client';
-import { validateStudentSegmentation } from '../common/utils/segmentation-validation.util';
+import { validateStudentSegmentation, validateUniversitySegmentation } from '../common/utils/segmentation-validation.util';
 
 @Injectable()
 export class UsersService {
@@ -28,12 +28,20 @@ export class UsersService {
          !user.baccalaureatePath) {
         return false;
       }
+    } else if (user.educationLevel === EducationLevel.UNIVERSITY) {
+      if (!user.universityId) return false;
+      // Note: According to decisions, Other university must have name, but validateUniversitySegmentation 
+      // enforces it. We can just check universityId here. Actually we should check both:
+      if (user.academicUniversity?.isOther && !user.otherUniversityName) return false;
     }
     return true;
   }
 
   async getProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({ 
+      where: { id: userId },
+      include: { academicUniversity: true }
+    });
     if (!user) throw new UnauthorizedException('This account has been deactivated or deleted.');
     return {
       id: user.id,
@@ -53,10 +61,14 @@ export class UsersService {
       highSchoolGrade: user.highSchoolGrade,
       traditionalBranch: user.traditionalBranch,
       baccalaureatePath: user.baccalaureatePath,
-      university: user.university,
-      faculty: user.faculty,
-      department: user.department,
-      academicYear: user.academicYear,
+      universityId: user.universityId,
+      facultyId: user.facultyId,
+      departmentId: user.departmentId,
+      programId: user.programId,
+      otherUniversityName: user.otherUniversityName,
+      otherFacultyName: user.otherFacultyName,
+      otherDepartmentName: user.otherDepartmentName,
+      otherProgramName: user.otherProgramName,
       isProfileComplete: this.isProfileComplete(user),
     };
   }
@@ -110,10 +122,14 @@ export class UsersService {
       highSchoolGrade?: any;
       traditionalBranch?: any;
       baccalaureatePath?: any;
-      university?: string;
-      faculty?: string;
-      department?: string;
-      academicYear?: string;
+      universityId?: string;
+      facultyId?: string;
+      departmentId?: string;
+      programId?: string;
+      otherUniversityName?: string;
+      otherFacultyName?: string;
+      otherDepartmentName?: string;
+      otherProgramName?: string;
     },
   ) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
@@ -130,10 +146,22 @@ export class UsersService {
       highSchoolGrade: data.highSchoolGrade !== undefined ? normalize(data.highSchoolGrade) : user.highSchoolGrade,
       traditionalBranch: data.traditionalBranch !== undefined ? normalize(data.traditionalBranch) : user.traditionalBranch,
       baccalaureatePath: data.baccalaureatePath !== undefined ? normalize(data.baccalaureatePath) : user.baccalaureatePath,
+      universityId: data.universityId !== undefined ? normalize(data.universityId) : user.universityId,
+      facultyId: data.facultyId !== undefined ? normalize(data.facultyId) : user.facultyId,
+      departmentId: data.departmentId !== undefined ? normalize(data.departmentId) : user.departmentId,
+      programId: data.programId !== undefined ? normalize(data.programId) : user.programId,
+      otherUniversityName: data.otherUniversityName !== undefined ? normalize(data.otherUniversityName) : user.otherUniversityName,
+      otherFacultyName: data.otherFacultyName !== undefined ? normalize(data.otherFacultyName) : user.otherFacultyName,
+      otherDepartmentName: data.otherDepartmentName !== undefined ? normalize(data.otherDepartmentName) : user.otherDepartmentName,
+      otherProgramName: data.otherProgramName !== undefined ? normalize(data.otherProgramName) : user.otherProgramName,
     };
 
     // 4 & 5. Validate the complete intended state
-    validateStudentSegmentation(finalState);
+    if (finalState.educationLevel === EducationLevel.UNIVERSITY) {
+      await validateUniversitySegmentation(this.prisma, finalState);
+    } else {
+      validateStudentSegmentation(finalState);
+    }
 
     // 6. Cleanup stale data logically based on validated state
     if (finalState.highSchoolSystem === HighSchoolSystem.TRADITIONAL) {
@@ -160,10 +188,14 @@ export class UsersService {
         highSchoolGrade: finalState.highSchoolGrade,
         traditionalBranch: finalState.traditionalBranch,
         baccalaureatePath: finalState.baccalaureatePath,
-        university: data.university !== undefined ? normalize(data.university) : user.university,
-        faculty: data.faculty !== undefined ? normalize(data.faculty) : user.faculty,
-        department: data.department !== undefined ? normalize(data.department) : user.department,
-        academicYear: data.academicYear !== undefined ? normalize(data.academicYear) : user.academicYear,
+        universityId: finalState.universityId,
+        facultyId: finalState.facultyId,
+        departmentId: finalState.departmentId,
+        programId: finalState.programId,
+        otherUniversityName: finalState.otherUniversityName,
+        otherFacultyName: finalState.otherFacultyName,
+        otherDepartmentName: finalState.otherDepartmentName,
+        otherProgramName: finalState.otherProgramName,
       },
       select: {
         id: true,
@@ -181,10 +213,14 @@ export class UsersService {
         highSchoolGrade: true,
         traditionalBranch: true,
         baccalaureatePath: true,
-        university: true,
-        faculty: true,
-        department: true,
-        academicYear: true,
+        universityId: true,
+        facultyId: true,
+        departmentId: true,
+        programId: true,
+        otherUniversityName: true,
+        otherFacultyName: true,
+        otherDepartmentName: true,
+        otherProgramName: true,
       },
     });
   }
