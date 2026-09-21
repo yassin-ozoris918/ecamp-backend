@@ -48,6 +48,9 @@ async function main() {
   // --- 1. جامعة قناة السويس (Suez Canal University) ---
   const scu = await getOrCreateUniversity('جامعة قناة السويس', 'Suez Canal University', 1);
   const scuEng = await getOrCreateFaculty(scu.id, 'كلية الهندسة', 'Faculty of Engineering', 1);
+  
+  await getOrCreateDepartment(scu.id, scuEng.id, 'إعدادي (لم يتم تحديد القسم)', 'Preparatory (General)', 0);
+
   const scuEngElec = await getOrCreateDepartment(scu.id, scuEng.id, 'الهندسة الكهربائية', 'Electrical Engineering', 1);
   await getOrCreateProgram(scuEng.id, scuEngElec.id, 'هندسة القوى والآلات الكهربائية', 'Power & Electrical Machines', 1);
   await getOrCreateProgram(scuEng.id, scuEngElec.id, 'هندسة الاتصالات والإلكترونيات', 'Communications & Electronics', 2);
@@ -94,6 +97,9 @@ async function main() {
   // --- 3. جامعة الزقازيق (Zagazig University) ---
   const zagu = await getOrCreateUniversity('جامعة الزقازيق', 'Zagazig University', 3);
   const zaguEng = await getOrCreateFaculty(zagu.id, 'كلية الهندسة', 'Faculty of Engineering', 1);
+  
+  await getOrCreateDepartment(zagu.id, zaguEng.id, 'إعدادي (لم يتم تحديد القسم)', 'Preparatory (General)', 0);
+  
   await getOrCreateDepartment(zagu.id, zaguEng.id, 'الهندسة المدنية', 'Civil Engineering', 1);
   const zaguEngElec = await getOrCreateDepartment(zagu.id, zaguEng.id, 'الهندسة الكهربائية', 'Electrical Engineering', 2);
   await getOrCreateProgram(zaguEng.id, zaguEngElec.id, 'هندسة الإلكترونيات والاتصالات الكهربائية', 'Electronics & Electrical Communications', 1);
