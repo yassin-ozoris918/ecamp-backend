@@ -423,28 +423,49 @@ Return a JSON object exactly matching this schema (do NOT use chain-of-thought f
 Questions and student answers to grade:
 ${JSON.stringify(promptData, null, 2)}`;
 
-      const modelName = this.configService.get<string>('GROQ_GRADING_MODEL') || 'openai/gpt-oss-120b';
+      const modelString = this.configService.get<string>('GROQ_GRADING_MODEL');
+      const fallbackModels = modelString ? [modelString] : [
+        'openai/gpt-oss-120b',
+        'qwen/qwen3.8-27b',
+        'groq/compound',
+        'allam-2-7b',
+        'canopylabs/orpheus-v1-english'
+      ];
 
       let aiResponseText = '{"grades":[]}';
-      let retries = 3;
-      while (retries > 0) {
-        try {
-          const completion = await this.groq.chat.completions.create({
-            messages: [{ role: 'user', content: prompt }],
-            model: modelName,
-            response_format: { type: 'json_object' }, // Groq supports JSON mode for structured output
-          });
-          aiResponseText = completion.choices[0]?.message?.content || '{"grades":[]}';
-          break; // success
-        } catch (error: any) {
-          retries--;
-          // For now, retry on 503 or 429
-          if (retries === 0 || (error?.status !== 503 && error?.status !== 429)) {
-            throw error;
+      let success = false;
+      let lastError = null;
+
+      for (const modelName of fallbackModels) {
+        if (success) break;
+
+        let retries = 2; // Try each model up to 2 times
+        while (retries > 0) {
+          try {
+            const completion = await this.groq.chat.completions.create({
+              messages: [{ role: 'user', content: prompt }],
+              model: modelName,
+              response_format: { type: 'json_object' }, // Groq/OpenAI compatible JSON mode
+            });
+            aiResponseText = completion.choices[0]?.message?.content || '{"grades":[]}';
+            success = true;
+            break; // success
+          } catch (error: any) {
+            retries--;
+            lastError = error;
+            // Only retry the SAME model if it's a temporary network/capacity error (503 or 429)
+            if (retries === 0 || (error?.status !== 503 && error?.status !== 429)) {
+              this.logger.warn(`Model ${modelName} failed with error: ${error?.message || error}. Trying next fallback model...`);
+              break; // Give up on this specific model and move to the next fallback
+            }
+            this.logger.warn(`Model ${modelName} returned ${error?.status}, retrying in 2 seconds...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
           }
-          this.logger.warn("Groq API returned " + error?.status + ", retrying in 2 seconds...");
-          await new Promise(resolve => setTimeout(resolve, 2000));
         }
+      }
+
+      if (!success) {
+        throw lastError || new Error("All configured fallback models failed to generate a response.");
       }
 
       // Groq json_object mode requires a JSON object, but we asked for an array.
