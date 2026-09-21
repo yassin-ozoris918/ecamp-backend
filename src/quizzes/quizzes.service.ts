@@ -628,12 +628,22 @@ export class QuizzesService {
 
     // Build per-question feedback map for the frontend
     // Keyed by questionId: { points: number | null, feedback: string | null }
-    const feedback: Record<string, { points: number | null; feedback: string | null }> = {};
+    let feedback: Record<string, { points: number | null; feedback: string | null }> = {};
     for (const record of responseRecords) {
       feedback[record.questionId] = {
         points: record.earnedPoints ?? null,
         feedback: record.evaluationNote ?? null,
       };
+    }
+
+    const isExhausted = finalStatus === AttemptStatus.FAILED && attemptsCount >= quiz.maxAttempts;
+    const hideResults = (finalStatus === AttemptStatus.FAILED && !isExhausted) || finalStatus === AttemptStatus.PENDING;
+
+    if (hideResults) {
+      // Clear correctAnswers and detailed feedback to prevent cheating when retrying or waiting for manual review
+      // However, we still return the overall score, status, and message.
+      for (const key in correctAnswers) delete correctAnswers[key];
+      for (const key in feedback) delete feedback[key];
     }
 
     return {
@@ -789,7 +799,7 @@ export class QuizzesService {
 
     let earnedPoints = 0;
     let totalPoints = 0;
-    const feedback: Record<string, { points: number | null; feedback: string | null }> = {};
+    let feedback: Record<string, { points: number | null; feedback: string | null }> = {};
     
     if (attempt.responses) {
       for (const record of attempt.responses) {
@@ -802,6 +812,19 @@ export class QuizzesService {
         }
         totalPoints += record.questionPoints ?? (record.question?.points || 1);
       }
+    }
+
+    const attemptsCount = await this.prisma.quizAttempt.count({
+      where: { quizId, studentId },
+    });
+    
+    const isExhausted = attempt.status === AttemptStatus.FAILED && attemptsCount >= (quiz?.maxAttempts || 1);
+    const hideResults = (attempt.status === AttemptStatus.FAILED && !isExhausted) || attempt.status === AttemptStatus.PENDING;
+
+    if (hideResults) {
+      // Clear correctAnswers and detailed feedback to prevent cheating when retrying or waiting for manual review
+      for (const key in correctAnswers) delete correctAnswers[key];
+      for (const key in feedback) delete feedback[key];
     }
 
     return {

@@ -418,4 +418,63 @@ describe('QuizzesService (Objective Grading)', () => {
       expect(result.questions[0].studentAnswer.selectedOptionIndex).toBe(1);
     });
   });
+  describe('Result Sanitization (Anti-Cheating)', () => {
+    const quizId = 'q1';
+    const studentId = 's1';
+
+    const mockQuiz = {
+      id: quizId,
+      maxAttempts: 3,
+      passGrade: 50,
+      questions: [
+        { id: 'q_mcq', type: 'MCQ', correctOptionIndex: 1, version: 'A', points: 10 }
+      ]
+    };
+
+    const mockAttempt = {
+      id: 'a1',
+      quizId,
+      studentId,
+      score: 40,
+      status: 'FAILED',
+      responses: [
+        { questionId: 'q_mcq', earnedPoints: 0, evaluationNote: 'Wrong' }
+      ]
+    };
+
+    beforeEach(() => {
+      if (!prisma.quiz.findUnique) {
+        prisma.quiz.findUnique = jest.fn();
+      }
+      (prisma.quiz.findUnique as jest.Mock).mockResolvedValue(mockQuiz);
+      (prisma.quizAttempt.findFirst as jest.Mock).mockResolvedValue(mockAttempt);
+    });
+
+    it('Test 1 - Passed: should return correctAnswers and feedback', async () => {
+      (prisma.quizAttempt.findFirst as jest.Mock).mockResolvedValue({ ...mockAttempt, status: 'PASSED', score: 80 });
+      (prisma.quizAttempt.count as jest.Mock).mockResolvedValue(1); // 1 out of 3 (not exhausted)
+
+      const result = await service.getLastSubmittedAttempt(quizId, studentId);
+      expect(result?.correctAnswers).toHaveProperty('q_mcq');
+      expect(result?.feedback).toHaveProperty('q_mcq');
+      expect(result?.feedback['q_mcq'].feedback).toBe('Wrong');
+    });
+
+    it('Test 2 - Failed with retries remaining: should NOT return correctAnswers or feedback', async () => {
+      (prisma.quizAttempt.count as jest.Mock).mockResolvedValue(1); // 1 out of 3 attempts used -> retries remain!
+
+      const result = await service.getLastSubmittedAttempt(quizId, studentId);
+      expect(Object.keys(result?.correctAnswers || {})).toHaveLength(0);
+      expect(Object.keys(result?.feedback || {})).toHaveLength(0);
+      expect(result?.score).toBe(40); // still gets score
+    });
+
+    it('Test 3 & 4 - Failed and exhausted / accepted: should return correctAnswers and feedback', async () => {
+      (prisma.quizAttempt.count as jest.Mock).mockResolvedValue(3); // 3 out of 3 attempts used -> exhausted
+
+      const result = await service.getLastSubmittedAttempt(quizId, studentId);
+      expect(result?.correctAnswers).toHaveProperty('q_mcq');
+      expect(result?.feedback).toHaveProperty('q_mcq');
+    });
+  });
 });
