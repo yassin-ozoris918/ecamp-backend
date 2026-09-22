@@ -175,6 +175,10 @@ export class CoursesService {
     const course = await this.prisma.course.findFirst({
       where: { id, },
       include: {
+        targetUniversityRel: { select: { id: true, nameEn: true, nameAr: true } },
+        targetFacultyRel: { select: { id: true, nameEn: true, nameAr: true } },
+        targetDepartmentRel: { select: { id: true, nameEn: true, nameAr: true } },
+        targetProgramRel: { select: { id: true, nameEn: true, nameAr: true } },
         instructors: {
           where: { instructor: { role: { not: Role.ADMIN } } },
           include: {
