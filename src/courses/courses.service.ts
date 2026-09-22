@@ -356,17 +356,19 @@ export class CoursesService {
     
     const normalize = (val: any) => val === '' ? null : val;
 
+    const isHighSchool = dto.audienceType === 'HIGH_SCHOOL';
+
     const finalState: any = {
-      highSchoolSystem: dto.targetHighSchoolSystem !== undefined ? normalize(dto.targetHighSchoolSystem) : course.targetHighSchoolSystem,
-      studyMode: dto.targetStudyMode !== undefined ? normalize(dto.targetStudyMode) : course.targetStudyMode,
-      studyLanguage: dto.targetStudyLanguage !== undefined ? normalize(dto.targetStudyLanguage) : course.targetStudyLanguage,
-      highSchoolGrade: dto.targetHighSchoolGrade !== undefined ? normalize(dto.targetHighSchoolGrade) : course.targetHighSchoolGrade,
-      traditionalBranch: dto.targetTraditionalBranch !== undefined ? normalize(dto.targetTraditionalBranch) : course.targetTraditionalBranch,
-      baccalaureatePath: dto.targetBaccalaureatePath !== undefined ? normalize(dto.targetBaccalaureatePath) : course.targetBaccalaureatePath,
-      targetUniversityId: dto.targetUniversityId !== undefined ? normalize(dto.targetUniversityId) : course.targetUniversityId,
-      targetFacultyId: dto.targetFacultyId !== undefined ? normalize(dto.targetFacultyId) : course.targetFacultyId,
-      targetDepartmentId: dto.targetDepartmentId !== undefined ? normalize(dto.targetDepartmentId) : course.targetDepartmentId,
-      targetProgramId: dto.targetProgramId !== undefined ? normalize(dto.targetProgramId) : course.targetProgramId,
+      highSchoolSystem: isHighSchool ? (dto.targetHighSchoolSystem !== undefined ? normalize(dto.targetHighSchoolSystem) : course.targetHighSchoolSystem) : null,
+      studyMode: isHighSchool ? (dto.targetStudyMode !== undefined ? normalize(dto.targetStudyMode) : course.targetStudyMode) : null,
+      studyLanguage: isHighSchool ? (dto.targetStudyLanguage !== undefined ? normalize(dto.targetStudyLanguage) : course.targetStudyLanguage) : null,
+      highSchoolGrade: isHighSchool ? (dto.targetHighSchoolGrade !== undefined ? normalize(dto.targetHighSchoolGrade) : course.targetHighSchoolGrade) : null,
+      traditionalBranch: isHighSchool ? (dto.targetTraditionalBranch !== undefined ? normalize(dto.targetTraditionalBranch) : course.targetTraditionalBranch) : null,
+      baccalaureatePath: isHighSchool ? (dto.targetBaccalaureatePath !== undefined ? normalize(dto.targetBaccalaureatePath) : course.targetBaccalaureatePath) : null,
+      targetUniversityId: !isHighSchool ? (dto.targetUniversityId !== undefined ? normalize(dto.targetUniversityId) : course.targetUniversityId) : null,
+      targetFacultyId: !isHighSchool ? (dto.targetFacultyId !== undefined ? normalize(dto.targetFacultyId) : course.targetFacultyId) : null,
+      targetDepartmentId: !isHighSchool ? (dto.targetDepartmentId !== undefined ? normalize(dto.targetDepartmentId) : course.targetDepartmentId) : null,
+      targetProgramId: !isHighSchool ? (dto.targetProgramId !== undefined ? normalize(dto.targetProgramId) : course.targetProgramId) : null,
     };
 
     await validateCourseTargetingAsync(this.prisma, finalState);
