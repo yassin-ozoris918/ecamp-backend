@@ -111,7 +111,7 @@ model User {
   profilePictureMediaId String?        @unique
   profilePicture        Media?         @relation("ProfilePicture", fields: [profilePictureMediaId], references: [id], onDelete: SetNull)
   educationLevel        EducationLevel @default(UNIVERSITY)
-  phoneNumber           String?
+  phoneNumber           String?        @unique
   parentPhoneNumber     String? // Required strictly for HIGH_SCHOOL
 
   // --- High School Dimensions ---
