@@ -9,7 +9,8 @@ async function main() {
   const deletedUsers = await prisma.user.findMany({
     where: {
       deletedAt: { not: null },
-      phoneNumber: { not: null, not: "" }
+      phoneNumber: { not: null },
+      NOT: { phoneNumber: "" }
     }
   });
 
@@ -31,7 +32,11 @@ async function main() {
   const emailDeletedUsers = await prisma.user.findMany({
     where: {
       email: { contains: '_deleted_' },
-      phoneNumber: { not: null, not: "", not: { contains: '_deleted_' } }
+      phoneNumber: { not: null },
+      NOT: [
+        { phoneNumber: "" },
+        { phoneNumber: { contains: '_deleted_' } }
+      ]
     }
   });
 
