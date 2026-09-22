@@ -981,7 +981,7 @@ export class QuizzesService {
     // Simpler: keep version filter for the frontend; not exposed in DB directly.
 
     // Student search: join through student relation
-    const studentWhere: any = {};
+    const studentWhere: any = { deletedAt: null };
     if (search) {
       studentWhere.OR = [
         { fullName: { contains: search, mode: 'insensitive' } },
@@ -993,13 +993,13 @@ export class QuizzesService {
       this.prisma.quizAttempt.count({
         where: {
           ...attemptWhere,
-          ...(search ? { student: studentWhere } : {}),
+          student: studentWhere,
         },
       }),
       this.prisma.quizAttempt.findMany({
         where: {
           ...attemptWhere,
-          ...(search ? { student: studentWhere } : {}),
+          student: studentWhere,
         },
         include: {
           student: { select: { id: true, fullName: true, email: true, profilePictureUrl: true } },
@@ -1098,7 +1098,7 @@ export class QuizzesService {
             lecture: { select: { id: true, courseId: true } },
           },
         },
-        student: { select: { id: true, fullName: true, email: true, profilePictureUrl: true } },
+        student: { select: { id: true, fullName: true, email: true, profilePictureUrl: true, deletedAt: true } },
         responses: {
           include: {
             question: true,
@@ -1108,7 +1108,7 @@ export class QuizzesService {
       },
     });
 
-    if (!attempt) throw new NotFoundException('Attempt not found');
+    if (!attempt || attempt.student?.deletedAt) throw new NotFoundException('Attempt not found');
 
     // Authorise via the existing ownership chain
     await this.verifyLectureOwnership(attempt.quiz.lectureId, instructorId, role);
