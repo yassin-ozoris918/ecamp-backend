@@ -46,7 +46,7 @@ async function main() {
   console.log('Seeding academic master data...');
 
   // --- 1. جامعة قناة السويس (Suez Canal University) ---
-  const scu = await getOrCreateUniversity('جامعة قناة السويس', 'Suez Canal University', 1);
+  const scu = await getOrCreateUniversity('جامعة قناة السويس (SCU)', 'Suez Canal University (SCU)', 1);
   const scuEng = await getOrCreateFaculty(scu.id, 'كلية الهندسة', 'Faculty of Engineering', 1);
   
   await getOrCreateDepartment(scu.id, scuEng.id, 'إعدادي (لم يتم تحديد القسم)', 'Preparatory (General)', 0);
@@ -83,23 +83,16 @@ async function main() {
   const scuCompBio = await getOrCreateDepartment(scu.id, scuComp.id, 'الحوسبة والمعلوماتية الحيوية', 'Bioinformatics', 6);
 
   // --- 2. جامعة الإسماعيلية الجديدة الأهلية (New Ismailia National University) ---
-  const ismailia = await getOrCreateUniversity('جامعة الإسماعيلية الجديدة الأهلية', 'New Ismailia National University', 2);
+  const ismailia = await getOrCreateUniversity('جامعة الإسماعيلية الجديدة الأهلية (NINU)', 'New Ismailia National University (NINU)', 2);
   const ismailiaEng = await getOrCreateFaculty(ismailia.id, 'كلية الهندسة', 'Faculty of Engineering', 1);
   // Programs directly under faculty
   await getOrCreateProgram(ismailiaEng.id, null, 'هندسة الذكاء الاصطناعي', 'AI Engineering', 1);
   await getOrCreateProgram(ismailiaEng.id, null, 'هندسة التشييد وإدارة المشروعات', 'Construction & Project Management', 2);
   await getOrCreateProgram(ismailiaEng.id, null, 'هندسة نظم الاتصالات الحديثة', 'Modern Communications Systems Engineering', 3);
 
-  await getOrCreateFaculty(ismailia.id, 'كلية الطب البشري', 'Faculty of Medicine', 2);
-  await getOrCreateFaculty(ismailia.id, 'كلية طب الأسنان', 'Faculty of Dentistry', 3);
-  await getOrCreateFaculty(ismailia.id, 'كلية الصيدلة', 'Faculty of Pharmacy', 4);
-  await getOrCreateFaculty(ismailia.id, 'كلية العلاج الطبيعي', 'Faculty of Physical Therapy', 5);
-  await getOrCreateFaculty(ismailia.id, 'كلية التمريض', 'Faculty of Nursing', 6);
-  await getOrCreateFaculty(ismailia.id, 'كلية تكنولوجيا العلوم الصحية التطبيقية', 'Faculty of Applied Health Sciences Technology', 7);
-  await getOrCreateFaculty(ismailia.id, 'كلية التجارة الدولية واللغات', 'Faculty of International Business & Languages', 8);
 
   // --- 3. جامعة الزقازيق (Zagazig University) ---
-  const zagu = await getOrCreateUniversity('جامعة الزقازيق', 'Zagazig University', 3);
+  const zagu = await getOrCreateUniversity('جامعة الزقازيق (ZU)', 'Zagazig University (ZU)', 3);
   const zaguEng = await getOrCreateFaculty(zagu.id, 'كلية الهندسة', 'Faculty of Engineering', 1);
   
   await getOrCreateDepartment(zagu.id, zaguEng.id, 'إعدادي (لم يتم تحديد القسم)', 'Preparatory (General)', 0);
@@ -124,7 +117,7 @@ async function main() {
   await getOrCreateDepartment(zagu.id, zaguComp.id, 'دعم القرار', 'Decision Support', 4);
 
   // --- 4. جامعة الزقازيق الأهلية (Zagazig National University) ---
-  const zaguNat = await getOrCreateUniversity('جامعة الزقازيق الأهلية', 'Zagazig National University', 4);
+  const zaguNat = await getOrCreateUniversity('جامعة الزقازيق الأهلية (ZNU)', 'Zagazig National University (ZNU)', 4);
   const zaguNatEng = await getOrCreateFaculty(zaguNat.id, 'كلية الهندسة', 'Faculty of Engineering', 1);
   await getOrCreateProgram(zaguNatEng.id, null, 'الميكاترونيك', 'Mechatronics', 1);
   await getOrCreateProgram(zaguNatEng.id, null, 'هندسة إنشاءات وإدارة التشييد', 'Construction Engineering & Management', 2);
