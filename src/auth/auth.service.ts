@@ -87,6 +87,10 @@ export class AuthService {
       });
     } catch (error: any) {
       if (error?.code === 'P2002') {
+        const target = error?.meta?.target;
+        if (target?.includes('phoneNumber')) {
+          throw new BadRequestException('auth.errors.phoneAlreadyInUse');
+        }
         throw new BadRequestException('auth.errors.emailAlreadyInUse');
       }
       throw error;
