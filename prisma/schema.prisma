@@ -115,31 +115,31 @@ model User {
   parentPhoneNumber     String? // Required strictly for HIGH_SCHOOL
 
   // --- High School Dimensions ---
-  highSchoolSystem      HighSchoolSystem?
-  studyMode             StudyMode?
-  studyLanguage         StudyLanguage?
-  highSchoolGrade       HighSchoolGrade?
-  traditionalBranch     TraditionalBranch?
-  baccalaureatePath     BaccalaureatePath?
+  highSchoolSystem  HighSchoolSystem?
+  studyMode         StudyMode?
+  studyLanguage     StudyLanguage?
+  highSchoolGrade   HighSchoolGrade?
+  traditionalBranch TraditionalBranch?
+  baccalaureatePath BaccalaureatePath?
 
   // --- University Dimensions (FK-based) ---
-  universityId          String?
-  facultyId             String?
-  departmentId          String?
-  programId             String?
-  otherUniversityName   String?
-  otherFacultyName      String?
-  otherDepartmentName   String?
-  otherProgramName      String?
+  universityId        String?
+  facultyId           String?
+  departmentId        String?
+  programId           String?
+  otherUniversityName String?
+  otherFacultyName    String?
+  otherDepartmentName String?
+  otherProgramName    String?
 
-  academicUniversity    AcademicUniversity? @relation("StudentUniversity", fields: [universityId], references: [id], onDelete: Restrict)
-  academicFaculty       AcademicFaculty?    @relation("StudentFaculty", fields: [facultyId], references: [id], onDelete: Restrict)
-  academicDepartment    AcademicDepartment? @relation("StudentDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
-  academicProgram       AcademicProgram?    @relation("StudentProgram", fields: [programId], references: [id], onDelete: Restrict)
+  academicUniversity AcademicUniversity? @relation("StudentUniversity", fields: [universityId], references: [id], onDelete: Restrict)
+  academicFaculty    AcademicFaculty?    @relation("StudentFaculty", fields: [facultyId], references: [id], onDelete: Restrict)
+  academicDepartment AcademicDepartment? @relation("StudentDepartment", fields: [departmentId], references: [id], onDelete: Restrict)
+  academicProgram    AcademicProgram?    @relation("StudentProgram", fields: [programId], references: [id], onDelete: Restrict)
 
-  refreshToken          String?
-  createdAt             DateTime       @default(now())
-  updatedAt             DateTime       @updatedAt
+  refreshToken String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
   // Gamification Fields
   xp          Int       @default(0)
@@ -199,28 +199,28 @@ model Course {
   audienceType             EducationLevel @default(HIGH_SCHOOL)
 
   // --- Segmentation Targeting Additions ---
-  targetHighSchoolSystem   HighSchoolSystem?
-  targetStudyMode          StudyMode?
-  targetStudyLanguage      StudyLanguage?
-  targetHighSchoolGrade    HighSchoolGrade?
-  targetTraditionalBranch  TraditionalBranch?
-  targetBaccalaureatePath  BaccalaureatePath?
-  targetUniversityId       String?
-  targetFacultyId          String?
-  targetDepartmentId       String?
-  targetProgramId          String?
+  targetHighSchoolSystem  HighSchoolSystem?
+  targetStudyMode         StudyMode?
+  targetStudyLanguage     StudyLanguage?
+  targetHighSchoolGrade   HighSchoolGrade?
+  targetTraditionalBranch TraditionalBranch?
+  targetBaccalaureatePath BaccalaureatePath?
+  targetUniversityId      String?
+  targetFacultyId         String?
+  targetDepartmentId      String?
+  targetProgramId         String?
 
-  targetUniversityRel      AcademicUniversity?  @relation("CourseTargetUniversity", fields: [targetUniversityId], references: [id], onDelete: Restrict)
-  targetFacultyRel         AcademicFaculty?     @relation("CourseTargetFaculty", fields: [targetFacultyId], references: [id], onDelete: Restrict)
-  targetDepartmentRel      AcademicDepartment?  @relation("CourseTargetDepartment", fields: [targetDepartmentId], references: [id], onDelete: Restrict)
-  targetProgramRel         AcademicProgram?     @relation("CourseTargetProgram", fields: [targetProgramId], references: [id], onDelete: Restrict)
+  targetUniversityRel AcademicUniversity? @relation("CourseTargetUniversity", fields: [targetUniversityId], references: [id], onDelete: Restrict)
+  targetFacultyRel    AcademicFaculty?    @relation("CourseTargetFaculty", fields: [targetFacultyId], references: [id], onDelete: Restrict)
+  targetDepartmentRel AcademicDepartment? @relation("CourseTargetDepartment", fields: [targetDepartmentId], references: [id], onDelete: Restrict)
+  targetProgramRel    AcademicProgram?    @relation("CourseTargetProgram", fields: [targetProgramId], references: [id], onDelete: Restrict)
 
-  validityDays             Int?
-  isFree                   Boolean        @default(false)
-  status                   CourseStatus   @default(DRAFT)
-  createdAt                DateTime       @default(now())
-  updatedAt                DateTime       @updatedAt
-  deletedAt                DateTime?
+  validityDays Int?
+  isFree       Boolean      @default(false)
+  status       CourseStatus @default(DRAFT)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
 
   instructors CourseInstructor[]
   chapters    Chapter[]
@@ -328,7 +328,7 @@ model Lecture {
   attachments Attachment[]
 
   @@index([courseId])
-@@index([chapterId])
+  @@index([chapterId])
 }
 
 model Session {
@@ -495,20 +495,20 @@ model Quiz {
 }
 
 model QuizQuestion {
-  id                 String               @id @default(uuid())
+  id                 String              @id @default(uuid())
   quizId             String
   text               String
-  type               QuestionType         @default(MCQ)
+  type               QuestionType        @default(MCQ)
   options            String[]
   correctOptionIndex Int
-  points             Float                @default(1)
-  orderIndex         Int                  @default(0)
-  version            QuizQuestionVersion  @default(A)
-  createdAt          DateTime             @default(now())
+  points             Float               @default(1)
+  orderIndex         Int                 @default(0)
+  version            QuizQuestionVersion @default(A)
+  createdAt          DateTime            @default(now())
 
-  referenceAnswer    String?
-  matchOptions       Json? // Used for MATCHING: { left: string, right: string }[]
-  correctOrder       String[] // Used for ORDERING
+  referenceAnswer String?
+  matchOptions    Json? // Used for MATCHING: { left: string, right: string }[]
+  correctOrder    String[] // Used for ORDERING
 
   // Relations
   quiz      Quiz                  @relation(fields: [quizId], references: [id], onDelete: Cascade)
@@ -529,8 +529,8 @@ model QuizAttempt {
   draftAnswers Json? // Stores partial answers for save-and-resume: { "questionId": selectedOptionIndex }
   createdAt    DateTime      @default(now())
 
-  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  quiz    Quiz @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  student   User                  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  quiz      Quiz                  @relation(fields: [quizId], references: [id], onDelete: Cascade)
   responses QuizAttemptResponse[]
 
   @@index([studentId])
@@ -961,8 +961,8 @@ model AcademicUniversity {
 
   faculties   AcademicFaculty[]
   departments AcademicDepartment[]
-  students    User[]   @relation("StudentUniversity")
-  courses     Course[] @relation("CourseTargetUniversity")
+  students    User[]               @relation("StudentUniversity")
+  courses     Course[]             @relation("CourseTargetUniversity")
 
   @@index([sortOrder])
 }
