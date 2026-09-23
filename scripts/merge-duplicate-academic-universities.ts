@@ -10,22 +10,53 @@ const NINU_CANONICAL_AR = 'جامعة الإسماعيلية الجديدة ال
 const NINU_CANONICAL_EN = 'New Ismailia National University (NINU)';
 const NINU_VARIANTS = [NINU_CANONICAL_AR, 'جامعة الإسماعيلية الجديدة الأهلية', 'New Ismailia National University'];
 
+async function cascadeDeactivate(tx: any, universityId: string) {
+  // Deactivate the university
+  await tx.academicUniversity.update({
+    where: { id: universityId },
+    data: { isActive: false }
+  });
+
+  // Find all faculties of this university
+  const facs = await tx.academicFaculty.findMany({ where: { universityId } });
+  const facIds = facs.map((f: any) => f.id);
+
+  if (facIds.length > 0) {
+    // Deactivate faculties
+    await tx.academicFaculty.updateMany({
+      where: { id: { in: facIds } },
+      data: { isActive: false }
+    });
+
+    // Deactivate departments
+    await tx.academicDepartment.updateMany({
+      where: { facultyId: { in: facIds } },
+      data: { isActive: false }
+    });
+
+    // Deactivate programs
+    await tx.academicProgram.updateMany({
+      where: { facultyId: { in: facIds } },
+      data: { isActive: false }
+    });
+  }
+}
+
 async function processUniversity(
   tx: Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">,
   canonicalAr: string,
   canonicalEn: string,
-  variants: string[],
-  isDryRun: boolean
+  variants: string[]
 ) {
   console.log(`\n--- Processing: ${canonicalAr} ---`);
 
   const rawRecords = await tx.academicUniversity.findMany({
-    where: { nameAr: { in: variants } }
+    where: { nameAr: { in: variants }, isActive: true }
   });
 
   if (rawRecords.length === 0) {
     console.log(`No records found for ${canonicalAr}. Skipping.`);
-    return;
+    return null;
   }
 
   // Load counts manually
@@ -72,9 +103,7 @@ async function processUniversity(
 
     for (const u of dupUsers) {
       if (!u.facultyId && !u.departmentId && !u.programId) {
-        if (!isDryRun) {
-          await tx.user.update({ where: { id: u.id }, data: { universityId: canonicalRecord.id } });
-        }
+        await tx.user.update({ where: { id: u.id }, data: { universityId: canonicalRecord.id } });
         totalMigratedUsers++;
       } else {
         const validChild = await tx.academicFaculty.findFirst({
@@ -82,9 +111,7 @@ async function processUniversity(
         });
 
         if (validChild) {
-          if (!isDryRun) {
-            await tx.user.update({ where: { id: u.id }, data: { universityId: canonicalRecord.id } });
-          }
+          await tx.user.update({ where: { id: u.id }, data: { universityId: canonicalRecord.id } });
           totalMigratedUsers++;
         } else {
           console.error(`[CONFLICT] User ${u.id} has child records belonging to a different hierarchy (Faculty: ${u.facultyId}). Cannot safely migrate.`);
@@ -93,27 +120,20 @@ async function processUniversity(
       }
     }
 
-    console.log(`[DRY-RUN] Deactivating duplicate university: ${dup.id}`);
-    if (!isDryRun) {
-      await tx.academicUniversity.update({
-        where: { id: dup.id },
-        data: { isActive: false }
-      });
-    }
+    console.log(`[DRY-RUN] Deactivating duplicate university & children: ${dup.id}`);
+    await cascadeDeactivate(tx, dup.id);
   }
 
   // Rename canonical
   if (canonicalRecord.nameAr !== canonicalAr || canonicalRecord.nameEn !== canonicalEn) {
     console.log(`[DRY-RUN] Renaming canonical university to ${canonicalAr}`);
-    if (!isDryRun) {
-      await tx.academicUniversity.update({
-        where: { id: canonicalRecord.id },
-        data: { nameAr: canonicalAr, nameEn: canonicalEn, isActive: true }
-      });
-    }
+    await tx.academicUniversity.update({
+      where: { id: canonicalRecord.id },
+      data: { nameAr: canonicalAr, nameEn: canonicalEn, isActive: true }
+    });
   } else {
     // Ensure active
-    if (!isDryRun && !canonicalRecord.isActive) {
+    if (!canonicalRecord.isActive) {
       await tx.academicUniversity.update({
         where: { id: canonicalRecord.id },
         data: { isActive: true }
@@ -121,7 +141,7 @@ async function processUniversity(
     }
   }
 
-  return { totalConflicts, totalMigratedUsers };
+  return { totalConflicts, totalMigratedUsers, canonicalId: canonicalRecord.id };
 }
 
 async function verifyInvariants(tx: Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends">) {
@@ -196,38 +216,47 @@ async function main() {
   try {
     await prisma.$transaction(async (tx) => {
       let conflicts = 0;
+      let scuId: string | null = null;
+      let ninuId: string | null = null;
 
-      const scuResult = await processUniversity(tx, SCU_CANONICAL_AR, SCU_CANONICAL_EN, SCU_VARIANTS, isDryRun);
+      const scuResult = await processUniversity(tx, SCU_CANONICAL_AR, SCU_CANONICAL_EN, SCU_VARIANTS);
       if (scuResult?.totalConflicts) conflicts += scuResult.totalConflicts;
+      if (scuResult?.canonicalId) scuId = scuResult.canonicalId;
 
-      const ninuResult = await processUniversity(tx, NINU_CANONICAL_AR, NINU_CANONICAL_EN, NINU_VARIANTS, isDryRun);
+      const ninuResult = await processUniversity(tx, NINU_CANONICAL_AR, NINU_CANONICAL_EN, NINU_VARIANTS);
       if (ninuResult?.totalConflicts) conflicts += ninuResult.totalConflicts;
+      if (ninuResult?.canonicalId) ninuId = ninuResult.canonicalId;
 
       console.log(`\n--- Deactivating Legacy Universities ---`);
+      
+      const excludeIds = [];
+      if (scuId) excludeIds.push(scuId);
+      if (ninuId) excludeIds.push(ninuId);
+
       const others = await tx.academicUniversity.findMany({
         where: {
-          nameAr: { notIn: [SCU_CANONICAL_AR, NINU_CANONICAL_AR] },
+          id: { notIn: excludeIds },
           isActive: true
         }
       });
 
       for (const o of others) {
-        console.log(`[DRY-RUN] Deactivating legacy: ${o.nameAr} (${o.id})`);
-        if (!isDryRun) {
-          await tx.academicUniversity.update({
-            where: { id: o.id },
-            data: { isActive: false }
-          });
-        }
+        console.log(`[DRY-RUN] Deactivating legacy university & children: ${o.nameAr} (${o.id})`);
+        await cascadeDeactivate(tx, o.id);
       }
 
-      await verifyInvariants(tx);
+      const pass = await verifyInvariants(tx);
 
       if (conflicts > 0) {
         throw new Error(`Migration blocked due to ${conflicts} unresolved conflicts.`);
       }
 
+      if (!pass) {
+        throw new Error(`Migration blocked due to failed invariants.`);
+      }
+
       if (isDryRun) {
+        // Force a rollback so no data is actually written
         throw new Error('DRY_RUN_SUCCESS');
       }
     });
