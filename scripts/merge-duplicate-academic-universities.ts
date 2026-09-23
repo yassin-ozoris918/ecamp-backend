@@ -229,7 +229,7 @@ async function main() {
 
       console.log(`\n--- Deactivating Legacy Universities ---`);
       
-      const excludeIds = [];
+      const excludeIds: string[] = [];
       if (scuId) excludeIds.push(scuId);
       if (ninuId) excludeIds.push(ninuId);
 
