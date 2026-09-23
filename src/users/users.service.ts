@@ -156,6 +156,18 @@ export class UsersService {
       otherProgramName: data.otherProgramName !== undefined ? normalize(data.otherProgramName) : user.otherProgramName,
     };
 
+    // 3.5. Clear stale children if parent changed
+    if (finalState.universityId !== user.universityId) {
+      finalState.facultyId = null;
+      finalState.departmentId = null;
+      finalState.programId = null;
+    } else if (finalState.facultyId !== user.facultyId) {
+      finalState.departmentId = null;
+      finalState.programId = null;
+    } else if (finalState.departmentId !== user.departmentId) {
+      finalState.programId = null;
+    }
+
     // 4 & 5. Validate the complete intended state
     if (finalState.educationLevel === EducationLevel.UNIVERSITY) {
       await validateUniversitySegmentation(this.prisma, finalState);

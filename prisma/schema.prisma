@@ -43,6 +43,11 @@ enum Role {
   STUDENT
 }
 
+enum ProgramType {
+  REGULAR
+  SPECIAL
+}
+
 enum EducationLevel {
   HIGH_SCHOOL
   UNIVERSITY
@@ -957,6 +962,7 @@ model AcademicUniversity {
   nameEn    String
   sortOrder Int      @default(0)
   isOther   Boolean  @default(false)
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
 
   faculties   AcademicFaculty[]
@@ -974,6 +980,7 @@ model AcademicFaculty {
   nameEn       String
   sortOrder    Int      @default(0)
   isOther      Boolean  @default(false)
+  isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
   university  AcademicUniversity   @relation(fields: [universityId], references: [id], onDelete: Restrict)
@@ -993,6 +1000,7 @@ model AcademicDepartment {
   nameEn       String
   sortOrder    Int      @default(0)
   isOther      Boolean  @default(false)
+  isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
   faculty    AcademicFaculty    @relation(fields: [facultyId], references: [id], onDelete: Restrict)
@@ -1006,14 +1014,16 @@ model AcademicDepartment {
 }
 
 model AcademicProgram {
-  id           String   @id @default(uuid())
+  id           String      @id @default(uuid())
   departmentId String?
   facultyId    String
   nameAr       String
   nameEn       String
-  sortOrder    Int      @default(0)
-  isOther      Boolean  @default(false)
-  createdAt    DateTime @default(now())
+  type         ProgramType @default(REGULAR)
+  sortOrder    Int         @default(0)
+  isOther      Boolean     @default(false)
+  isActive     Boolean     @default(true)
+  createdAt    DateTime    @default(now())
 
   department AcademicDepartment? @relation("DepartmentPrograms", fields: [departmentId], references: [id], onDelete: Restrict)
   faculty    AcademicFaculty     @relation("FacultyPrograms", fields: [facultyId], references: [id], onDelete: Restrict)

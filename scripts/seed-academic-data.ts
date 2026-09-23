@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, ProgramType } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -6,7 +6,12 @@ async function getOrCreateUniversity(nameAr: string, nameEn: string, sortOrder: 
   let uni = await prisma.academicUniversity.findFirst({ where: { nameAr } });
   if (!uni) {
     uni = await prisma.academicUniversity.create({
-      data: { nameAr, nameEn, sortOrder, isOther }
+      data: { nameAr, nameEn, sortOrder, isOther, isActive: true }
+    });
+  } else {
+    uni = await prisma.academicUniversity.update({
+      where: { id: uni.id },
+      data: { nameAr, nameEn, sortOrder, isOther, isActive: true }
     });
   }
   return uni;
@@ -16,7 +21,12 @@ async function getOrCreateFaculty(universityId: string, nameAr: string, nameEn: 
   let fac = await prisma.academicFaculty.findFirst({ where: { universityId, nameAr } });
   if (!fac) {
     fac = await prisma.academicFaculty.create({
-      data: { universityId, nameAr, nameEn, sortOrder, isOther }
+      data: { universityId, nameAr, nameEn, sortOrder, isOther, isActive: true }
+    });
+  } else {
+    fac = await prisma.academicFaculty.update({
+      where: { id: fac.id },
+      data: { nameAr, nameEn, sortOrder, isOther, isActive: true }
     });
   }
   return fac;
@@ -26,111 +36,116 @@ async function getOrCreateDepartment(universityId: string, facultyId: string, na
   let dep = await prisma.academicDepartment.findFirst({ where: { facultyId, nameAr } });
   if (!dep) {
     dep = await prisma.academicDepartment.create({
-      data: { universityId, facultyId, nameAr, nameEn, sortOrder, isOther }
+      data: { universityId, facultyId, nameAr, nameEn, sortOrder, isOther, isActive: true }
+    });
+  } else {
+    dep = await prisma.academicDepartment.update({
+      where: { id: dep.id },
+      data: { nameAr, nameEn, sortOrder, isOther, isActive: true }
     });
   }
   return dep;
 }
 
-async function getOrCreateProgram(facultyId: string, departmentId: string | null, nameAr: string, nameEn: string, sortOrder: number, isOther: boolean = false) {
-  let prog = await prisma.academicProgram.findFirst({ where: { facultyId, nameAr } }); // Simplified check
+async function getOrCreateProgram(facultyId: string, departmentId: string | null, nameAr: string, nameEn: string, sortOrder: number, type: ProgramType = ProgramType.REGULAR, isOther: boolean = false) {
+  let prog = await prisma.academicProgram.findFirst({ where: { facultyId, nameAr } });
   if (!prog) {
     prog = await prisma.academicProgram.create({
-      data: { facultyId, departmentId, nameAr, nameEn, sortOrder, isOther }
+      data: { facultyId, departmentId, nameAr, nameEn, sortOrder, type, isOther, isActive: true }
+    });
+  } else {
+    prog = await prisma.academicProgram.update({
+      where: { id: prog.id },
+      data: { departmentId, nameAr, nameEn, sortOrder, type, isOther, isActive: true }
     });
   }
   return prog;
 }
 
 async function main() {
-  console.log('Seeding academic master data...');
+  console.log('Seeding active academic master data...');
 
   // --- 1. جامعة قناة السويس (Suez Canal University) ---
-  const scu = await getOrCreateUniversity('جامعة قناة السويس (SCU)', 'Suez Canal University (SCU)', 1);
+  const scu = await getOrCreateUniversity('جامعة قناة السويس', 'Suez Canal University', 1);
+  
+  // Faculty 1: Engineering
   const scuEng = await getOrCreateFaculty(scu.id, 'كلية الهندسة', 'Faculty of Engineering', 1);
   
-  await getOrCreateDepartment(scu.id, scuEng.id, 'إعدادي (لم يتم تحديد القسم)', 'Preparatory (General)', 0);
-
-  const scuEngElec = await getOrCreateDepartment(scu.id, scuEng.id, 'الهندسة الكهربائية', 'Electrical Engineering', 1);
-  await getOrCreateProgram(scuEng.id, scuEngElec.id, 'هندسة القوى والآلات الكهربائية', 'Power & Electrical Machines', 1);
-  await getOrCreateProgram(scuEng.id, scuEngElec.id, 'هندسة الاتصالات والإلكترونيات', 'Communications & Electronics', 2);
-  await getOrCreateProgram(scuEng.id, scuEngElec.id, 'هندسة الحاسبات والتحكم', 'Computer & Control Engineering', 3);
-  await getOrCreateProgram(scuEng.id, scuEngElec.id, 'برامج خاصة (Credit Programs)', 'Credit Programs', 99);
+  // SCU Eng - Architecture
+  const scuEngArch = await getOrCreateDepartment(scu.id, scuEng.id, 'العمارة', 'Architecture', 1);
+  await getOrCreateProgram(scuEng.id, scuEngArch.id, 'هندسة العمارة', 'Architecture Engineering', 1, ProgramType.REGULAR);
+  await getOrCreateProgram(scuEng.id, scuEngArch.id, 'هندسة وتكنولوجيا العمارة المستدامة', 'Sustainable Architecture Engineering and Technology', 2, ProgramType.SPECIAL);
+  await getOrCreateProgram(scuEng.id, scuEngArch.id, 'هندسة تخطيط المدن', 'Urban Planning Engineering', 3, ProgramType.SPECIAL);
   
-  const scuEngCivil = await getOrCreateDepartment(scu.id, scuEng.id, 'الهندسة المدنية', 'Civil Engineering', 2);
-  await getOrCreateProgram(scuEng.id, scuEngCivil.id, 'هندسة الإنشاءات', 'Structural', 1);
-  await getOrCreateProgram(scuEng.id, scuEngCivil.id, 'هندسة الأشغال العامة', 'Public Works', 2);
-  await getOrCreateProgram(scuEng.id, scuEngCivil.id, 'هندسة الري والموارد المائية', 'Irrigation & Water Resources', 3);
-  await getOrCreateProgram(scuEng.id, scuEngCivil.id, 'هندسة التشييد وإدارة المشروعات', 'Construction & Project Management', 4);
-  await getOrCreateProgram(scuEng.id, scuEngCivil.id, 'برامج خاصة (Credit Programs)', 'Credit Programs', 99);
+  // SCU Eng - Civil
+  const scuEngCivil = await getOrCreateDepartment(scu.id, scuEng.id, 'مدني', 'Civil Engineering', 2);
+  await getOrCreateProgram(scuEng.id, scuEngCivil.id, 'الهندسة الإنشائية', 'Structural Engineering', 1, ProgramType.REGULAR);
+  await getOrCreateProgram(scuEng.id, scuEngCivil.id, 'هندسة الأشغال العامة', 'Public Works Engineering', 2, ProgramType.REGULAR);
+  await getOrCreateProgram(scuEng.id, scuEngCivil.id, 'هندسة الري والموارد المائية', 'Water Resources and Irrigation Engineering', 3, ProgramType.REGULAR);
+  await getOrCreateProgram(scuEng.id, scuEngCivil.id, 'هندسة التشييد وإدارة المشروعات', 'Construction and Project Management Engineering', 4, ProgramType.SPECIAL);
 
-  const scuEngMech = await getOrCreateDepartment(scu.id, scuEng.id, 'الهندسة الميكانيكية', 'Mechanical Engineering', 3);
-  await getOrCreateProgram(scuEng.id, scuEngMech.id, 'هندسة الإنتاج والتصميم الميكانيكي', 'Production & Mechanical Design', 1);
-  await getOrCreateProgram(scuEng.id, scuEngMech.id, 'هندسة القوى الميكانيكية', 'Mechanical Power', 2);
-  await getOrCreateProgram(scuEng.id, scuEngMech.id, 'برامج خاصة (Credit Programs)', 'Credit Programs', 99);
+  // SCU Eng - Electrical
+  const scuEngElec = await getOrCreateDepartment(scu.id, scuEng.id, 'كهرباء', 'Electrical Engineering', 3);
+  await getOrCreateProgram(scuEng.id, scuEngElec.id, 'هندسة القوى والآلات الكهربية', 'Electrical Power and Machines Engineering', 1, ProgramType.REGULAR);
+  await getOrCreateProgram(scuEng.id, scuEngElec.id, 'هندسة الاتصالات والإلكترونيات', 'Communications and Electronics Engineering', 2, ProgramType.REGULAR);
+  await getOrCreateProgram(scuEng.id, scuEngElec.id, 'هندسة الحاسبات والتحكم', 'Computer and Control Engineering', 3, ProgramType.REGULAR);
+  await getOrCreateProgram(scuEng.id, scuEngElec.id, 'هندسة تكنولوجيا المعلومات والاتصالات', 'Information and Communications Technology Engineering', 4, ProgramType.SPECIAL);
+
+  // SCU Eng - Mechanical
+  const scuEngMech = await getOrCreateDepartment(scu.id, scuEng.id, 'ميكانيكا', 'Mechanical Engineering', 4);
+  await getOrCreateProgram(scuEng.id, scuEngMech.id, 'هندسة القوى الميكانيكية', 'Mechanical Power Engineering', 1, ProgramType.REGULAR);
+  await getOrCreateProgram(scuEng.id, scuEngMech.id, 'هندسة الإنتاج والتصميم الميكانيكي', 'Production and Mechanical Design Engineering', 2, ProgramType.REGULAR);
+  await getOrCreateProgram(scuEng.id, scuEngMech.id, 'هندسة الطاقة المستدامة', 'Sustainable Energy Engineering', 3, ProgramType.SPECIAL);
+
+  // SCU Eng - Preparatory
+  await getOrCreateDepartment(scu.id, scuEng.id, 'إعدادي', 'Preparatory / Undeclared', 5);
+
+  // Faculty 2: Computers and Information
+  const scuComp = await getOrCreateFaculty(scu.id, 'كلية الحاسبات والمعلومات', 'Faculty of Computers and Information', 2);
   
-  const scuEngArch = await getOrCreateDepartment(scu.id, scuEng.id, 'هندسة العمارة والتخطيط العمراني', 'Architecture & Urban Planning', 4);
-  await getOrCreateProgram(scuEng.id, scuEngArch.id, 'هندسة العمارة', 'Architecture', 1);
-  await getOrCreateProgram(scuEng.id, scuEngArch.id, 'هندسة تخطيط المدن', 'Urban Planning', 2);
-  await getOrCreateProgram(scuEng.id, scuEngArch.id, 'برامج خاصة (Credit Programs)', 'Credit Programs', 99);
-
-  const scuComp = await getOrCreateFaculty(scu.id, 'كلية الحاسبات والمعلومات', 'Faculty of Computers & Information', 2);
-  const scuCompCs = await getOrCreateDepartment(scu.id, scuComp.id, 'علوم الحاسب', 'Computer Science', 1);
-  const scuCompIs = await getOrCreateDepartment(scu.id, scuComp.id, 'نظم المعلومات', 'Information Systems', 2);
-  const scuCompIt = await getOrCreateDepartment(scu.id, scuComp.id, 'تكنولوجيا المعلومات', 'Information Technology', 3);
-  const scuCompAi = await getOrCreateDepartment(scu.id, scuComp.id, 'الذكاء الاصطناعي وعلوم البيانات', 'AI & Data Science', 4);
-  const scuCompSe = await getOrCreateDepartment(scu.id, scuComp.id, 'هندسة البرمجيات', 'Software Engineering', 5);
-  const scuCompBio = await getOrCreateDepartment(scu.id, scuComp.id, 'الحوسبة والمعلوماتية الحيوية', 'Bioinformatics', 6);
+  // (No departments specified for Computers and Information in the current flow where students need to select them, but the prompt says:
+  // "If: SCU + Computers and Information: show only valid academic departments where department selection is actually required."
+  // Wait, prompt says: "The CURRENT official SCU announcements for academic year 2026/2027 state that the Faculty of Computers and Information offers: Software Engineering, Artificial Intelligence and Data Science, Cybersecurity"
+  // "Where the official academic structure identifies a program's owning department, preserve that relationship. For example: Software Engineering -> Computer Science, Artificial Intelligence -> Computer Science + Information Systems, Cybersecurity -> use actual department."
+  // Actually, I can just create them under the departments if they are known, or under null department if not required.
+  // The prompt says: "Where the official academic structure identifies a program's owning department, preserve that relationship."
+  // Since earlier seed had Computer Science, Information Systems, Information Technology, AI & Data Science, Software Engineering.
+  // Let's create the departments first.
+  const scuCompCs = await getOrCreateDepartment(scu.id, scuComp.id, 'علوم الحاسب', 'Department of Computer Science', 1);
+  const scuCompIs = await getOrCreateDepartment(scu.id, scuComp.id, 'نظم المعلومات', 'Department of Information Systems', 2);
+  const scuCompIt = await getOrCreateDepartment(scu.id, scuComp.id, 'تكنولوجيا المعلومات', 'Department of Information Technology', 3);
+  
+  // Programs
+  await getOrCreateProgram(scuComp.id, scuCompCs.id, 'هندسة البرمجيات', 'Software Engineering', 1, ProgramType.REGULAR);
+  // Shared program: place under CS as primary or null if platform supports one. Platform supports one, so CS.
+  await getOrCreateProgram(scuComp.id, scuCompCs.id, 'الذكاء الاصطناعي وعلوم البيانات', 'Artificial Intelligence and Data Science', 2, ProgramType.REGULAR);
+  // Cybersecurity: typically IT or CS. Let's put under IT.
+  await getOrCreateProgram(scuComp.id, scuCompIt.id, 'الأمن السيبراني', 'Cybersecurity', 3, ProgramType.REGULAR);
 
   // --- 2. جامعة الإسماعيلية الجديدة الأهلية (New Ismailia National University) ---
-  const ismailia = await getOrCreateUniversity('جامعة الإسماعيلية الجديدة الأهلية (NINU)', 'New Ismailia National University (NINU)', 2);
-  const ismailiaEng = await getOrCreateFaculty(ismailia.id, 'كلية الهندسة', 'Faculty of Engineering', 1);
-  // Programs directly under faculty
-  await getOrCreateProgram(ismailiaEng.id, null, 'هندسة الذكاء الاصطناعي', 'AI Engineering', 1);
-  await getOrCreateProgram(ismailiaEng.id, null, 'هندسة التشييد وإدارة المشروعات', 'Construction & Project Management', 2);
-  await getOrCreateProgram(ismailiaEng.id, null, 'هندسة نظم الاتصالات الحديثة', 'Modern Communications Systems Engineering', 3);
-
-
-  // --- 3. جامعة الزقازيق (Zagazig University) ---
-  const zagu = await getOrCreateUniversity('جامعة الزقازيق (ZU)', 'Zagazig University (ZU)', 3);
-  const zaguEng = await getOrCreateFaculty(zagu.id, 'كلية الهندسة', 'Faculty of Engineering', 1);
+  const ninu = await getOrCreateUniversity('جامعة الإسماعيلية الجديدة الأهلية', 'New Ismailia National University', 2);
   
-  await getOrCreateDepartment(zagu.id, zaguEng.id, 'إعدادي (لم يتم تحديد القسم)', 'Preparatory (General)', 0);
-  
-  await getOrCreateDepartment(zagu.id, zaguEng.id, 'الهندسة المدنية', 'Civil Engineering', 1);
-  const zaguEngElec = await getOrCreateDepartment(zagu.id, zaguEng.id, 'الهندسة الكهربائية', 'Electrical Engineering', 2);
-  await getOrCreateProgram(zaguEng.id, zaguEngElec.id, 'هندسة الإلكترونيات والاتصالات الكهربائية', 'Electronics & Electrical Communications', 1);
-  await getOrCreateProgram(zaguEng.id, zaguEngElec.id, 'هندسة القوى والآلات الكهربائية', 'Power & Electrical Machines', 2);
-  const zaguEngMech = await getOrCreateDepartment(zagu.id, zaguEng.id, 'الهندسة الميكانيكية', 'Mechanical Engineering', 3);
-  await getOrCreateProgram(zaguEng.id, zaguEngMech.id, 'التصميم الميكانيكي والإنتاج', 'Mechanical Design & Production', 1);
-  await getOrCreateProgram(zaguEng.id, zaguEngMech.id, 'القوى الميكانيكية', 'Mechanical Power', 2);
-  await getOrCreateDepartment(zagu.id, zaguEng.id, 'الهندسة المعمارية', 'Architecture', 4);
-  await getOrCreateDepartment(zagu.id, zaguEng.id, 'الهندسة الصناعية', 'Industrial Engineering', 5);
-  await getOrCreateDepartment(zagu.id, zaguEng.id, 'هندسة الحاسبات والمنظومات', 'Computer & Systems Engineering', 6);
-  await getOrCreateDepartment(zagu.id, zaguEng.id, 'هندسة المواد', 'Materials Engineering', 7);
-  await getOrCreateDepartment(zagu.id, zaguEng.id, 'الفيزياء والرياضيات الهندسية', 'Engineering Physics & Mathematics', 8);
+  const ninuEng = await getOrCreateFaculty(ninu.id, 'كلية الهندسة', 'Faculty of Engineering', 1);
 
-  const zaguComp = await getOrCreateFaculty(zagu.id, 'كلية الحاسبات والمعلومات', 'Faculty of Computers & Information', 2);
-  await getOrCreateDepartment(zagu.id, zaguComp.id, 'علوم الحاسب', 'Computer Science', 1);
-  await getOrCreateDepartment(zagu.id, zaguComp.id, 'نظم المعلومات', 'Information Systems', 2);
-  await getOrCreateDepartment(zagu.id, zaguComp.id, 'تكنولوجيا المعلومات', 'Information Technology', 3);
-  await getOrCreateDepartment(zagu.id, zaguComp.id, 'دعم القرار', 'Decision Support', 4);
+  // NINU Eng - Civil
+  const ninuEngCivil = await getOrCreateDepartment(ninu.id, ninuEng.id, 'قسم الهندسة المدنية', 'Department of Civil Engineering', 1);
+  await getOrCreateProgram(ninuEng.id, ninuEngCivil.id, 'هندسة التشييد وإدارة المشروعات', 'Construction and Project Management Engineering', 1, ProgramType.REGULAR);
 
-  // --- 4. جامعة الزقازيق الأهلية (Zagazig National University) ---
-  const zaguNat = await getOrCreateUniversity('جامعة الزقازيق الأهلية (ZNU)', 'Zagazig National University (ZNU)', 4);
-  const zaguNatEng = await getOrCreateFaculty(zaguNat.id, 'كلية الهندسة', 'Faculty of Engineering', 1);
-  await getOrCreateProgram(zaguNatEng.id, null, 'الميكاترونيك', 'Mechatronics', 1);
-  await getOrCreateProgram(zaguNatEng.id, null, 'هندسة إنشاءات وإدارة التشييد', 'Construction Engineering & Management', 2);
+  // NINU Eng - Electrical
+  const ninuEngElec = await getOrCreateDepartment(ninu.id, ninuEng.id, 'قسم الهندسة الكهربائية', 'Department of Electrical Engineering', 2);
+  await getOrCreateProgram(ninuEng.id, ninuEngElec.id, 'هندسة الذكاء الاصطناعي', 'Artificial Intelligence Engineering', 1, ProgramType.REGULAR);
+  await getOrCreateProgram(ninuEng.id, ninuEngElec.id, 'نظم الاتصالات الحديثة', 'Modern Communication Systems', 2, ProgramType.REGULAR);
 
-  const zaguNatComp = await getOrCreateFaculty(zaguNat.id, 'كلية الحاسبات والمعلومات', 'Faculty of Computers & Information', 2);
-  await getOrCreateProgram(zaguNatComp.id, null, 'الذكاء الاصطناعي وعلوم البيانات', 'AI & Data Science', 1);
-  await getOrCreateProgram(zaguNatComp.id, null, 'المعلوماتية الطبية', 'Medical Informatics', 2);
-  await getOrCreateProgram(zaguNatComp.id, null, 'نظم معلومات الطيران', 'Aviation Information Systems', 3);
+  // NINU Eng - Mechanical
+  const ninuEngMech = await getOrCreateDepartment(ninu.id, ninuEng.id, 'قسم الهندسة الميكانيكية', 'Department of Mechanical Engineering', 3);
+  await getOrCreateProgram(ninuEng.id, ninuEngMech.id, 'هندسة التصميم الابتكاري', 'Innovative Design Engineering', 1, ProgramType.REGULAR);
+  await getOrCreateProgram(ninuEng.id, ninuEngMech.id, 'هندسة المواد والتصنيع', 'Materials and Manufacturing Engineering', 2, ProgramType.REGULAR);
 
-  // --- 5. أخرى (Other) ---
-  const otherUni = await getOrCreateUniversity('أخرى', 'Other', 99, true);
+  // NINU Eng - Ship
+  const ninuEngShip = await getOrCreateDepartment(ninu.id, ninuEng.id, 'قسم هندسة السفن', 'Department of Naval / Ship Engineering', 4);
+  await getOrCreateProgram(ninuEng.id, ninuEngShip.id, 'الهندسة البحرية', 'Marine Engineering', 1, ProgramType.REGULAR);
 
-  console.log('Done seeding.');
+  console.log('Done seeding active academic data.');
 }
 
 main().catch(e => {

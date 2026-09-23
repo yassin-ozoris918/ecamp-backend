@@ -7,34 +7,35 @@ export class AcademicDataService {
 
   async getUniversities() {
     return this.prisma.academicUniversity.findMany({
+      where: { isActive: true },
       orderBy: { sortOrder: 'asc' },
     });
   }
 
   async getFacultiesByUniversity(universityId: string) {
     return this.prisma.academicFaculty.findMany({
-      where: { universityId },
+      where: { universityId, isActive: true },
       orderBy: { sortOrder: 'asc' },
     });
   }
 
   async getDepartmentsByFaculty(facultyId: string) {
     return this.prisma.academicDepartment.findMany({
-      where: { facultyId },
+      where: { facultyId, isActive: true },
       orderBy: { sortOrder: 'asc' },
     });
   }
 
   async getProgramsByDepartment(departmentId: string) {
     return this.prisma.academicProgram.findMany({
-      where: { departmentId },
+      where: { departmentId, isActive: true },
       orderBy: { sortOrder: 'asc' },
     });
   }
 
   async getProgramsByFaculty(facultyId: string) {
     return this.prisma.academicProgram.findMany({
-      where: { facultyId, departmentId: null },
+      where: { facultyId, departmentId: null, isActive: true },
       orderBy: { sortOrder: 'asc' },
     });
   }
