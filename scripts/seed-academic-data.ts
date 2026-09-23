@@ -2,61 +2,73 @@ import { PrismaClient, ProgramType } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-async function getOrCreateUniversity(nameAr: string, nameEn: string, sortOrder: number, isOther: boolean = false) {
-  let uni = await prisma.academicUniversity.findFirst({ where: { nameAr } });
+const SCU_CANONICAL_AR = 'جامعة قناة السويس (SCU)';
+const SCU_CANONICAL_EN = 'Suez Canal University (SCU)';
+const SCU_VARIANTS = [SCU_CANONICAL_AR, 'جامعة قناة السويس', 'Suez Canal University'];
+
+const NINU_CANONICAL_AR = 'جامعة الإسماعيلية الجديدة الأهلية (NINU)';
+const NINU_CANONICAL_EN = 'New Ismailia National University (NINU)';
+const NINU_VARIANTS = [NINU_CANONICAL_AR, 'جامعة الإسماعيلية الجديدة الأهلية', 'New Ismailia National University'];
+
+async function getOrCreateUniversity(canonicalAr: string, canonicalEn: string, variants: string[], sortOrder: number) {
+  let uni = await prisma.academicUniversity.findFirst({
+    where: { nameAr: { in: variants } },
+    orderBy: { isActive: 'desc' }
+  });
+
   if (!uni) {
     uni = await prisma.academicUniversity.create({
-      data: { nameAr, nameEn, sortOrder, isOther, isActive: true }
+      data: { nameAr: canonicalAr, nameEn: canonicalEn, sortOrder, isOther: false, isActive: true }
     });
   } else {
     uni = await prisma.academicUniversity.update({
       where: { id: uni.id },
-      data: { nameAr, nameEn, sortOrder, isOther, isActive: true }
+      data: { nameAr: canonicalAr, nameEn: canonicalEn, sortOrder, isOther: false, isActive: true }
     });
   }
   return uni;
 }
 
-async function getOrCreateFaculty(universityId: string, nameAr: string, nameEn: string, sortOrder: number, isOther: boolean = false) {
+async function getOrCreateFaculty(universityId: string, nameAr: string, nameEn: string, sortOrder: number) {
   let fac = await prisma.academicFaculty.findFirst({ where: { universityId, nameAr } });
   if (!fac) {
     fac = await prisma.academicFaculty.create({
-      data: { universityId, nameAr, nameEn, sortOrder, isOther, isActive: true }
+      data: { universityId, nameAr, nameEn, sortOrder, isOther: false, isActive: true }
     });
   } else {
     fac = await prisma.academicFaculty.update({
       where: { id: fac.id },
-      data: { nameAr, nameEn, sortOrder, isOther, isActive: true }
+      data: { nameEn, sortOrder, isActive: true }
     });
   }
   return fac;
 }
 
-async function getOrCreateDepartment(universityId: string, facultyId: string, nameAr: string, nameEn: string, sortOrder: number, isOther: boolean = false) {
+async function getOrCreateDepartment(universityId: string, facultyId: string, nameAr: string, nameEn: string, sortOrder: number) {
   let dep = await prisma.academicDepartment.findFirst({ where: { facultyId, nameAr } });
   if (!dep) {
     dep = await prisma.academicDepartment.create({
-      data: { universityId, facultyId, nameAr, nameEn, sortOrder, isOther, isActive: true }
+      data: { universityId, facultyId, nameAr, nameEn, sortOrder, isOther: false, isActive: true }
     });
   } else {
     dep = await prisma.academicDepartment.update({
       where: { id: dep.id },
-      data: { nameAr, nameEn, sortOrder, isOther, isActive: true }
+      data: { nameEn, sortOrder, isActive: true }
     });
   }
   return dep;
 }
 
-async function getOrCreateProgram(facultyId: string, departmentId: string | null, nameAr: string, nameEn: string, sortOrder: number, type: ProgramType = ProgramType.REGULAR, isOther: boolean = false) {
-  let prog = await prisma.academicProgram.findFirst({ where: { facultyId, nameAr } });
+async function getOrCreateProgram(facultyId: string, departmentId: string | null, nameAr: string, nameEn: string, sortOrder: number, type: ProgramType) {
+  let prog = await prisma.academicProgram.findFirst({ where: { facultyId, nameAr, departmentId } });
   if (!prog) {
     prog = await prisma.academicProgram.create({
-      data: { facultyId, departmentId, nameAr, nameEn, sortOrder, type, isOther, isActive: true }
+      data: { facultyId, departmentId, nameAr, nameEn, sortOrder, type, isOther: false, isActive: true }
     });
   } else {
     prog = await prisma.academicProgram.update({
       where: { id: prog.id },
-      data: { departmentId, nameAr, nameEn, sortOrder, type, isOther, isActive: true }
+      data: { nameEn, sortOrder, type, isActive: true }
     });
   }
   return prog;
@@ -65,8 +77,8 @@ async function getOrCreateProgram(facultyId: string, departmentId: string | null
 async function main() {
   console.log('Seeding active academic master data...');
 
-  // --- 1. جامعة قناة السويس (Suez Canal University) ---
-  const scu = await getOrCreateUniversity('جامعة قناة السويس', 'Suez Canal University', 1);
+  // --- 1. SCU ---
+  const scu = await getOrCreateUniversity(SCU_CANONICAL_AR, SCU_CANONICAL_EN, SCU_VARIANTS, 1);
   
   // Faculty 1: Engineering
   const scuEng = await getOrCreateFaculty(scu.id, 'كلية الهندسة', 'Faculty of Engineering', 1);
@@ -103,27 +115,16 @@ async function main() {
   // Faculty 2: Computers and Information
   const scuComp = await getOrCreateFaculty(scu.id, 'كلية الحاسبات والمعلومات', 'Faculty of Computers and Information', 2);
   
-  // (No departments specified for Computers and Information in the current flow where students need to select them, but the prompt says:
-  // "If: SCU + Computers and Information: show only valid academic departments where department selection is actually required."
-  // Wait, prompt says: "The CURRENT official SCU announcements for academic year 2026/2027 state that the Faculty of Computers and Information offers: Software Engineering, Artificial Intelligence and Data Science, Cybersecurity"
-  // "Where the official academic structure identifies a program's owning department, preserve that relationship. For example: Software Engineering -> Computer Science, Artificial Intelligence -> Computer Science + Information Systems, Cybersecurity -> use actual department."
-  // Actually, I can just create them under the departments if they are known, or under null department if not required.
-  // The prompt says: "Where the official academic structure identifies a program's owning department, preserve that relationship."
-  // Since earlier seed had Computer Science, Information Systems, Information Technology, AI & Data Science, Software Engineering.
-  // Let's create the departments first.
   const scuCompCs = await getOrCreateDepartment(scu.id, scuComp.id, 'علوم الحاسب', 'Department of Computer Science', 1);
   const scuCompIs = await getOrCreateDepartment(scu.id, scuComp.id, 'نظم المعلومات', 'Department of Information Systems', 2);
   const scuCompIt = await getOrCreateDepartment(scu.id, scuComp.id, 'تكنولوجيا المعلومات', 'Department of Information Technology', 3);
   
-  // Programs
   await getOrCreateProgram(scuComp.id, scuCompCs.id, 'هندسة البرمجيات', 'Software Engineering', 1, ProgramType.REGULAR);
-  // Shared program: place under CS as primary or null if platform supports one. Platform supports one, so CS.
   await getOrCreateProgram(scuComp.id, scuCompCs.id, 'الذكاء الاصطناعي وعلوم البيانات', 'Artificial Intelligence and Data Science', 2, ProgramType.REGULAR);
-  // Cybersecurity: typically IT or CS. Let's put under IT.
   await getOrCreateProgram(scuComp.id, scuCompIt.id, 'الأمن السيبراني', 'Cybersecurity', 3, ProgramType.REGULAR);
 
-  // --- 2. جامعة الإسماعيلية الجديدة الأهلية (New Ismailia National University) ---
-  const ninu = await getOrCreateUniversity('جامعة الإسماعيلية الجديدة الأهلية', 'New Ismailia National University', 2);
+  // --- 2. NINU ---
+  const ninu = await getOrCreateUniversity(NINU_CANONICAL_AR, NINU_CANONICAL_EN, NINU_VARIANTS, 2);
   
   const ninuEng = await getOrCreateFaculty(ninu.id, 'كلية الهندسة', 'Faculty of Engineering', 1);
 
