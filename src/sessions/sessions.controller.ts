@@ -23,7 +23,7 @@ import type { RequestWithUser } from '../auth/interfaces/request-with-user.inter
 
 // --- New Imports for Phase 14 Storage ---
 import { FileInterceptor } from '@nestjs/platform-express';
-import { videoFileFilter, UPLOAD_LIMITS } from '../common/config/upload.config';
+import { videoFileFilter, UPLOAD_LIMITS, MIME_TYPES } from '../common/config/upload.config';
 import { StorageService } from '../storage/storage.service'; // Adjust path if necessary
 
 @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -73,6 +73,70 @@ export class SessionsController {
   }
 
   // --- NEW PHASE 14 VIDEO UPLOAD OPERATION ---
+
+  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Post(':id/video/upload/init')
+  async initUpload(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { filename: string; mimetype: string; fileSize: number },
+    @Req() req: RequestWithUser,
+  ) {
+    if (!body.filename || !body.mimetype || typeof body.fileSize !== 'number') {
+      throw new BadRequestException('Filename, mimetype, and fileSize are required.');
+    }
+
+    if (!(MIME_TYPES.VIDEO as readonly string[]).includes(body.mimetype)) {
+      throw new BadRequestException(`Unsupported MIME type: "${body.mimetype}". Accepted: ${MIME_TYPES.VIDEO.join(', ')}`);
+    }
+
+    if (body.fileSize > UPLOAD_LIMITS.VIDEO) {
+      throw new BadRequestException(`File size exceeds the limit of ${UPLOAD_LIMITS.VIDEO} bytes.`);
+    }
+
+    // Authorization check
+    await this.sessionsService.verifySessionOwnershipById(id, req.user.sub, req.user.role);
+
+    const { uploadUrl, objectKey, assetUrl } = await this.storageService.generatePresignedUrl(
+      'videos',
+      body.filename,
+      body.mimetype,
+      body.fileSize,
+    );
+
+    return { uploadUrl, objectKey, assetUrl, expiresIn: 3600 };
+  }
+
+  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Post(':id/video/upload/complete')
+  async completeUpload(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: { objectKey: string; assetUrl: string },
+    @Req() req: RequestWithUser,
+  ) {
+    if (!body.objectKey || !body.assetUrl) {
+      throw new BadRequestException('Object key and asset URL are required.');
+    }
+
+    // Authorization check (redundant since updateVideoUrl also checks, but good for validation phase)
+    await this.sessionsService.verifySessionOwnershipById(id, req.user.sub, req.user.role);
+
+    const exists = await this.storageService.verifyR2Object(body.objectKey);
+    if (!exists) {
+      throw new BadRequestException('File not found in storage. Upload may have failed.');
+    }
+
+    const updatedSession = await this.sessionsService.updateVideoUrl(
+      id,
+      body.assetUrl,
+      req.user.sub,
+      req.user.role,
+    );
+
+    return {
+      message: 'Lecture video uploaded and finalized successfully.',
+      session: updatedSession,
+    };
+  }
 
   @Roles(Role.INSTRUCTOR, Role.ADMIN)
   @Post(':id/upload-video')

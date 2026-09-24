@@ -8,8 +8,10 @@ import { ConfigService } from '@nestjs/config';
 import {
   S3Client,
   PutObjectCommand,
+  HeadObjectCommand,
   NoSuchBucket,
 } from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import * as path from 'path';
 import * as fs from 'fs';
@@ -97,7 +99,6 @@ export class StorageService {
       }
     }
 
-    // Layer 4 — Secure unique filename to prevent collisions / overwrites
     const key = `${folder}/${randomUUID()}${secureExtension}`;
 
     if (this.s3Client) {
@@ -163,5 +164,64 @@ export class StorageService {
       if (buffer[i] === 0x00) return false;
     }
     return true;
+  }
+
+  async generatePresignedUrl(
+    folder: string,
+    filename: string,
+    mimetype: string,
+    fileSize?: number,
+  ): Promise<{ uploadUrl: string; objectKey: string; assetUrl: string }> {
+    if (!this.s3Client) {
+      throw new InternalServerErrorException('Direct upload is only supported with Cloudflare R2.');
+    }
+
+    const secureExtension = path.extname(filename).toLowerCase();
+    
+    if (BLOCKED_EXTENSIONS.includes(secureExtension)) {
+      throw new BadRequestException(`Blocked file extension "${secureExtension}".`);
+    }
+
+    const nameParts = filename.toLowerCase().split('.');
+    for (const part of nameParts) {
+      if (BLOCKED_EXTENSIONS.includes(`.${part}`)) {
+        throw new BadRequestException('Hidden executable extension detected.');
+      }
+    }
+
+    const key = `${folder}/${randomUUID()}${secureExtension}`;
+    const command = new PutObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+      ContentType: mimetype,
+      ...(fileSize ? { ContentLength: fileSize } : {}),
+    });
+
+    try {
+      const uploadUrl = await getSignedUrl(this.s3Client, command, { expiresIn: 3600 });
+      return {
+        uploadUrl,
+        objectKey: key,
+        assetUrl: `${this.publicUrl}/${key}`,
+      };
+    } catch (error) {
+      this.logger.error('Failed to generate presigned URL', error);
+      throw new InternalServerErrorException('Failed to generate upload URL.');
+    }
+  }
+
+  async verifyR2Object(key: string): Promise<boolean> {
+    if (!this.s3Client) return false;
+    try {
+      const command = new HeadObjectCommand({
+        Bucket: this.bucketName,
+        Key: key,
+      });
+      await this.s3Client.send(command);
+      return true;
+    } catch (error) {
+      this.logger.error(`Object verification failed for ${key}`, error);
+      return false;
+    }
   }
 }

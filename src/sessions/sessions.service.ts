@@ -40,6 +40,11 @@ export class SessionsService {
     }
   }
 
+  async verifySessionOwnershipById(sessionId: string, instructorId: string, role: Role) {
+    const session = await this.findOne(sessionId);
+    await this.verifySessionOwnership(session.lectureId, instructorId, role);
+  }
+
   async create(dto: CreateSessionDto, instructorId: string, role: Role) {
     await this.verifySessionOwnership(dto.lectureId, instructorId, role);
 
