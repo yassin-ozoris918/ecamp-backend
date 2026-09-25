@@ -40,7 +40,7 @@ export class AttachmentsService {
       where: { id: attachmentId, deletedAt: null },
       include: { lecture: true },
     });
-    if (!attachment) return false;
+    if (!attachment || !attachment.lecture || !attachment.lecture.courseId) return false;
 
     // Must be eligible for the course
     const eligibleCourses = await this.coursesService.getCoursesForStudent(studentId);
@@ -112,8 +112,11 @@ export class AttachmentsService {
     const result = attachments.map(attachment => {
       let accessStatus = 'LOCKED';
       let accessSource: string | null = null;
+      
+      const courseId = attachment.lecture?.course?.id;
+      if (!courseId || !attachment.lecture) return null; // Skip attachments that somehow don't belong to a lecture or course
 
-      const hasCourseAccess = courseAccesses.some(ca => ca.courseId === attachment.lecture.course.id);
+      const hasCourseAccess = courseAccesses.some(ca => ca.courseId === courseId);
       if (hasCourseAccess) {
         accessStatus = 'UNLOCKED';
         accessSource = 'COURSE';
@@ -123,7 +126,7 @@ export class AttachmentsService {
           accessStatus = 'UNLOCKED';
           accessSource = 'LECTURE';
         } else {
-          const hasCourseFiles = fileAccesses.some(fa => fa.courseId === attachment.lecture.course.id);
+          const hasCourseFiles = fileAccesses.some(fa => fa.courseId === courseId);
           if (hasCourseFiles) {
             accessStatus = 'UNLOCKED';
             accessSource = 'COURSE_FILES_CODE';
