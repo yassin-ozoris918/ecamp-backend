@@ -502,7 +502,10 @@ export class CoursesService {
       include: {
         attachments: true,
         lectures: {
-          include: { attachments: true }
+          include: { 
+            attachments: true,
+            sessions: true
+          }
         }
       }
     });
@@ -522,10 +525,12 @@ export class CoursesService {
     }
 
     for (const lecture of course.lectures) {
-      if (lecture.videoUrl) urlsToDelete.push(lecture.videoUrl);
       if (lecture.thumbnailUrl) urlsToDelete.push(lecture.thumbnailUrl);
       for (const att of lecture.attachments) {
         urlsToDelete.push(att.fileUrl);
+      }
+      for (const session of lecture.sessions) {
+        if (session.videoUrl) urlsToDelete.push(session.videoUrl);
       }
     }
 

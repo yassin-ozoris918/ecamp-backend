@@ -109,16 +109,21 @@ export class LecturesService {
   async remove(id: string, userId: string, role: Role) {
     const lecture = await this.prisma.lecture.findUnique({
       where: { id },
-      include: { attachments: true }
+      include: { 
+        attachments: true,
+        sessions: true 
+      }
     });
     if (!lecture) throw new NotFoundException('Lecture not found.');
     await this.verifyCourseOwnership(lecture.courseId, userId, role);
 
     const urlsToDelete: string[] = [];
-    if (lecture.videoUrl) urlsToDelete.push(lecture.videoUrl);
     if (lecture.thumbnailUrl) urlsToDelete.push(lecture.thumbnailUrl);
     for (const att of lecture.attachments || []) {
       urlsToDelete.push(att.fileUrl);
+    }
+    for (const session of lecture.sessions || []) {
+      if (session.videoUrl) urlsToDelete.push(session.videoUrl);
     }
 
     if (urlsToDelete.length > 0) {
