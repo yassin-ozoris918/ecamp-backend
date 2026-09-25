@@ -9,5 +9,6 @@ import { ProgressModule } from '../progress/progress.module';
   imports: [PrismaModule, ProgressModule],
   controllers: [CoursesController, PublicController],
   providers: [CoursesService],
+  exports: [CoursesService],
 })
 export class CoursesModule {}
