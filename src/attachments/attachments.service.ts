@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
+import { CoursesService } from '../courses/courses.service';
 import { CreateAttachmentDto } from './dto/create-attachment.dto';
 import { Role } from '@prisma/client';
 
@@ -9,6 +10,7 @@ export class AttachmentsService {
   constructor(
     private prisma: PrismaService,
     private storage: StorageService,
+    private coursesService: CoursesService,
   ) {}
 
   async create(file: Express.Multer.File, dto: CreateAttachmentDto, instructorId: string, role: Role) {
@@ -28,9 +30,155 @@ export class AttachmentsService {
 
   async findAllByLecture(lectureId: string) {
     return this.prisma.attachment.findMany({
-      where: { lectureId, },
+      where: { lectureId, deletedAt: null },
       orderBy: { createdAt: 'asc' },
     });
+  }
+
+  async hasFileAccess(studentId: string, attachmentId: string): Promise<boolean> {
+    const attachment = await this.prisma.attachment.findUnique({
+      where: { id: attachmentId, deletedAt: null },
+      include: { lecture: true },
+    });
+    if (!attachment) return false;
+
+    // Must be eligible for the course
+    const eligibleCourses = await this.coursesService.getCoursesForStudent(studentId);
+    if (!eligibleCourses.some(c => c.id === attachment.lecture.courseId)) {
+      return false;
+    }
+
+    const lectureAccess = await this.prisma.studentLectureAccess.findFirst({
+      where: { studentId, lectureId: attachment.lectureId },
+    });
+    if (lectureAccess) return true;
+
+    const courseAccess = await this.prisma.studentCourseAccess.findFirst({
+      where: { studentId, courseId: attachment.lecture.courseId },
+    });
+    if (courseAccess) return true;
+
+    const fileAccess = await this.prisma.studentFileAccess.findFirst({
+      where: {
+        studentId,
+        OR: [
+          { attachmentId },
+          { courseId: attachment.lecture.courseId },
+        ],
+      },
+    });
+    if (fileAccess) return true;
+
+    return false;
+  }
+
+  async getFilesForStudent(studentId: string, search?: string, courseId?: string, accessFilter?: string) {
+    const eligibleCourses = await this.coursesService.getCoursesForStudent(studentId);
+    const eligibleCourseIds = eligibleCourses.map(c => c.id);
+
+    if (courseId && !eligibleCourseIds.includes(courseId)) {
+      return [];
+    }
+    const filterCourseIds = courseId ? [courseId] : eligibleCourseIds;
+
+    const attachments = await this.prisma.attachment.findMany({
+      where: {
+        lecture: {
+          courseId: { in: filterCourseIds },
+        },
+        deletedAt: null,
+        ...(search ? { title: { contains: search, mode: 'insensitive' } } : {}),
+      },
+      include: {
+        lecture: { select: { id: true, title: true, course: { select: { id: true, title: true } } } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (attachments.length === 0) return [];
+
+    const lectureIds = Array.from(new Set(attachments.map(a => a.lectureId)));
+    
+    const lectureAccesses = await this.prisma.studentLectureAccess.findMany({
+      where: { studentId, lectureId: { in: lectureIds } },
+    });
+    const courseAccesses = await this.prisma.studentCourseAccess.findMany({
+      where: { studentId, courseId: { in: filterCourseIds } },
+    });
+    const fileAccesses = await this.prisma.studentFileAccess.findMany({
+      where: { studentId },
+    });
+
+    const result = attachments.map(attachment => {
+      let accessStatus = 'LOCKED';
+      let accessSource: string | null = null;
+
+      const hasCourseAccess = courseAccesses.some(ca => ca.courseId === attachment.lecture.course.id);
+      if (hasCourseAccess) {
+        accessStatus = 'UNLOCKED';
+        accessSource = 'COURSE';
+      } else {
+        const hasLectureAccess = lectureAccesses.some(la => la.lectureId === attachment.lecture.id);
+        if (hasLectureAccess) {
+          accessStatus = 'UNLOCKED';
+          accessSource = 'LECTURE';
+        } else {
+          const hasCourseFiles = fileAccesses.some(fa => fa.courseId === attachment.lecture.course.id);
+          if (hasCourseFiles) {
+            accessStatus = 'UNLOCKED';
+            accessSource = 'COURSE_FILES_CODE';
+          } else {
+            const hasFileAccess = fileAccesses.some(fa => fa.attachmentId === attachment.id);
+            if (hasFileAccess) {
+              accessStatus = 'UNLOCKED';
+              accessSource = 'FILE_CODE';
+            }
+          }
+        }
+      }
+
+      if (accessFilter === 'UNLOCKED' && accessStatus === 'LOCKED') return null;
+      if (accessFilter === 'LOCKED' && accessStatus === 'UNLOCKED') return null;
+
+      return {
+        id: attachment.id,
+        title: attachment.title,
+        type: attachment.type,
+        course: attachment.lecture.course,
+        lecture: { id: attachment.lecture.id, title: attachment.lecture.title },
+        accessStatus,
+        accessSource,
+      };
+    }).filter(Boolean);
+
+    return result;
+  }
+
+  async getStudentAttachmentViewUrl(studentId: string, attachmentId: string) {
+    const hasAccess = await this.hasFileAccess(studentId, attachmentId);
+    if (!hasAccess) {
+      throw new ForbiddenException('You do not have access to this file.');
+    }
+
+    const attachment = await this.prisma.attachment.findUnique({
+      where: { id: attachmentId, deletedAt: null },
+    });
+    if (!attachment) throw new NotFoundException('Attachment not found.');
+
+    return this.storage.generatePresignedGetUrl(attachment.fileUrl, 300);
+  }
+
+  async findById(id: string) {
+    const attachment = await this.prisma.attachment.findUnique({
+      where: { id, deletedAt: null },
+    });
+    if (!attachment) throw new NotFoundException('Attachment not found.');
+    return attachment;
+  }
+
+  async getInstructorAttachmentViewUrl(id: string) {
+    const attachment = await this.findById(id);
+    return this.storage.generatePresignedGetUrl(attachment.fileUrl, 300);
   }
 
   async delete(id: string, instructorId: string, role: Role) {

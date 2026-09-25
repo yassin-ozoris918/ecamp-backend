@@ -61,6 +61,8 @@ enum CodeStatus {
 enum ActivationCodeType {
   LECTURE
   COURSE
+  FILE
+  COURSE_FILES
 }
 
 enum CourseStatus {
@@ -166,6 +168,7 @@ model User {
   codeHistoryAsActor   ActivationCodeHistory[] @relation("HistoryActor")
   accessedLectures     StudentLectureAccess[]
   accessedCourses      StudentCourseAccess[]
+  accessedFiles        StudentFileAccess[]
 
   quizAttempts QuizAttempt[]
 
@@ -237,6 +240,7 @@ model Course {
 
   // Access & Codes
   studentAccess StudentCourseAccess[]
+  fileAccess    StudentFileAccess[]
   redeemedCodes ActivationCode[]
   codeHistory   ActivationCodeHistory[]
 
@@ -393,6 +397,9 @@ model ActivationCode {
   redeemedCourseId String?
   redeemedCourse   Course? @relation(fields: [redeemedCourseId], references: [id], onDelete: SetNull)
 
+  redeemedAttachmentId String?
+  redeemedAttachment   Attachment? @relation(fields: [redeemedAttachmentId], references: [id], onDelete: SetNull)
+
   studentId String?
   student   User?   @relation(fields: [studentId], references: [id], onDelete: SetNull)
 
@@ -402,6 +409,7 @@ model ActivationCode {
 
   @@index([redeemedLectureId])
   @@index([redeemedCourseId])
+  @@index([redeemedAttachmentId])
   @@index([studentId])
 }
 
@@ -410,8 +418,9 @@ model ActivationCodeHistory {
   codeId String
   code   String
 
-  redeemedLectureId String?
-  redeemedCourseId  String?
+  redeemedLectureId    String?
+  redeemedCourseId     String?
+  redeemedAttachmentId String?
 
   studentId String?
   action    String // GENERATED | REDEEMED | REVOKED | EXPIRED
@@ -422,9 +431,10 @@ model ActivationCodeHistory {
   browser   String?
   createdAt DateTime    @default(now())
 
-  codeRel         ActivationCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
-  redeemedLecture Lecture?       @relation(fields: [redeemedLectureId], references: [id], onDelete: SetNull)
-  redeemedCourse  Course?        @relation(fields: [redeemedCourseId], references: [id], onDelete: SetNull)
+  codeRel            ActivationCode @relation(fields: [codeId], references: [id], onDelete: Cascade)
+  redeemedLecture    Lecture?       @relation(fields: [redeemedLectureId], references: [id], onDelete: SetNull)
+  redeemedCourse     Course?        @relation(fields: [redeemedCourseId], references: [id], onDelete: SetNull)
+  redeemedAttachment Attachment?    @relation(fields: [redeemedAttachmentId], references: [id], onDelete: SetNull)
 
   student User? @relation("HistoryStudent", fields: [studentId], references: [id], onDelete: SetNull)
   actor   User? @relation("HistoryActor", fields: [actorId], references: [id], onDelete: SetNull)
@@ -432,6 +442,7 @@ model ActivationCodeHistory {
   @@index([codeId])
   @@index([redeemedLectureId])
   @@index([redeemedCourseId])
+  @@index([redeemedAttachmentId])
   @@index([studentId])
   @@index([actorId])
   @@index([createdAt])
@@ -470,6 +481,25 @@ model StudentCourseAccess {
   course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@unique([studentId, courseId])
+  @@index([courseId])
+}
+
+model StudentFileAccess {
+  id           String    @id @default(uuid())
+  studentId    String
+  attachmentId String?
+  courseId     String?
+  source       String // FILE_CODE, COURSE_FILES_CODE, ADMIN_GRANT
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+
+  student    User        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  attachment Attachment? @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  course     Course?     @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([studentId])
+  @@index([attachmentId])
   @@index([courseId])
 }
 
@@ -820,7 +850,10 @@ model Attachment {
   deletedAt   DateTime?
 
   // Relations
-  lecture Lecture @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+  lecture                 Lecture                 @relation(fields: [lectureId], references: [id], onDelete: Cascade)
+  activationCodes         ActivationCode[]
+  activationCodeHistories ActivationCodeHistory[]
+  studentFileAccesses     StudentFileAccess[]
 
   @@index([lectureId])
 }

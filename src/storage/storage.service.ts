@@ -9,6 +9,7 @@ import {
   S3Client,
   PutObjectCommand,
   HeadObjectCommand,
+  GetObjectCommand,
   NoSuchBucket,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
@@ -207,6 +208,37 @@ export class StorageService {
     } catch (error) {
       this.logger.error('Failed to generate presigned URL', error);
       throw new InternalServerErrorException('Failed to generate upload URL.');
+    }
+  }
+
+  async generatePresignedGetUrl(fileUrl: string, expiresIn: number = 300): Promise<string> {
+    if (!this.s3Client) {
+      return fileUrl; // Fallback for local storage
+    }
+
+    let key = fileUrl;
+    if (this.publicUrl && fileUrl.startsWith(this.publicUrl)) {
+      key = fileUrl.substring(this.publicUrl.length + 1);
+    } else if (fileUrl.startsWith('https://')) {
+      // Try to parse the URL to extract the path (key)
+      try {
+        const urlObj = new URL(fileUrl);
+        key = urlObj.pathname.substring(1); // Remove leading slash
+      } catch (e) {
+        // Fallback
+      }
+    }
+
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+    });
+
+    try {
+      return await getSignedUrl(this.s3Client, command, { expiresIn });
+    } catch (error) {
+      this.logger.error('Failed to generate presigned GET URL', error);
+      throw new InternalServerErrorException('Failed to generate secure URL.');
     }
   }
 

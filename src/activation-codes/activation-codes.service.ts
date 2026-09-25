@@ -5,6 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { CoursesService } from '../courses/courses.service';
 import { GenerateCodesDto } from './dto/generate-codes.dto';
 import { RedeemCodeDto } from './dto/redeem-code.dto';
 import * as crypto from 'crypto';
@@ -12,7 +13,10 @@ import { CodeStatus, ActivationCodeType, EducationLevel } from '@prisma/client';
 
 @Injectable()
 export class ActivationCodesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private coursesService: CoursesService,
+  ) {}
 
   async getAllCodes(skip: number = 0, take: number = 50, search?: string, status?: string, targetType?: string, educationLevel?: string) {
     const whereClause: any = { };
@@ -46,6 +50,7 @@ export class ActivationCodesService {
             select: { title: true, course: { select: { title: true } } },
           },
           redeemedCourse: { select: { title: true } },
+          redeemedAttachment: { select: { title: true, lecture: { select: { course: { select: { title: true } } } } } },
           student: { select: { fullName: true } },
         },
       }),
@@ -55,8 +60,9 @@ export class ActivationCodesService {
     return {
       items: items.map((c) => ({
         ...c,
-        courseTitle: c.targetType === 'COURSE' ? c.redeemedCourse?.title : c.redeemedLecture?.course?.title,
+        courseTitle: c.targetType === 'COURSE' || c.targetType === 'COURSE_FILES' ? c.redeemedCourse?.title : (c.targetType === 'FILE' ? c.redeemedAttachment?.lecture?.course?.title : c.redeemedLecture?.course?.title),
         lectureTitle: c.redeemedLecture?.title,
+        attachmentTitle: c.redeemedAttachment?.title,
         redeemerName: c.student?.fullName,
       })),
       total,
@@ -251,7 +257,7 @@ export class ActivationCodesService {
           },
         });
 
-      } else {
+      } else if (dto.targetType === 'COURSE') {
         // COURSE REDEMPTION
         const course = await tx.course.findUnique({ where: { id: dto.targetId } });
         if (!course) throw new NotFoundException('Course not found.');
@@ -288,6 +294,60 @@ export class ActivationCodesService {
             redeemedCourseId: dto.targetId,
           },
         });
+      } else if (dto.targetType === 'FILE' || dto.targetType === 'COURSE_FILES') {
+        const eligibleCourses = await this.coursesService.getCoursesForStudent(studentId);
+        const eligibleCourseIds = eligibleCourses.map(c => c.id);
+
+        let attachment: any = null;
+        let targetCourseId: string | null = null;
+
+        if (dto.targetType === 'FILE') {
+          attachment = await tx.attachment.findUnique({
+            where: { id: dto.targetId },
+            include: { lecture: true }
+          });
+          if (!attachment) throw new NotFoundException('File not found.');
+          targetCourseId = attachment.lecture.courseId;
+        } else {
+          const course = await tx.course.findUnique({ where: { id: dto.targetId } });
+          if (!course) throw new NotFoundException('Course not found.');
+          targetCourseId = dto.targetId;
+        }
+
+        if (!targetCourseId || !eligibleCourseIds.includes(targetCourseId)) {
+          throw new ForbiddenException('You are not eligible to access files for this course based on your academic profile.');
+        }
+
+        const existingAccess = await tx.studentFileAccess.findFirst({
+          where: {
+            studentId,
+            ...(dto.targetType === 'FILE' ? { attachmentId: dto.targetId } : { courseId: dto.targetId }),
+          }
+        });
+
+        if (existingAccess) {
+          throw new ForbiddenException(`You already have access to ${dto.targetType === 'FILE' ? 'this file' : 'these course files'}. Keep this code safe!`);
+        }
+
+        await tx.studentFileAccess.create({
+          data: {
+            studentId,
+            ...(dto.targetType === 'FILE' ? { attachmentId: dto.targetId } : { courseId: dto.targetId }),
+            source: dto.targetType === 'FILE' ? 'FILE_CODE' : 'COURSE_FILES_CODE',
+          }
+        });
+
+        responseTitle = dto.targetType === 'FILE' ? attachment!.title : eligibleCourses.find(c => c.id === targetCourseId)!.title + ' Files';
+
+        await tx.activationCode.update({
+          where: { id: activationCode.id },
+          data: {
+            status: CodeStatus.REDEEMED,
+            redeemedAt: now,
+            studentId,
+            ...(dto.targetType === 'FILE' ? { redeemedAttachmentId: dto.targetId } : { redeemedCourseId: dto.targetId }),
+          },
+        });
       }
 
       await tx.activationCodeHistory.create({
@@ -295,7 +355,8 @@ export class ActivationCodesService {
           codeId: activationCode.id,
           code: activationCode.code,
           redeemedLectureId: dto.targetType === 'LECTURE' ? dto.targetId : null,
-          redeemedCourseId: dto.targetType === 'COURSE' ? dto.targetId : null,
+          redeemedCourseId: dto.targetType === 'COURSE' || dto.targetType === 'COURSE_FILES' ? dto.targetId : null,
+          redeemedAttachmentId: dto.targetType === 'FILE' ? dto.targetId : null,
           action: 'REDEEMED',
           oldStatus: CodeStatus.UNUSED,
           newStatus: CodeStatus.REDEEMED,
