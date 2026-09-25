@@ -497,12 +497,83 @@ export class CoursesService {
   }
 
   async remove(id: string, instructorId: string, role: Role) {
-    await this.findOne(id);
-    await this.verifyCourseOwnership(id, instructorId, role);
-    return this.prisma.course.update({
+    const course = await this.prisma.course.findUnique({
       where: { id },
-      data: { deletedAt: new Date() },
+      include: {
+        attachments: true,
+        lectures: {
+          include: { attachments: true }
+        }
+      }
     });
+
+    if (!course) {
+      throw new NotFoundException('Course not found');
+    }
+
+    await this.verifyCourseOwnership(id, instructorId, role);
+
+    const urlsToDelete: string[] = [];
+    if (course.thumbnailUrl) urlsToDelete.push(course.thumbnailUrl);
+    if (course.introductoryVideoUrl) urlsToDelete.push(course.introductoryVideoUrl);
+
+    for (const att of course.attachments) {
+      urlsToDelete.push(att.fileUrl);
+    }
+
+    for (const lecture of course.lectures) {
+      if (lecture.videoUrl) urlsToDelete.push(lecture.videoUrl);
+      if (lecture.thumbnailUrl) urlsToDelete.push(lecture.thumbnailUrl);
+      for (const att of lecture.attachments) {
+        urlsToDelete.push(att.fileUrl);
+      }
+    }
+
+    // Since we don't have StorageService imported, we'll manually use @aws-sdk/client-s3 here, or we can use CloudflareService if available.
+    // Wait, CloudflareService is imported? Let's check imports! No, neither are imported. Let me dynamically import DeleteObjectsCommand.
+    
+    if (urlsToDelete.length > 0) {
+      const bucketName = process.env.R2_BUCKET_NAME;
+      const endpoint = process.env.R2_ENDPOINT;
+      const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+      const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+      const publicUrl = process.env.R2_PUBLIC_URL;
+
+      if (bucketName && endpoint && accessKeyId && secretAccessKey) {
+        const { S3Client, DeleteObjectsCommand } = await import('@aws-sdk/client-s3');
+        const s3Client = new S3Client({
+          region: 'auto',
+          endpoint,
+          credentials: { accessKeyId, secretAccessKey },
+        });
+
+        const keys = urlsToDelete.map(url => {
+          let key = url;
+          if (publicUrl && url.startsWith(publicUrl)) {
+            key = url.substring(publicUrl.length + 1);
+          } else if (url.startsWith('https://')) {
+            try {
+              const urlObj = new URL(url);
+              key = urlObj.pathname.substring(1);
+            } catch (e) {
+              // Fallback
+            }
+          }
+          return key;
+        });
+
+        try {
+          await s3Client.send(new DeleteObjectsCommand({
+            Bucket: bucketName,
+            Delete: { Objects: keys.map(Key => ({ Key })), Quiet: true },
+          }));
+        } catch (error) {
+          console.error('Failed to delete objects from R2', error);
+        }
+      }
+    }
+
+    return this.prisma.course.delete({ where: { id } });
   }
 
   async getCoursesForStudent(userId: string) {

@@ -50,18 +50,6 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
                   where: { deletedAt: null, ...args.where },
                 });
               }
-              if (operation === 'delete') {
-                return (baseClient as any)[model].update({
-                  ...args,
-                  data: { deletedAt: new Date() },
-                });
-              }
-              if (operation === 'deleteMany') {
-                return (baseClient as any)[model].updateMany({
-                  ...args,
-                  data: { deletedAt: new Date() },
-                });
-              }
             }
             return query(args);
           },

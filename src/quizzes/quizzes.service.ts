@@ -104,10 +104,7 @@ export class QuizzesService {
       const quiz = await this.prisma.quiz.findUnique({ where: { id } });
       if (!quiz || quiz.deletedAt) throw new NotFoundException('Quiz not found');
     }
-    return this.prisma.quiz.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+    return this.prisma.quiz.delete({ where: { id } });
   }
 
 

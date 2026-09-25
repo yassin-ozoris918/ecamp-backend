@@ -1,0 +1,316 @@
+﻿{
+  "activeUniversities": [
+    {
+      "nameEn": "Suez Canal University",
+      "nameAr": "╪¼╪º┘à╪╣╪⌐ ┘é┘å╪º╪⌐ ╪º┘ä╪│┘ê┘è╪│",
+      "faculties": [
+        {
+          "nameEn": "Faculty of Engineering",
+          "nameAr": "┘â┘ä┘è╪⌐ ╪º┘ä┘ç┘å╪»╪│╪⌐",
+          "departments": [
+            {
+              "nameEn": "Architecture",
+              "nameAr": "╪º┘ä╪╣┘à╪º╪▒╪⌐",
+              "programs": [
+                {
+                  "nameEn": "Architecture Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪º┘ä╪╣┘à╪º╪▒╪⌐",
+                  "type": "REGULAR"
+                },
+                {
+                  "nameEn": "Sustainable Architecture Engineering and Technology",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ┘ê╪¬┘â┘å┘ê┘ä┘ê╪¼┘è╪º ╪º┘ä╪╣┘à╪º╪▒╪⌐ ╪º┘ä┘à╪│╪¬╪»╪º┘à╪⌐",
+                  "type": "SPECIAL"
+                },
+                {
+                  "nameEn": "Urban Planning Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪¬╪«╪╖┘è╪╖ ╪º┘ä┘à╪»┘å",
+                  "type": "SPECIAL"
+                }
+              ]
+            },
+            {
+              "nameEn": "Civil Engineering",
+              "nameAr": "┘à╪»┘å┘è",
+              "programs": [
+                {
+                  "nameEn": "Structural Engineering",
+                  "nameAr": "╪º┘ä┘ç┘å╪»╪│╪⌐ ╪º┘ä╪Ñ┘å╪┤╪º╪ª┘è╪⌐",
+                  "type": "REGULAR"
+                },
+                {
+                  "nameEn": "Public Works Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪º┘ä╪ú╪┤╪║╪º┘ä ╪º┘ä╪╣╪º┘à╪⌐",
+                  "type": "REGULAR"
+                },
+                {
+                  "nameEn": "Water Resources and Irrigation Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪º┘ä╪▒┘è ┘ê╪º┘ä┘à┘ê╪º╪▒╪» ╪º┘ä┘à╪º╪ª┘è╪⌐",
+                  "type": "REGULAR"
+                },
+                {
+                  "nameEn": "Construction and Project Management Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪º┘ä╪¬╪┤┘è┘è╪» ┘ê╪Ñ╪»╪º╪▒╪⌐ ╪º┘ä┘à╪┤╪▒┘ê╪╣╪º╪¬",
+                  "type": "SPECIAL"
+                }
+              ]
+            },
+            {
+              "nameEn": "Electrical Engineering",
+              "nameAr": "┘â┘ç╪▒╪¿╪º╪í",
+              "programs": [
+                {
+                  "nameEn": "Electrical Power and Machines Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪º┘ä┘é┘ê┘ë ┘ê╪º┘ä╪ó┘ä╪º╪¬ ╪º┘ä┘â┘ç╪▒╪¿┘è╪⌐",
+                  "type": "REGULAR"
+                },
+                {
+                  "nameEn": "Communications and Electronics Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪º┘ä╪º╪¬╪╡╪º┘ä╪º╪¬ ┘ê╪º┘ä╪Ñ┘ä┘â╪¬╪▒┘ê┘å┘è╪º╪¬",
+                  "type": "REGULAR"
+                },
+                {
+                  "nameEn": "Computer and Control Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪º┘ä╪¡╪º╪│╪¿╪º╪¬ ┘ê╪º┘ä╪¬╪¡┘â┘à",
+                  "type": "REGULAR"
+                },
+                {
+                  "nameEn": "Information and Communications Technology Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪¬┘â┘å┘ê┘ä┘ê╪¼┘è╪º ╪º┘ä┘à╪╣┘ä┘ê┘à╪º╪¬ ┘ê╪º┘ä╪º╪¬╪╡╪º┘ä╪º╪¬",
+                  "type": "SPECIAL"
+                }
+              ]
+            },
+            {
+              "nameEn": "Mechanical Engineering",
+              "nameAr": "┘à┘è┘â╪º┘å┘è┘â╪º",
+              "programs": [
+                {
+                  "nameEn": "Mechanical Power Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪º┘ä┘é┘ê┘ë ╪º┘ä┘à┘è┘â╪º┘å┘è┘â┘è╪⌐",
+                  "type": "REGULAR"
+                },
+                {
+                  "nameEn": "Production and Mechanical Design Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪º┘ä╪Ñ┘å╪¬╪º╪¼ ┘ê╪º┘ä╪¬╪╡┘à┘è┘à ╪º┘ä┘à┘è┘â╪º┘å┘è┘â┘è",
+                  "type": "REGULAR"
+                },
+                {
+                  "nameEn": "Sustainable Energy Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪º┘ä╪╖╪º┘é╪⌐ ╪º┘ä┘à╪│╪¬╪»╪º┘à╪⌐",
+                  "type": "SPECIAL"
+                }
+              ]
+            },
+            {
+              "nameEn": "Preparatory / Undeclared",
+              "nameAr": "╪Ñ╪╣╪»╪º╪»┘è",
+              "programs": []
+            }
+          ]
+        },
+        {
+          "nameEn": "Faculty of Computers and Information",
+          "nameAr": "┘â┘ä┘è╪⌐ ╪º┘ä╪¡╪º╪│╪¿╪º╪¬ ┘ê╪º┘ä┘à╪╣┘ä┘ê┘à╪º╪¬",
+          "departments": [
+            {
+              "nameEn": "Department of Computer Science",
+              "nameAr": "╪╣┘ä┘ê┘à ╪º┘ä╪¡╪º╪│╪¿",
+              "programs": [
+                {
+                  "nameEn": "Software Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪º┘ä╪¿╪▒┘à╪¼┘è╪º╪¬",
+                  "type": "REGULAR"
+                },
+                {
+                  "nameEn": "Artificial Intelligence and Data Science",
+                  "nameAr": "╪º┘ä╪░┘â╪º╪í ╪º┘ä╪º╪╡╪╖┘å╪º╪╣┘è ┘ê╪╣┘ä┘ê┘à ╪º┘ä╪¿┘è╪º┘å╪º╪¬",
+                  "type": "REGULAR"
+                }
+              ]
+            },
+            {
+              "nameEn": "Department of Information Systems",
+              "nameAr": "┘å╪╕┘à ╪º┘ä┘à╪╣┘ä┘ê┘à╪º╪¬",
+              "programs": []
+            },
+            {
+              "nameEn": "Department of Information Technology",
+              "nameAr": "╪¬┘â┘å┘ê┘ä┘ê╪¼┘è╪º ╪º┘ä┘à╪╣┘ä┘ê┘à╪º╪¬",
+              "programs": [
+                {
+                  "nameEn": "Cybersecurity",
+                  "nameAr": "╪º┘ä╪ú┘à┘å ╪º┘ä╪│┘è╪¿╪▒╪º┘å┘è",
+                  "type": "REGULAR"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "nameEn": "New Ismailia National University",
+      "nameAr": "╪¼╪º┘à╪╣╪⌐ ╪º┘ä╪Ñ╪│┘à╪º╪╣┘è┘ä┘è╪⌐ ╪º┘ä╪¼╪»┘è╪»╪⌐ ╪º┘ä╪ú┘ç┘ä┘è╪⌐",
+      "faculties": [
+        {
+          "nameEn": "Faculty of Engineering",
+          "nameAr": "┘â┘ä┘è╪⌐ ╪º┘ä┘ç┘å╪»╪│╪⌐",
+          "departments": [
+            {
+              "nameEn": "Department of Civil Engineering",
+              "nameAr": "┘é╪│┘à ╪º┘ä┘ç┘å╪»╪│╪⌐ ╪º┘ä┘à╪»┘å┘è╪⌐",
+              "programs": [
+                {
+                  "nameEn": "Construction and Project Management Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪º┘ä╪¬╪┤┘è┘è╪» ┘ê╪Ñ╪»╪º╪▒╪⌐ ╪º┘ä┘à╪┤╪▒┘ê╪╣╪º╪¬",
+                  "type": "REGULAR"
+                }
+              ]
+            },
+            {
+              "nameEn": "Department of Electrical Engineering",
+              "nameAr": "┘é╪│┘à ╪º┘ä┘ç┘å╪»╪│╪⌐ ╪º┘ä┘â┘ç╪▒╪¿╪º╪ª┘è╪⌐",
+              "programs": [
+                {
+                  "nameEn": "Artificial Intelligence Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪º┘ä╪░┘â╪º╪í ╪º┘ä╪º╪╡╪╖┘å╪º╪╣┘è",
+                  "type": "REGULAR"
+                },
+                {
+                  "nameEn": "Modern Communication Systems",
+                  "nameAr": "┘å╪╕┘à ╪º┘ä╪º╪¬╪╡╪º┘ä╪º╪¬ ╪º┘ä╪¡╪»┘è╪½╪⌐",
+                  "type": "REGULAR"
+                }
+              ]
+            },
+            {
+              "nameEn": "Department of Mechanical Engineering",
+              "nameAr": "┘é╪│┘à ╪º┘ä┘ç┘å╪»╪│╪⌐ ╪º┘ä┘à┘è┘â╪º┘å┘è┘â┘è╪⌐",
+              "programs": [
+                {
+                  "nameEn": "Innovative Design Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪º┘ä╪¬╪╡┘à┘è┘à ╪º┘ä╪º╪¿╪¬┘â╪º╪▒┘è",
+                  "type": "REGULAR"
+                },
+                {
+                  "nameEn": "Materials and Manufacturing Engineering",
+                  "nameAr": "┘ç┘å╪»╪│╪⌐ ╪º┘ä┘à┘ê╪º╪» ┘ê╪º┘ä╪¬╪╡┘å┘è╪╣",
+                  "type": "REGULAR"
+                }
+              ]
+            },
+            {
+              "nameEn": "Department of Naval / Ship Engineering",
+              "nameAr": "┘é╪│┘à ┘ç┘å╪»╪│╪⌐ ╪º┘ä╪│┘ü┘å",
+              "programs": [
+                {
+                  "nameEn": "Marine Engineering",
+                  "nameAr": "╪º┘ä┘ç┘å╪»╪│╪⌐ ╪º┘ä╪¿╪¡╪▒┘è╪⌐",
+                  "type": "REGULAR"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "programTypes": [
+    {
+      "nameEn": "Architecture Engineering",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Sustainable Architecture Engineering and Technology",
+      "type": "SPECIAL"
+    },
+    {
+      "nameEn": "Urban Planning Engineering",
+      "type": "SPECIAL"
+    },
+    {
+      "nameEn": "Structural Engineering",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Public Works Engineering",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Water Resources and Irrigation Engineering",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Construction and Project Management Engineering",
+      "type": "SPECIAL"
+    },
+    {
+      "nameEn": "Electrical Power and Machines Engineering",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Communications and Electronics Engineering",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Computer and Control Engineering",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Information and Communications Technology Engineering",
+      "type": "SPECIAL"
+    },
+    {
+      "nameEn": "Mechanical Power Engineering",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Production and Mechanical Design Engineering",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Sustainable Energy Engineering",
+      "type": "SPECIAL"
+    },
+    {
+      "nameEn": "Software Engineering",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Artificial Intelligence and Data Science",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Cybersecurity",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Construction and Project Management Engineering",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Artificial Intelligence Engineering",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Modern Communication Systems",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Innovative Design Engineering",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Materials and Manufacturing Engineering",
+      "type": "REGULAR"
+    },
+    {
+      "nameEn": "Marine Engineering",
+      "type": "REGULAR"
+    }
+  ],
+  "nullProgramTypes": 0,
+  "bilingualIssues": 0,
+  "usersWithInactiveUni": 0
+}

@@ -107,13 +107,60 @@ export class LecturesService {
   }
 
   async remove(id: string, userId: string, role: Role) {
-    const lecture = await this.findOne(id);
+    const lecture = await this.prisma.lecture.findUnique({
+      where: { id },
+      include: { attachments: true }
+    });
+    if (!lecture) throw new NotFoundException('Lecture not found.');
     await this.verifyCourseOwnership(lecture.courseId, userId, role);
 
-    return this.prisma.lecture.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+    const urlsToDelete: string[] = [];
+    if (lecture.videoUrl) urlsToDelete.push(lecture.videoUrl);
+    if (lecture.thumbnailUrl) urlsToDelete.push(lecture.thumbnailUrl);
+    for (const att of lecture.attachments || []) {
+      urlsToDelete.push(att.fileUrl);
+    }
+
+    if (urlsToDelete.length > 0) {
+      const bucketName = process.env.R2_BUCKET_NAME;
+      const endpoint = process.env.R2_ENDPOINT;
+      const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+      const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+      const publicUrl = process.env.R2_PUBLIC_URL;
+
+      if (bucketName && endpoint && accessKeyId && secretAccessKey) {
+        const { S3Client, DeleteObjectsCommand } = await import('@aws-sdk/client-s3');
+        const s3Client = new S3Client({
+          region: 'auto',
+          endpoint,
+          credentials: { accessKeyId, secretAccessKey },
+        });
+
+        const keys = urlsToDelete.map(url => {
+          let key = url;
+          if (publicUrl && url.startsWith(publicUrl)) {
+            key = url.substring(publicUrl.length + 1);
+          } else if (url.startsWith('https://')) {
+            try {
+              const urlObj = new URL(url);
+              key = urlObj.pathname.substring(1);
+            } catch (e) {}
+          }
+          return key;
+        });
+
+        try {
+          await s3Client.send(new DeleteObjectsCommand({
+            Bucket: bucketName,
+            Delete: { Objects: keys.map(Key => ({ Key })), Quiet: true },
+          }));
+        } catch (error) {
+          console.error('Failed to delete objects from R2', error);
+        }
+      }
+    }
+
+    return this.prisma.lecture.delete({ where: { id } });
   }
 
   async reorder(

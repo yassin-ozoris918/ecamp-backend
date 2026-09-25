@@ -94,10 +94,7 @@ export class SessionsService {
     await this.verifySessionOwnership(session.lectureId, instructorId, role);
 
     const [deleted] = await this.prisma.$transaction([
-      this.prisma.session.update({
-        where: { id },
-        data: { deletedAt: new Date() },
-      }),
+      this.prisma.session.delete({ where: { id } }),
       // Re-index remaining sessions in the same lecture to fill ordering gaps
       this.prisma.$executeRaw`
         UPDATE "Session"

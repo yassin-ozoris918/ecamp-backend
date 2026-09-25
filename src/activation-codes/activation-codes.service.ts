@@ -126,10 +126,7 @@ export class ActivationCodesService {
     }
 
     return this.prisma.$transaction(async (tx) => {
-      await tx.activationCode.update({
-        where: { id },
-        data: { deletedAt: new Date() },
-      });
+      await tx.activationCode.delete({ where: { id } });
 
       await tx.activationCodeHistory.create({
         data: {

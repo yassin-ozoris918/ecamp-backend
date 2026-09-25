@@ -242,6 +242,70 @@ export class StorageService {
     }
   }
 
+  async getFileStream(fileUrl: string) {
+    if (!this.s3Client) {
+      throw new InternalServerErrorException('Direct file streaming is only supported with Cloudflare R2.');
+    }
+
+    let key = fileUrl;
+    if (this.publicUrl && fileUrl.startsWith(this.publicUrl)) {
+      key = fileUrl.substring(this.publicUrl.length + 1);
+    } else if (fileUrl.startsWith('https://')) {
+      try {
+        const urlObj = new URL(fileUrl);
+        key = urlObj.pathname.substring(1);
+      } catch (e) {
+        // Fallback
+      }
+    }
+
+    const command = new GetObjectCommand({
+      Bucket: this.bucketName,
+      Key: key,
+    });
+
+    try {
+      return await this.s3Client.send(command);
+    } catch (error) {
+      this.logger.error('Failed to fetch file stream', error);
+      throw new InternalServerErrorException('Failed to fetch file.');
+    }
+  }
+
+  async deleteFiles(fileUrls: string[]): Promise<void> {
+    if (!this.s3Client || fileUrls.length === 0) return;
+
+    const keys = fileUrls.map(url => {
+      let key = url;
+      if (this.publicUrl && url.startsWith(this.publicUrl)) {
+        key = url.substring(this.publicUrl.length + 1);
+      } else if (url.startsWith('https://')) {
+        try {
+          const urlObj = new URL(url);
+          key = urlObj.pathname.substring(1);
+        } catch (e) {
+          // Fallback
+        }
+      }
+      return key;
+    });
+
+    const { DeleteObjectsCommand } = await import('@aws-sdk/client-s3');
+    
+    try {
+      const command = new DeleteObjectsCommand({
+        Bucket: this.bucketName,
+        Delete: {
+          Objects: keys.map(Key => ({ Key })),
+          Quiet: true,
+        },
+      });
+      await this.s3Client.send(command);
+    } catch (error) {
+      this.logger.error('Failed to delete objects from R2', error);
+    }
+  }
+
   async verifyR2Object(key: string): Promise<boolean> {
     if (!this.s3Client) return false;
     try {

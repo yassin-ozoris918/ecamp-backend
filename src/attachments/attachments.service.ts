@@ -193,9 +193,45 @@ export class AttachmentsService {
 
     await this.verifyCourseOwnership(attachment.lecture.courseId, instructorId, role);
 
-    return this.prisma.attachment.update({
+    const fileUrl = attachment.fileUrl;
+    if (fileUrl) {
+      const bucketName = process.env.R2_BUCKET_NAME;
+      const endpoint = process.env.R2_ENDPOINT;
+      const accessKeyId = process.env.R2_ACCESS_KEY_ID;
+      const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY;
+      const publicUrl = process.env.R2_PUBLIC_URL;
+
+      if (bucketName && endpoint && accessKeyId && secretAccessKey) {
+        const { S3Client, DeleteObjectCommand } = await import('@aws-sdk/client-s3');
+        const s3Client = new S3Client({
+          region: 'auto',
+          endpoint,
+          credentials: { accessKeyId, secretAccessKey },
+        });
+
+        let key = fileUrl;
+        if (publicUrl && fileUrl.startsWith(publicUrl)) {
+          key = fileUrl.substring(publicUrl.length + 1);
+        } else if (fileUrl.startsWith('https://')) {
+          try {
+            const urlObj = new URL(fileUrl);
+            key = urlObj.pathname.substring(1);
+          } catch (e) {}
+        }
+
+        try {
+          await s3Client.send(new DeleteObjectCommand({
+            Bucket: bucketName,
+            Key: key,
+          }));
+        } catch (error) {
+          console.error('Failed to delete object from R2', error);
+        }
+      }
+    }
+
+    return this.prisma.attachment.delete({
       where: { id },
-      data: { deletedAt: new Date() },
     });
   }
 

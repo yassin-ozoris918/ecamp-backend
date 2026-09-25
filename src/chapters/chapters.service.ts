@@ -74,10 +74,7 @@ export class ChaptersService {
 
   async remove(id: string, instructorId: string, role: Role) {
     await this.verifyChapterOwnership(id, instructorId, role);
-    return this.prisma.chapter.update({
-      where: { id },
-      data: { deletedAt: new Date() },
-    });
+    return this.prisma.chapter.delete({ where: { id } });
   }
 }
 
