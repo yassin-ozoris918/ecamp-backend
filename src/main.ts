@@ -29,9 +29,16 @@ async function bootstrap() {
     profilesSampleRate: process.env.NODE_ENV === 'production' ? 0.1 : 1.0,
   });
 
+  const allowedOrigins = process.env.FRONTEND_URL ? process.env.FRONTEND_URL.split(',') : ['http://localhost:5173'];
+  
   // Enable CORS
   app.enableCors({
-    origin: [process.env.FRONTEND_URL || 'http://localhost:5173', 'http://192.168.1.3:5173'],
+    origin: [
+      ...allowedOrigins, 
+      'http://192.168.1.3:5173', 
+      'https://ecamp-lms.com', 
+      'https://www.ecamp-lms.com'
+    ],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'x-device-id', 'x-request-id'],
   });
