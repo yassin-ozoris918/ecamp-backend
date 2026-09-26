@@ -2,25 +2,18 @@ const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
 async function main() {
-  const uni = await prisma.academicUniversity.findFirst({
-    where: { nameEn: 'Suez Canal University (SCU)' }
-  });
-  if (!uni) return console.log('Uni not found');
-
-  const fac = await prisma.academicFaculty.findFirst({
-    where: { universityId: uni.id, nameEn: 'Faculty of Computers and Information' }
-  });
-  if (!fac) return console.log('Fac not found');
+  const uniId = '7304dd8b-c1c3-4341-b306-bc2f7a42586b';
+  const facId = '1e12a682-771e-4942-850c-83fc80015498';
 
   const dept = await prisma.academicDepartment.findFirst({
-    where: { facultyId: fac.id, nameAr: 'لا يوجد تخصص حاليا' }
+    where: { facultyId: facId, nameAr: 'لا يوجد تخصص حاليا' }
   });
 
   if (!dept) {
     await prisma.academicDepartment.create({
       data: {
-        universityId: uni.id,
-        facultyId: fac.id,
+        universityId: uniId,
+        facultyId: facId,
         nameAr: 'لا يوجد تخصص حاليا',
         nameEn: 'No Specialization Currently',
         sortOrder: 4,
