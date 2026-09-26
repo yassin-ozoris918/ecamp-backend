@@ -118,6 +118,7 @@ async function main() {
   const scuCompCs = await getOrCreateDepartment(scu.id, scuComp.id, 'علوم الحاسب', 'Department of Computer Science', 1);
   const scuCompIs = await getOrCreateDepartment(scu.id, scuComp.id, 'نظم المعلومات', 'Department of Information Systems', 2);
   const scuCompIt = await getOrCreateDepartment(scu.id, scuComp.id, 'تكنولوجيا المعلومات', 'Department of Information Technology', 3);
+  const scuCompNone = await getOrCreateDepartment(scu.id, scuComp.id, 'لا يوجد تخصص حاليا', 'No Specialization Currently', 4);
   
   await getOrCreateProgram(scuComp.id, scuCompCs.id, 'هندسة البرمجيات', 'Software Engineering', 1, ProgramType.REGULAR);
   await getOrCreateProgram(scuComp.id, scuCompCs.id, 'الذكاء الاصطناعي وعلوم البيانات', 'Artificial Intelligence and Data Science', 2, ProgramType.REGULAR);
