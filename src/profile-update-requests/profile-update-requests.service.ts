@@ -21,12 +21,27 @@ export class ProfileUpdateRequestsService {
       throw new BadRequestException('You already have a pending profile update request.');
     }
 
+    const student = await this.prisma.user.findUnique({
+      where: { id: studentId },
+      select: { educationLevel: true },
+    });
+
+    let requestedParentPhone = dto.requestedParentPhone;
+    if (student?.educationLevel === 'UNIVERSITY') {
+      requestedParentPhone = null; // or undefined
+    }
+
+    // We should double check if after omitting parent phone, the request is still valid (not empty)
+    if (!dto.requestedFullName && !requestedParentPhone && !dto.requestedPhoneNumber) {
+      throw new BadRequestException('No valid fields to update for your education level');
+    }
+
     return this.prisma.profileUpdateRequest.create({
       data: {
         studentId,
         requestedFullName: dto.requestedFullName,
         requestedPhoneNumber: dto.requestedPhoneNumber,
-        requestedParentPhone: dto.requestedParentPhone,
+        requestedParentPhone: requestedParentPhone,
       },
     });
   }
