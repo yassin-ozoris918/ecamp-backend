@@ -28,7 +28,7 @@ export class ProfileUpdateRequestsService {
 
     let requestedParentPhone = dto.requestedParentPhone;
     if (student?.educationLevel === 'UNIVERSITY') {
-      requestedParentPhone = null; // or undefined
+      requestedParentPhone = undefined;
     }
 
     // We should double check if after omitting parent phone, the request is still valid (not empty)
