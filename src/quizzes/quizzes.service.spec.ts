@@ -291,7 +291,7 @@ describe('QuizzesService (Objective Grading)', () => {
         answers: [{ questionId: 'q_ordering', orderAnswer: payload as any }]
       }, studentId);
       
-      let expected = expectedScore;
+      const expected = expectedScore;
       
       expect(prisma.quizAttempt.update).toHaveBeenCalledWith(
         expect.objectContaining({

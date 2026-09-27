@@ -50,18 +50,26 @@ export class ProfileUpdateRequestsService {
   }
 
   async approve(id: string, adminId: string) {
-    const request = await this.prisma.profileUpdateRequest.findUnique({ where: { id } });
+    const request = await this.prisma.profileUpdateRequest.findUnique({ 
+      where: { id },
+      include: { student: { select: { educationLevel: true } } }
+    });
     if (!request) throw new NotFoundException('Request not found');
     if (request.status !== 'PENDING') throw new BadRequestException('Request is not pending');
+
+    const updateData: any = {
+      fullName: request.requestedFullName || undefined,
+      phoneNumber: request.requestedPhoneNumber || undefined,
+    };
+
+    if (request.student.educationLevel === 'HIGH_SCHOOL') {
+      updateData.parentPhoneNumber = request.requestedParentPhone || undefined;
+    }
 
     // Update user
     await this.prisma.user.update({
       where: { id: request.studentId },
-      data: {
-        fullName: request.requestedFullName || undefined,
-        phoneNumber: request.requestedPhoneNumber || undefined,
-        parentPhoneNumber: request.requestedParentPhone || undefined,
-      },
+      data: updateData,
     });
 
     // Mark request as approved

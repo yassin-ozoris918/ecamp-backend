@@ -15,7 +15,7 @@ import { Role, EducationLevel } from '@prisma/client';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MaintenancePolicy } from './policies/maintenance.policy';
 
-import { validateUniversitySegmentation, validateStudentSegmentation } from '../common/utils/segmentation-validation.util';
+import { validateUniversitySegmentation, validateStudentSegmentation, normalizeEducationProfile } from '../common/utils/segmentation-validation.util';
 
 @Injectable()
 export class AuthService {
@@ -48,6 +48,9 @@ export class AuthService {
     // Determine the deviceId
     const finalDeviceId = headerDeviceId || dto.deviceId;
     
+    // Normalize education profile fields
+    normalizeEducationProfile(dto);
+
     // Validate university hierarchy
     if (dto.educationLevel === EducationLevel.UNIVERSITY) {
       await validateUniversitySegmentation(this.prisma, dto);

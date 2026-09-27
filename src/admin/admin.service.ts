@@ -7,6 +7,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { Role, CodeStatus, AttemptStatus } from '@prisma/client';
 import { GetUsersQueryDto } from './dto/get-users-query.dto';
 import * as bcrypt from 'bcrypt';
+import { normalizeEducationProfile } from '../common/utils/segmentation-validation.util';
 
 @Injectable()
 export class AdminService {
@@ -177,6 +178,10 @@ export class AdminService {
     if (data.deviceId === null) {
       await this.resetDeviceLock(userId);
       delete data.deviceId;
+    }
+
+    if (data.educationLevel && data.educationLevel !== user.educationLevel) {
+      normalizeEducationProfile(data as any);
     }
 
     return this.prisma.user.update({

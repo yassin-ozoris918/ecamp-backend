@@ -271,7 +271,7 @@ export class QuizzesService {
     const questions = quiz.questions
       .filter((q: any) => q.version === questionVersion)
       .map((q: any) => {
-         const out = { ...q } as any;
+         const out = { ...q };
          delete out.correctOptionIndex;
          delete out.referenceAnswer;
          
@@ -423,10 +423,10 @@ export class QuizzesService {
       const studentAnswer = dto.answers.find(a => a.questionId === question.id);
       
       let earnedPoints = 0;
-      let textResponse = studentAnswer?.textResponse || null;
-      let selectedOptionIndex = studentAnswer?.selectedOptionIndex ?? null;
-      let matchAnswer = studentAnswer?.matchAnswer || null;
-      let orderAnswer = studentAnswer?.orderAnswer || null;
+      const textResponse = studentAnswer?.textResponse || null;
+      const selectedOptionIndex = studentAnswer?.selectedOptionIndex ?? null;
+      const matchAnswer = studentAnswer?.matchAnswer || null;
+      const orderAnswer = studentAnswer?.orderAnswer || null;
 
       if (studentAnswer) {
         studentAnswersRecord[question.id] = {
@@ -576,7 +576,7 @@ export class QuizzesService {
       : false;
 
     // Final score calculation
-    let finalEarnedPoints = earnedObjectivePoints + earnedSubjectivePoints;
+    const finalEarnedPoints = earnedObjectivePoints + earnedSubjectivePoints;
     const scorePercentage = totalPossiblePoints > 0 ? Math.round((finalEarnedPoints / totalPossiblePoints) * 100) : 0;
     
     // If AI failed, do not mark as passed/failed permanently yet. We'll leave it pending or mark as pending_review if we had that state.
@@ -625,7 +625,7 @@ export class QuizzesService {
 
     // Build per-question feedback map for the frontend
     // Keyed by questionId: { points: number | null, feedback: string | null }
-    let feedback: Record<string, { points: number | null; feedback: string | null }> = {};
+    const feedback: Record<string, { points: number | null; feedback: string | null }> = {};
     for (const record of responseRecords) {
       feedback[record.questionId] = {
         points: record.earnedPoints ?? null,
@@ -775,7 +775,7 @@ export class QuizzesService {
       questions = quiz.questions
         .filter((q: any) => q.version === questionVersion)
         .map((q: any) => {
-           const out = { ...q } as any;
+           const out = { ...q };
            delete out.correctOptionIndex;
            delete out.referenceAnswer;
            
@@ -796,7 +796,7 @@ export class QuizzesService {
 
     let earnedPoints = 0;
     let totalPoints = 0;
-    let feedback: Record<string, { points: number | null; feedback: string | null }> = {};
+    const feedback: Record<string, { points: number | null; feedback: string | null }> = {};
     
     if (attempt.responses) {
       for (const record of attempt.responses) {

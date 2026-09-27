@@ -9,6 +9,28 @@ import {
   StudyLanguage,
 } from '@prisma/client';
 
+export function normalizeEducationProfile(state: any): void {
+  if (state.educationLevel === EducationLevel.UNIVERSITY) {
+    state.highSchoolSystem = null;
+    state.studyMode = null;
+    state.studyLanguage = null;
+    state.highSchoolGrade = null;
+    state.traditionalBranch = null;
+    state.baccalaureatePath = null;
+    state.parentPhoneNumber = null;
+  } else if (state.educationLevel === EducationLevel.HIGH_SCHOOL) {
+    state.universityId = null;
+    state.facultyId = null;
+    state.departmentId = null;
+    state.programId = null;
+    state.otherUniversityName = null;
+    state.otherFacultyName = null;
+    state.otherDepartmentName = null;
+    state.otherProgramName = null;
+  }
+}
+
+
 export interface StudentSegmentationState {
   educationLevel?: EducationLevel | null;
   highSchoolSystem?: HighSchoolSystem | null;

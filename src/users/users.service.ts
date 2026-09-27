@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import * as bcrypt from 'bcrypt';
 import { HighSchoolSystem, HighSchoolGrade, EducationLevel } from '@prisma/client';
-import { validateStudentSegmentation, validateUniversitySegmentation } from '../common/utils/segmentation-validation.util';
+import { validateStudentSegmentation, validateUniversitySegmentation, normalizeEducationProfile } from '../common/utils/segmentation-validation.util';
 
 @Injectable()
 export class UsersService {
@@ -167,6 +167,9 @@ export class UsersService {
     } else if (finalState.departmentId !== user.departmentId) {
       finalState.programId = null;
     }
+
+    // Normalize education profile fields before validation
+    normalizeEducationProfile(finalState);
 
     // 4 & 5. Validate the complete intended state
     if (finalState.educationLevel === EducationLevel.UNIVERSITY) {
