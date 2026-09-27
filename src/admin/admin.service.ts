@@ -206,7 +206,8 @@ export class AdminService {
       where: { id: userId },
       data: { 
         deletedAt: new Date(),
-        email: `${user.email}_deleted_${Date.now()}`
+        email: `${user.email}_deleted_${Date.now()}`,
+        phoneNumber: user.phoneNumber ? `${user.phoneNumber}_del_${Date.now()}` : null
       },
     });
 
