@@ -13,6 +13,52 @@ import { validateCourseTargeting, validateCourseTargetingAsync } from '../common
 export class CoursesService {
   constructor(private prisma: PrismaService) {}
 
+  private getStudentTargetingCondition(user: any) {
+    if (user.educationLevel === 'HIGH_SCHOOL') {
+      const condition = [
+        { OR: [{ targetHighSchoolSystem: null }, { targetHighSchoolSystem: user.highSchoolSystem }] },
+        { OR: [{ targetStudyMode: null }, { targetStudyMode: user.studyMode }] },
+        { OR: [{ targetStudyLanguage: null }, { targetStudyLanguage: user.studyLanguage }] },
+        { OR: [{ targetHighSchoolGrade: null }, { targetHighSchoolGrade: user.highSchoolGrade }] },
+        { OR: [{ targetTraditionalBranch: null }, { targetTraditionalBranch: user.traditionalBranch }] },
+        { OR: [{ targetBaccalaureatePath: null }, { targetBaccalaureatePath: user.baccalaureatePath }] },
+      ];
+      return [
+        {
+          OR: [
+            {
+              AND: [
+                { targetGroups: { none: {} } },
+                { AND: condition }
+              ]
+            },
+            { targetGroups: { some: { AND: condition } } }
+          ]
+        }
+      ];
+    } else {
+      const condition = [
+        { OR: [{ targetUniversityId: null }, { targetUniversityId: user.universityId }] },
+        { OR: [{ targetFacultyId: null }, { targetFacultyId: user.facultyId }] },
+        { OR: [{ targetDepartmentId: null }, { targetDepartmentId: user.departmentId }] },
+        { OR: [{ targetProgramId: null }, { targetProgramId: user.programId }] },
+      ];
+      return [
+        {
+          OR: [
+            {
+              AND: [
+                { targetGroups: { none: {} } },
+                { AND: condition }
+              ]
+            },
+            { targetGroups: { some: { AND: condition } } }
+          ]
+        }
+      ];
+    }
+  }
+
   private async verifyCourseOwnership(
     courseId: string,
     instructorId: string,
@@ -47,6 +93,11 @@ export class CoursesService {
     };
 
     await validateCourseTargetingAsync(this.prisma, finalState);
+    if (dto.targetGroups) {
+      for (const group of dto.targetGroups) {
+        await validateCourseTargetingAsync(this.prisma, { ...group, educationLevel: dto.audienceType });
+      }
+    }
 
     return this.prisma.course.create({
       data: {
@@ -64,6 +115,20 @@ export class CoursesService {
         targetFacultyId: dto.targetFacultyId !== undefined ? normalize(dto.targetFacultyId) : null,
         targetDepartmentId: dto.targetDepartmentId !== undefined ? normalize(dto.targetDepartmentId) : null,
         targetProgramId: dto.targetProgramId !== undefined ? normalize(dto.targetProgramId) : null,
+        targetGroups: dto.targetGroups ? {
+          create: dto.targetGroups.map(g => ({
+            targetHighSchoolSystem: g.targetHighSchoolSystem !== undefined ? normalize(g.targetHighSchoolSystem) : null,
+            targetStudyMode: g.targetStudyMode !== undefined ? normalize(g.targetStudyMode) : null,
+            targetStudyLanguage: g.targetStudyLanguage !== undefined ? normalize(g.targetStudyLanguage) : null,
+            targetHighSchoolGrade: g.targetHighSchoolGrade !== undefined ? normalize(g.targetHighSchoolGrade) : null,
+            targetTraditionalBranch: g.targetTraditionalBranch !== undefined ? normalize(g.targetTraditionalBranch) : null,
+            targetBaccalaureatePath: g.targetBaccalaureatePath !== undefined ? normalize(g.targetBaccalaureatePath) : null,
+            targetUniversityId: g.targetUniversityId !== undefined ? normalize(g.targetUniversityId) : null,
+            targetFacultyId: g.targetFacultyId !== undefined ? normalize(g.targetFacultyId) : null,
+            targetDepartmentId: g.targetDepartmentId !== undefined ? normalize(g.targetDepartmentId) : null,
+            targetProgramId: g.targetProgramId !== undefined ? normalize(g.targetProgramId) : null,
+          }))
+        } : undefined,
         ...(role === Role.INSTRUCTOR && {
           instructors: {
             create: {
@@ -109,19 +174,7 @@ export class CoursesService {
       if (dbUser) {
         whereClause.AND = [
           { audienceType: dbUser.educationLevel },
-          ...(dbUser.educationLevel === 'HIGH_SCHOOL' ? [
-            { OR: [{ targetHighSchoolSystem: null }, { targetHighSchoolSystem: dbUser.highSchoolSystem }] },
-            { OR: [{ targetStudyMode: null }, { targetStudyMode: dbUser.studyMode }] },
-            { OR: [{ targetStudyLanguage: null }, { targetStudyLanguage: dbUser.studyLanguage }] },
-            { OR: [{ targetHighSchoolGrade: null }, { targetHighSchoolGrade: dbUser.highSchoolGrade }] },
-            { OR: [{ targetTraditionalBranch: null }, { targetTraditionalBranch: dbUser.traditionalBranch }] },
-            { OR: [{ targetBaccalaureatePath: null }, { targetBaccalaureatePath: dbUser.baccalaureatePath }] },
-          ] : [
-            { OR: [{ targetUniversityId: null }, { targetUniversityId: dbUser.universityId }] },
-            { OR: [{ targetFacultyId: null }, { targetFacultyId: dbUser.facultyId }] },
-            { OR: [{ targetDepartmentId: null }, { targetDepartmentId: dbUser.departmentId }] },
-            { OR: [{ targetProgramId: null }, { targetProgramId: dbUser.programId }] },
-          ])
+          ...this.getStudentTargetingCondition(dbUser)
         ];
       }
     }
@@ -179,6 +232,14 @@ export class CoursesService {
         targetFacultyRel: { select: { id: true, nameEn: true, nameAr: true } },
         targetDepartmentRel: { select: { id: true, nameEn: true, nameAr: true } },
         targetProgramRel: { select: { id: true, nameEn: true, nameAr: true } },
+        targetGroups: {
+          include: {
+            targetUniversityRel: { select: { id: true, nameEn: true, nameAr: true } },
+            targetFacultyRel: { select: { id: true, nameEn: true, nameAr: true } },
+            targetDepartmentRel: { select: { id: true, nameEn: true, nameAr: true } },
+            targetProgramRel: { select: { id: true, nameEn: true, nameAr: true } },
+          }
+        },
         instructors: {
           where: { instructor: { role: { not: Role.ADMIN } } },
           include: {
@@ -211,6 +272,14 @@ export class CoursesService {
         targetFacultyRel: { select: { id: true, nameEn: true, nameAr: true } },
         targetDepartmentRel: { select: { id: true, nameEn: true, nameAr: true } },
         targetProgramRel: { select: { id: true, nameEn: true, nameAr: true } },
+        targetGroups: {
+          include: {
+            targetUniversityRel: { select: { id: true, nameEn: true, nameAr: true } },
+            targetFacultyRel: { select: { id: true, nameEn: true, nameAr: true } },
+            targetDepartmentRel: { select: { id: true, nameEn: true, nameAr: true } },
+            targetProgramRel: { select: { id: true, nameEn: true, nameAr: true } },
+          }
+        },
         chapters: {
           where: { deletedAt: null },
           orderBy: { orderIndex: 'asc' },
@@ -376,6 +445,11 @@ export class CoursesService {
     };
 
     await validateCourseTargetingAsync(this.prisma, finalState);
+    if (dto.targetGroups) {
+      for (const group of dto.targetGroups) {
+        await validateCourseTargetingAsync(this.prisma, { ...group, educationLevel: dto.audienceType });
+      }
+    }
 
     return this.prisma.course.update({
       where: { id },
@@ -394,6 +468,21 @@ export class CoursesService {
         targetFacultyId: dto.targetFacultyId !== undefined ? normalize(dto.targetFacultyId) : course.targetFacultyId,
         targetDepartmentId: dto.targetDepartmentId !== undefined ? normalize(dto.targetDepartmentId) : course.targetDepartmentId,
         targetProgramId: dto.targetProgramId !== undefined ? normalize(dto.targetProgramId) : course.targetProgramId,
+        targetGroups: dto.targetGroups ? {
+          deleteMany: {},
+          create: dto.targetGroups.map(g => ({
+            targetHighSchoolSystem: g.targetHighSchoolSystem !== undefined ? normalize(g.targetHighSchoolSystem) : null,
+            targetStudyMode: g.targetStudyMode !== undefined ? normalize(g.targetStudyMode) : null,
+            targetStudyLanguage: g.targetStudyLanguage !== undefined ? normalize(g.targetStudyLanguage) : null,
+            targetHighSchoolGrade: g.targetHighSchoolGrade !== undefined ? normalize(g.targetHighSchoolGrade) : null,
+            targetTraditionalBranch: g.targetTraditionalBranch !== undefined ? normalize(g.targetTraditionalBranch) : null,
+            targetBaccalaureatePath: g.targetBaccalaureatePath !== undefined ? normalize(g.targetBaccalaureatePath) : null,
+            targetUniversityId: g.targetUniversityId !== undefined ? normalize(g.targetUniversityId) : null,
+            targetFacultyId: g.targetFacultyId !== undefined ? normalize(g.targetFacultyId) : null,
+            targetDepartmentId: g.targetDepartmentId !== undefined ? normalize(g.targetDepartmentId) : null,
+            targetProgramId: g.targetProgramId !== undefined ? normalize(g.targetProgramId) : null,
+          }))
+        } : undefined,
       },
     });
   }
@@ -595,19 +684,7 @@ export class CoursesService {
         status: 'PUBLISHED',
         AND: [
           { audienceType: user.educationLevel },
-          ...(user.educationLevel === 'HIGH_SCHOOL' ? [
-            { OR: [{ targetHighSchoolSystem: null }, { targetHighSchoolSystem: user.highSchoolSystem }] },
-            { OR: [{ targetStudyMode: null }, { targetStudyMode: user.studyMode }] },
-            { OR: [{ targetStudyLanguage: null }, { targetStudyLanguage: user.studyLanguage }] },
-            { OR: [{ targetHighSchoolGrade: null }, { targetHighSchoolGrade: user.highSchoolGrade }] },
-            { OR: [{ targetTraditionalBranch: null }, { targetTraditionalBranch: user.traditionalBranch }] },
-            { OR: [{ targetBaccalaureatePath: null }, { targetBaccalaureatePath: user.baccalaureatePath }] },
-          ] : [
-            { OR: [{ targetUniversityId: null }, { targetUniversityId: user.universityId }] },
-            { OR: [{ targetFacultyId: null }, { targetFacultyId: user.facultyId }] },
-            { OR: [{ targetDepartmentId: null }, { targetDepartmentId: user.departmentId }] },
-            { OR: [{ targetProgramId: null }, { targetProgramId: user.programId }] },
-          ])
+          ...this.getStudentTargetingCondition(user)
         ]
       },
       include: {

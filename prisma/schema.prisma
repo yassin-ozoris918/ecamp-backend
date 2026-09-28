@@ -244,6 +244,38 @@ model Course {
   redeemedCodes ActivationCode[]
   codeHistory   ActivationCodeHistory[]
 
+  targetGroups  CourseTargetGroup[]
+
+  @@index([targetUniversityId])
+  @@index([targetFacultyId])
+  @@index([targetDepartmentId])
+  @@index([targetProgramId])
+}
+
+model CourseTargetGroup {
+  id       String @id @default(uuid())
+  courseId String
+  course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  targetHighSchoolSystem  HighSchoolSystem?
+  targetStudyMode         StudyMode?
+  targetStudyLanguage     StudyLanguage?
+  targetHighSchoolGrade   HighSchoolGrade?
+  targetTraditionalBranch TraditionalBranch?
+  targetBaccalaureatePath BaccalaureatePath?
+  targetUniversityId      String?
+  targetFacultyId         String?
+  targetDepartmentId      String?
+  targetProgramId         String?
+
+  targetUniversityRel AcademicUniversity? @relation("GroupTargetUniversity", fields: [targetUniversityId], references: [id], onDelete: Restrict)
+  targetFacultyRel    AcademicFaculty?    @relation("GroupTargetFaculty", fields: [targetFacultyId], references: [id], onDelete: Restrict)
+  targetDepartmentRel AcademicDepartment? @relation("GroupTargetDepartment", fields: [targetDepartmentId], references: [id], onDelete: Restrict)
+  targetProgramRel    AcademicProgram?    @relation("GroupTargetProgram", fields: [targetProgramId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([courseId])
   @@index([targetUniversityId])
   @@index([targetFacultyId])
   @@index([targetDepartmentId])
@@ -1002,6 +1034,7 @@ model AcademicUniversity {
   departments AcademicDepartment[]
   students    User[]               @relation("StudentUniversity")
   courses     Course[]             @relation("CourseTargetUniversity")
+  courseTargetGroups CourseTargetGroup[] @relation("GroupTargetUniversity")
 
   @@index([sortOrder])
 }
@@ -1021,6 +1054,7 @@ model AcademicFaculty {
   programs    AcademicProgram[]    @relation("FacultyPrograms")
   students    User[]               @relation("StudentFaculty")
   courses     Course[]             @relation("CourseTargetFaculty")
+  courseTargetGroups CourseTargetGroup[] @relation("GroupTargetFaculty")
 
   @@index([universityId])
 }
@@ -1041,6 +1075,7 @@ model AcademicDepartment {
   programs   AcademicProgram[]  @relation("DepartmentPrograms")
   students   User[]             @relation("StudentDepartment")
   courses    Course[]           @relation("CourseTargetDepartment")
+  courseTargetGroups CourseTargetGroup[] @relation("GroupTargetDepartment")
 
   @@index([facultyId])
   @@index([universityId])
@@ -1062,6 +1097,7 @@ model AcademicProgram {
   faculty    AcademicFaculty     @relation("FacultyPrograms", fields: [facultyId], references: [id], onDelete: Restrict)
   students   User[]              @relation("StudentProgram")
   courses    Course[]            @relation("CourseTargetProgram")
+  courseTargetGroups CourseTargetGroup[] @relation("GroupTargetProgram")
 
   @@index([departmentId])
   @@index([facultyId])

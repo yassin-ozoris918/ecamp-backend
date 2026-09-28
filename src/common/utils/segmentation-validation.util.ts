@@ -229,33 +229,44 @@ export async function validateCourseTargetingAsync(prisma: any, state: StudentSe
   // Prohibit targeting `isOther` entities
   if (state.targetUniversityId) {
     const uni = await prisma.academicUniversity.findUnique({ where: { id: state.targetUniversityId } });
+    if (!uni) throw new BadRequestException('Invalid target university ID');
     if (uni?.isOther) throw new BadRequestException('Cannot target an "Other" university directly.');
   }
 
   if (state.targetFacultyId) {
     const fac = await prisma.academicFaculty.findUnique({ where: { id: state.targetFacultyId } });
+    if (!fac) throw new BadRequestException('Invalid target faculty ID');
     if (fac?.isOther) throw new BadRequestException('Cannot target an "Other" faculty directly.');
-    if (state.targetUniversityId && fac?.universityId !== state.targetUniversityId) {
+    if (state.targetUniversityId && fac.universityId !== state.targetUniversityId) {
       throw new BadRequestException('Target faculty does not belong to target university.');
     }
   }
 
   if (state.targetDepartmentId) {
     const dep = await prisma.academicDepartment.findUnique({ where: { id: state.targetDepartmentId } });
+    if (!dep) throw new BadRequestException('Invalid target department ID');
     if (dep?.isOther) throw new BadRequestException('Cannot target an "Other" department directly.');
-    if (state.targetFacultyId && dep?.facultyId !== state.targetFacultyId) {
+    if (state.targetFacultyId && dep.facultyId !== state.targetFacultyId) {
       throw new BadRequestException('Target department does not belong to target faculty.');
+    }
+    if (state.targetUniversityId && dep.universityId !== state.targetUniversityId) {
+      throw new BadRequestException('Target department does not belong to target university.');
     }
   }
 
   if (state.targetProgramId) {
-    const prog = await prisma.academicProgram.findUnique({ where: { id: state.targetProgramId } });
+    const prog = await prisma.academicProgram.findUnique({ where: { id: state.targetProgramId }, include: { faculty: true } });
+    if (!prog) throw new BadRequestException('Invalid target program ID');
     if (prog?.isOther) throw new BadRequestException('Cannot target an "Other" program directly.');
-    if (state.targetFacultyId && prog?.facultyId !== state.targetFacultyId) {
+    
+    if (state.targetDepartmentId && prog.departmentId !== state.targetDepartmentId) {
+      throw new BadRequestException('Target program does not belong to target department.');
+    }
+    if (state.targetFacultyId && prog.facultyId !== state.targetFacultyId) {
       throw new BadRequestException('Target program does not belong to target faculty.');
     }
-    if (state.targetDepartmentId && prog?.departmentId !== state.targetDepartmentId) {
-      throw new BadRequestException('Target program does not belong to target department.');
+    if (state.targetUniversityId && prog.faculty.universityId !== state.targetUniversityId) {
+      throw new BadRequestException('Target program does not belong to target university.');
     }
   }
 }
