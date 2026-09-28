@@ -14,7 +14,7 @@ export class ReorderItemDto {
 export class ReorderDto {
   @IsNotEmpty()
   @IsString()
-  @IsIn(['chapter', 'lecture', 'session', 'quiz', 'quiz-question'])
+  @IsIn(['chapter', 'lecture', 'unassigned-lecture', 'session', 'quiz', 'quiz-question'])
   entityType: string;
 
   @IsNotEmpty()

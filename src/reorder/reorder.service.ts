@@ -22,6 +22,18 @@ const HANDLERS: Record<string, EntityHandler> = {
   },
   'lecture': {
     model: 'lecture',
+    parentModel: 'chapter',
+    parentField: 'chapterId',
+    orderField: 'sortOrder',
+    hasDeletedAt: true,
+    getCourseId: async (prisma, parentId) => {
+      const chapter = await prisma.chapter.findUnique({ where: { id: parentId }, select: { courseId: true } });
+      if (!chapter) throw new NotFoundException('Parent chapter not found');
+      return chapter.courseId;
+    },
+  },
+  'unassigned-lecture': {
+    model: 'lecture',
     parentModel: 'course',
     parentField: 'courseId',
     orderField: 'sortOrder',
