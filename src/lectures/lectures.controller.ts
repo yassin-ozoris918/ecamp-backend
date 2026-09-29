@@ -27,6 +27,7 @@ import { RedeemCodeDto } from '../activation-codes/dto/redeem-code.dto';
 import { DeviceRestrictionGuard } from '../auth/guards/device.guard';
 import { ThrottlerGuard, Throttle } from '@nestjs/throttler';
 import { HttpCode, HttpStatus } from '@nestjs/common';
+import { ViewLimitService } from '../sessions/view-limit.service';
 
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('lectures')
@@ -34,6 +35,7 @@ export class LecturesController {
   constructor(
     private readonly lecturesService: LecturesService,
     private readonly storageService: StorageService,
+    private readonly viewLimitService: ViewLimitService,
   ) {}
 
   @Roles(Role.INSTRUCTOR, Role.ADMIN)
@@ -43,13 +45,37 @@ export class LecturesController {
     return this.lecturesService.create(dto, user.sub, user.role);
   }
 
-  // Get secure playback token for Cloudflare
+  // Get secure playback token for Cloudflare + view-limit check + playback session token
   @Roles(Role.STUDENT)
   @UseGuards(DeviceRestrictionGuard)
   @Get('sessions/:id/stream-token')
   getSecureStreamToken(@Param('id') id: string, @Req() req: RequestWithUser) {
     const user = req.user;
     return this.lecturesService.getSecureStreamToken(id, user.sub);
+  }
+
+  // Get view status for a specific session (used by frontend to show usage)
+  @Roles(Role.STUDENT)
+  @UseGuards(DeviceRestrictionGuard)
+  @Get('sessions/:id/view-status')
+  getViewStatus(@Param('id') id: string, @Req() req: RequestWithUser) {
+    return this.viewLimitService.getViewStatus(id, req.user.sub);
+  }
+
+  // Consume one view for a session (called when threshold is reached)
+  // Uses playbackSessionId for idempotency — safe to retry.
+  @Roles(Role.STUDENT)
+  @UseGuards(DeviceRestrictionGuard)
+  @Post('sessions/:id/consume-view')
+  consumeView(
+    @Param('id') id: string,
+    @Body() body: { playbackSessionId: string },
+    @Req() req: RequestWithUser,
+  ) {
+    if (!body.playbackSessionId) {
+      throw new BadRequestException('playbackSessionId is required.');
+    }
+    return this.viewLimitService.consumeView(body.playbackSessionId, req.user.sub, id);
   }
 
   @Get('course/:courseId')

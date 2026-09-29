@@ -5,6 +5,7 @@ import {
   IsString,
   IsBoolean,
   Min,
+  IsInt,
 } from 'class-validator';
 
 export class CreateLectureDto {
@@ -57,4 +58,14 @@ export class CreateLectureDto {
   @IsNumber()
   @Min(0)
   warningMinutes?: number;
+
+  /**
+   * Optional maximum number of views per video session.
+   * null or omitted = unlimited.
+   * Must be a positive integer (>= 1) when provided.
+   */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  maxViews?: number | null;
 }

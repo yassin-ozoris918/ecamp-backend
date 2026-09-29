@@ -217,6 +217,17 @@ export class ProgressService {
       include: { progress: { where: { studentId } } },
     });
 
+    // Load view usages for this student for all sessions in this lecture
+    const viewUsages = await this.prisma.studentSessionViewUsage.findMany({
+      where: { studentId, sessionId: { in: sessions.map(s => s.id) } },
+    });
+    const viewUsageMap = new Map<string, number>();
+    for (const vu of viewUsages) {
+      viewUsageMap.set(vu.sessionId, vu.usedViews);
+    }
+    // maxViews comes from the lecture (null = unlimited)
+    const lectureMaxViews = lectureInfo.maxViews ?? null;
+
     const quizzes = await this.prisma.quiz.findMany({
       where: { lectureId, },
       include: {
@@ -248,6 +259,10 @@ export class ProgressService {
           isLocked: true,
           video_url: null, // Hardcoded
           duration: s.duration,
+          // Include view limit info even in locked state so UI can explain
+          maxViews: lectureMaxViews,
+          usedViews: viewUsageMap.get(s.id) ?? 0,
+          isViewExhausted: lectureMaxViews !== null && (viewUsageMap.get(s.id) ?? 0) >= lectureMaxViews,
         })),
         ...quizzes.map((q) => ({
           id: q.id,
@@ -271,6 +286,10 @@ export class ProgressService {
           isCompleted: s.progress.length > 0 ? s.progress[0].isCompleted : false,
           video_url: s.videoUrl,
           duration: s.duration,
+          // View limit fields for the student to see usage
+          maxViews: lectureMaxViews,
+          usedViews: viewUsageMap.get(s.id) ?? 0,
+          isViewExhausted: lectureMaxViews !== null && (viewUsageMap.get(s.id) ?? 0) >= lectureMaxViews,
         })),
         ...quizzes.map((q) => {
           const passedAttempt = q.attempts.find((a) => a.status === 'PASSED');

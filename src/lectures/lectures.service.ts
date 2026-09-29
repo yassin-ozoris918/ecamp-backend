@@ -8,12 +8,14 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateLectureDto } from './dto/create-lecture.dto';
 import { Role } from '@prisma/client';
 import { CloudflareService } from '../cloudflare/cloudflare.service';
+import { ViewLimitService } from '../sessions/view-limit.service';
 
 @Injectable()
 export class LecturesService {
   constructor(
     private prisma: PrismaService,
     private cloudflareService: CloudflareService,
+    private viewLimitService: ViewLimitService,
   ) {}
 
   // Verifies the user is assigned to this specific course
@@ -51,6 +53,8 @@ export class LecturesService {
         durationMinutes: dto.durationMinutes || 0,
         warningHours: dto.warningHours || 0,
         warningMinutes: dto.warningMinutes || 0,
+        // maxViews: null = unlimited (omitted or null from DTO)
+        maxViews: dto.maxViews ?? null,
       },
     });
   }
@@ -85,9 +89,17 @@ export class LecturesService {
     const lecture = await this.findOne(id);
     await this.verifyCourseOwnership(lecture.courseId, userId, role);
 
+    // Build explicit update data so that maxViews=null (remove limit) is handled correctly.
+    // Prisma interprets undefined as "don't change" and null as "set to null".
+    const data: Record<string, any> = { ...dto };
+    if ('maxViews' in dto) {
+      // Allow explicit null to remove the limit (→ unlimited)
+      data.maxViews = dto.maxViews ?? null;
+    }
+
     return this.prisma.lecture.update({
       where: { id },
-      data: dto,
+      data,
     });
   }
 
@@ -303,14 +315,28 @@ export class LecturesService {
         throw new ForbiddenException('You must start the lecture before accessing the video.');
       }
 
+      // Existing time-limit check (unchanged)
       if (access.expiresAt && new Date() > access.expiresAt) {
         throw new ForbiddenException('Your access to this lecture has expired.');
       }
     }
 
+    // --- View Limit Check (new, independent of time limit) ---
+    // Only applies to sessions that have a video URL.
+    if (session.videoUrl) {
+      await this.viewLimitService.assertCanWatch(sessionId, studentId);
+    }
+
     if (!session.videoUrl) {
       throw new NotFoundException('Video not found for this session');
     }
+
+    // Create an idempotency token for this viewing session.
+    // The frontend will send this back when the threshold is reached.
+    const playbackSessionId = await this.viewLimitService.createPlaybackSession(
+      sessionId,
+      studentId,
+    );
 
     let videoId = session.videoUrl;
     
@@ -322,7 +348,7 @@ export class LecturesService {
     ) {
       // Unless it is explicitly a cloudflarestream.com URL, return direct URL
       if (!videoId.includes('cloudflarestream.com')) {
-        return { playbackUrl: videoId };
+        return { playbackUrl: videoId, playbackSessionId };
       }
     }
 
@@ -333,6 +359,7 @@ export class LecturesService {
 
     return {
       playbackUrl: this.cloudflareService.generateSignedUrl(videoId),
+      playbackSessionId,
     };
   }
 }
