@@ -191,52 +191,59 @@ export class UsersService {
       }
     }
 
-    return this.prisma.user.update({
-      where: { id: userId },
-      data: {
-        fullName: data.fullName,
-        phoneNumber: data.phoneNumber,
-        parentPhoneNumber: data.parentPhoneNumber,
-        highSchoolSystem: finalState.highSchoolSystem,
-        studyMode: finalState.studyMode,
-        studyLanguage: finalState.studyLanguage,
-        highSchoolGrade: finalState.highSchoolGrade,
-        traditionalBranch: finalState.traditionalBranch,
-        baccalaureatePath: finalState.baccalaureatePath,
-        universityId: finalState.universityId,
-        facultyId: finalState.facultyId,
-        departmentId: finalState.departmentId,
-        programId: finalState.programId,
-        otherUniversityName: finalState.otherUniversityName,
-        otherFacultyName: finalState.otherFacultyName,
-        otherDepartmentName: finalState.otherDepartmentName,
-        otherProgramName: finalState.otherProgramName,
-      },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        profilePictureUrl: true,
-        role: true,
-        isActive: true,
-        educationLevel: true,
-        phoneNumber: true,
-        parentPhoneNumber: true,
-        highSchoolSystem: true,
-        studyMode: true,
-        studyLanguage: true,
-        highSchoolGrade: true,
-        traditionalBranch: true,
-        baccalaureatePath: true,
-        universityId: true,
-        facultyId: true,
-        departmentId: true,
-        programId: true,
-        otherUniversityName: true,
-        otherFacultyName: true,
-        otherDepartmentName: true,
-        otherProgramName: true,
-      },
-    });
+    try {
+      return await this.prisma.user.update({
+        where: { id: userId },
+        data: {
+          fullName: data.fullName,
+          phoneNumber: data.phoneNumber,
+          parentPhoneNumber: data.parentPhoneNumber,
+          highSchoolSystem: finalState.highSchoolSystem,
+          studyMode: finalState.studyMode,
+          studyLanguage: finalState.studyLanguage,
+          highSchoolGrade: finalState.highSchoolGrade,
+          traditionalBranch: finalState.traditionalBranch,
+          baccalaureatePath: finalState.baccalaureatePath,
+          universityId: finalState.universityId,
+          facultyId: finalState.facultyId,
+          departmentId: finalState.departmentId,
+          programId: finalState.programId,
+          otherUniversityName: finalState.otherUniversityName,
+          otherFacultyName: finalState.otherFacultyName,
+          otherDepartmentName: finalState.otherDepartmentName,
+          otherProgramName: finalState.otherProgramName,
+        },
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          profilePictureUrl: true,
+          role: true,
+          isActive: true,
+          educationLevel: true,
+          phoneNumber: true,
+          parentPhoneNumber: true,
+          highSchoolSystem: true,
+          studyMode: true,
+          studyLanguage: true,
+          highSchoolGrade: true,
+          traditionalBranch: true,
+          baccalaureatePath: true,
+          universityId: true,
+          facultyId: true,
+          departmentId: true,
+          programId: true,
+          otherUniversityName: true,
+          otherFacultyName: true,
+          otherDepartmentName: true,
+          otherProgramName: true,
+        },
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002' && error?.meta?.target?.includes('phoneNumber')) {
+        throw new BadRequestException('Phone number is already in use by another account.');
+      }
+      throw error;
+    }
   }
 }

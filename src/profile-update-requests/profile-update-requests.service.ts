@@ -82,10 +82,17 @@ export class ProfileUpdateRequestsService {
     }
 
     // Update user
-    await this.prisma.user.update({
-      where: { id: request.studentId },
-      data: updateData,
-    });
+    try {
+      await this.prisma.user.update({
+        where: { id: request.studentId },
+        data: updateData,
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002' && error?.meta?.target?.includes('phoneNumber')) {
+        throw new BadRequestException('Phone number is already in use by another account.');
+      }
+      throw error;
+    }
 
     // Mark request as approved
     return this.prisma.profileUpdateRequest.update({

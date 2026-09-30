@@ -186,18 +186,25 @@ export class AdminService {
       normalizeEducationProfile(data as any);
     }
 
-    return this.prisma.user.update({
-      where: { id: userId },
-      data,
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        role: true,
-        isActive: true,
-        deviceId: true,
-      },
-    });
+    try {
+      return await this.prisma.user.update({
+        where: { id: userId },
+        data,
+        select: {
+          id: true,
+          email: true,
+          fullName: true,
+          role: true,
+          isActive: true,
+          deviceId: true,
+        },
+      });
+    } catch (error: any) {
+      if (error?.code === 'P2002' && error?.meta?.target?.includes('email')) {
+        throw new BadRequestException('Email is already in use by another account.');
+      }
+      throw error;
+    }
   }
 
   async deleteUser(userId: string) {
