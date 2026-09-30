@@ -8,6 +8,8 @@ import { Role, CodeStatus, AttemptStatus } from '@prisma/client';
 import { GetUsersQueryDto } from './dto/get-users-query.dto';
 import * as bcrypt from 'bcrypt';
 import { normalizeEducationProfile } from '../common/utils/segmentation-validation.util';
+import * as fs from 'fs';
+import * as path from 'path';
 
 @Injectable()
 export class AdminService {
@@ -850,5 +852,119 @@ export class AdminService {
       activatedAt: a.activatedAt,
     }));
   }
+
+  /**
+   * Returns a merged view of:
+   *  1. device-issues.log — every login attempt (with mismatch flag)
+   *  2. DeviceHistory DB table — REGISTERED / RESET / REMOVED events
+   *
+   * Supports:
+   *  - search (email or student name)
+   *  - mismatchOnly filter (only show failed device checks)
+   *  - pagination (skip / take)
+   */
+  async getDeviceLogs(opts: {
+    search?: string;
+    mismatchOnly?: boolean;
+    skip?: number;
+    take?: number;
+  }) {
+    const { search = '', mismatchOnly = false, skip = 0, take = 100 } = opts;
+
+    // --- 1. Parse device-issues.log ---
+    const logPath = path.join(process.cwd(), 'device-issues.log');
+    let fileEntries: any[] = [];
+    if (fs.existsSync(logPath)) {
+      const raw = fs.readFileSync(logPath, 'utf8');
+      fileEntries = raw
+        .split('\n')
+        .filter((line) => line.trim())
+        .map((line) => {
+          try {
+            const parsed = JSON.parse(line);
+            return {
+              source: 'LOGIN_ATTEMPT',
+              id: `log_${parsed.timestamp}_${parsed.studentId}`,
+              timestamp: parsed.timestamp,
+              studentId: parsed.studentId,
+              studentEmail: parsed.studentEmail,
+              studentName: null, // enriched later
+              deviceFingerprint: parsed.receivedFinalId,
+              expectedDevice: parsed.expectedDeviceId,
+              action: parsed.isMatch ? 'LOGIN_OK' : 'LOGIN_MISMATCH',
+              isMatch: parsed.isMatch,
+              ipAddress: parsed.ipAddress,
+              browser: parsed.browserAgent,
+            };
+          } catch {
+            return null;
+          }
+        })
+        .filter(Boolean);
+    }
+
+    // --- 2. Enrich file entries with student names from DB ---
+    const studentIds = [...new Set(fileEntries.map((e) => e.studentId).filter(Boolean))];
+    let studentMap: Record<string, { fullName: string; email: string }> = {};
+    if (studentIds.length > 0) {
+      const students = await this.prisma.user.findMany({
+        where: { id: { in: studentIds } },
+        select: { id: true, fullName: true, email: true },
+      });
+      studentMap = Object.fromEntries(students.map((s) => [s.id, s]));
+      fileEntries = fileEntries.map((e) => ({
+        ...e,
+        studentName: studentMap[e.studentId]?.fullName ?? null,
+      }));
+    }
+
+    // --- 3. Fetch DeviceHistory DB events ---
+    const dbEvents = await this.prisma.deviceHistory.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 500, // cap to avoid loading entire history
+      include: { student: { select: { fullName: true, email: true } } },
+    });
+
+    const dbEntries = dbEvents.map((e) => ({
+      source: 'DEVICE_HISTORY',
+      id: `db_${e.id}`,
+      timestamp: e.createdAt.toISOString(),
+      studentId: e.studentId,
+      studentEmail: e.student.email,
+      studentName: e.student.fullName,
+      deviceFingerprint: e.deviceFingerprint,
+      expectedDevice: null,
+      action: e.action, // REGISTERED | RESET | REMOVED | REPLACED
+      isMatch: true, // DB events are authoritative (not mismatches)
+      ipAddress: e.ipAddress ?? null,
+      browser: e.browser ?? null,
+    }));
+
+    // --- 4. Merge and sort ---
+    let merged = [...fileEntries, ...dbEntries].sort(
+      (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+    );
+
+    // --- 5. Apply filters ---
+    if (mismatchOnly) {
+      merged = merged.filter((e) => !e.isMatch);
+    }
+    if (search) {
+      const q = search.toLowerCase();
+      merged = merged.filter(
+        (e) =>
+          e.studentEmail?.toLowerCase().includes(q) ||
+          e.studentName?.toLowerCase().includes(q) ||
+          e.studentId?.toLowerCase().includes(q) ||
+          e.deviceFingerprint?.toLowerCase().includes(q),
+      );
+    }
+
+    const total = merged.length;
+    const items = merged.slice(skip, skip + take);
+
+    return { total, items };
+  }
 }
+
 

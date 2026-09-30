@@ -202,6 +202,21 @@ export class AdminController {
     return this.adminService.getSystemAuditLogs(parsedSkip, parsedTake);
   }
 
+  @Get('device-logs')
+  async getDeviceLogs(
+    @Query('search') search?: string,
+    @Query('mismatchOnly') mismatchOnly?: string,
+    @Query('skip') skip?: string,
+    @Query('take') take?: string,
+  ) {
+    return this.adminService.getDeviceLogs({
+      search: search || '',
+      mismatchOnly: mismatchOnly === 'true',
+      skip: skip ? parseInt(skip, 10) : 0,
+      take: take ? parseInt(take, 10) : 100,
+    });
+  }
+
   // --- STATISTICS ---
 
   @Get('stats')
