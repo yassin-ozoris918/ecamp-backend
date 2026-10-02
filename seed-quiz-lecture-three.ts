@@ -179,17 +179,17 @@ async function main() {
   // Complete sentences (Short Answer)
   const saQuestions = [
     {
-      text: "Among the things that require caution: issues of __________ when using copyrighted works as training data.",
+      text: "Complete the sentence using one of the following words: [ probabilistic reasoning - copyright - representative - privacy ]\n\nAmong the things that require caution: issues of __________ when using copyrighted works as training data.",
       referenceAnswer: "copyright",
       points: 0.5
     },
     {
-      text: "AI is good at __________ and prediction based on data.",
+      text: "Complete the sentence using one of the following words: [ probabilistic reasoning - copyright - representative - privacy ]\n\nAI is good at __________ and prediction based on data.",
       referenceAnswer: "probabilistic reasoning",
       points: 0.5
     },
     {
-      text: "AI results become less accurate when the training data is insufficient or not __________ of real conditions.",
+      text: "Complete the sentence using one of the following words: [ probabilistic reasoning - copyright - representative - privacy ]\n\nAI results become less accurate when the training data is insufficient or not __________ of real conditions.",
       referenceAnswer: "representative",
       points: 0.5
     }
