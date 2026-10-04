@@ -53,11 +53,17 @@ export class LevelIsolationGuard implements CanActivate {
           facultyId: true,
           departmentId: true,
           programId: true,
+          isDemo: true,
         },
       });
 
       if (!dbUser) {
         return false;
+      }
+
+      // 2.5 Demo accounts bypass isolation completely
+      if ((dbUser as any).isDemo) {
+        return true;
       }
 
       // Re-fetch the full course with targeting fields

@@ -692,13 +692,17 @@ export class CoursesService {
       throw new ForbiddenException('User not found');
     }
 
+    const isDemo = (user as any).isDemo === true;
+
     return this.prisma.course.findMany({
       where: {
         status: 'PUBLISHED',
-        AND: [
-          { audienceType: user.educationLevel },
-          ...this.getStudentTargetingCondition(user)
-        ]
+        ...(isDemo ? {} : {
+          AND: [
+            { audienceType: user.educationLevel },
+            ...this.getStudentTargetingCondition(user)
+          ]
+        })
       },
       include: {
         instructors: {
