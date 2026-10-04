@@ -30,11 +30,15 @@ export class DeviceRestrictionGuard implements CanActivate {
     // Fetch the bound device from the database
     const dbUser = await this.prisma.user.findUnique({
       where: { id: user.sub || user.id },
-      select: { deviceId: true },
+      select: { deviceId: true, isDemo: true },
     });
 
     if (!dbUser) {
       return false;
+    }
+
+    if ((dbUser as any).isDemo) {
+      return true; // Bypass for demo accounts
     }
 
     if (dbUser.deviceId !== deviceId) {
