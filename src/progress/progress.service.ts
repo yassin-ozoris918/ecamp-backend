@@ -542,7 +542,10 @@ export class ProgressService {
     // If studentId is provided, check which lectures they have access to
     let accesses: any[] = [];
     let courseAccess: any = null;
+    let isDemo = false;
     if (studentId) {
+      const student = await this.prisma.user.findUnique({ where: { id: studentId }, select: { isDemo: true } });
+      isDemo = (student as any)?.isDemo === true;
       accesses = await this.prisma.studentLectureAccess.findMany({
         where: { studentId, lectureId: { in: allLectures.map((l) => l.id) }, },
       });
@@ -554,11 +557,11 @@ export class ProgressService {
     const formatLecture = (l: any) => {
       const access = accesses.find((a) => a.lectureId === l.id);
 
-      let isUnlocked = course.isFree || !!access || !!courseAccess;
+      let isUnlocked = course.isFree || !!access || !!courseAccess || isDemo;
       const isStarted = access ? access.isStarted : false;
       let isExpired = false;
 
-      if (!course.isFree) {
+      if (!course.isFree && !isDemo) {
         // Check if the lecture access has expired
         if (access && access.expiresAt) {
           const now = new Date();
