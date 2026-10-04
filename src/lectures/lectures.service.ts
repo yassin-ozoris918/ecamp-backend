@@ -213,7 +213,20 @@ export class LecturesService {
 
   async startAccess(lectureId: string, studentId: string) {
     const lecture = await this.findOne(lectureId);
-    
+
+    // --- Demo account bypass: grant access immediately with no restrictions ---
+    const student = await this.prisma.user.findUnique({ where: { id: studentId } });
+    if ((student as any)?.isDemo) {
+      const existingAccess = await this.prisma.studentLectureAccess.findFirst({
+        where: { studentId, lectureId },
+      });
+      if (existingAccess) return existingAccess;
+      return this.prisma.studentLectureAccess.create({
+        data: { studentId, lectureId, isStarted: true, activatedAt: new Date(), expiresAt: null },
+      });
+    }
+    // --- End demo bypass ---
+
     // Check if they already have an unstarted lecture access
     const existingAccess = await this.prisma.studentLectureAccess.findFirst({
       where: { studentId, lectureId },
@@ -296,36 +309,39 @@ export class LecturesService {
 
     if (!session) throw new NotFoundException('Session not found');
 
-    const access = await this.prisma.studentLectureAccess.findFirst({
-      where: {
-        studentId,
-        lectureId: session.lectureId,
-        },
-    });
+    // --- Demo account bypass: skip all access, expiry, and view-limit checks ---
+    const student = await this.prisma.user.findUnique({ where: { id: studentId } });
+    const isDemo = (student as any)?.isDemo === true;
 
-    const course = await this.prisma.course.findUnique({ where: { id: session.lecture.courseId } });
-    const isFree = course?.isFree || false;
+    if (!isDemo) {
+      const access = await this.prisma.studentLectureAccess.findFirst({
+        where: { studentId, lectureId: session.lectureId },
+      });
 
-    if (!isFree) {
-      if (!access) {
-        throw new ForbiddenException('You must redeem a code to access this session.');
+      const course = await this.prisma.course.findUnique({ where: { id: session.lecture.courseId } });
+      const isFree = course?.isFree || false;
+
+      if (!isFree) {
+        if (!access) {
+          throw new ForbiddenException('You must redeem a code to access this session.');
+        }
+
+        if (!access.isStarted) {
+          throw new ForbiddenException('You must start the lecture before accessing the video.');
+        }
+
+        // Existing time-limit check (unchanged)
+        if (access.expiresAt && new Date() > access.expiresAt) {
+          throw new ForbiddenException('Your access to this lecture has expired.');
+        }
       }
 
-      if (!access.isStarted) {
-        throw new ForbiddenException('You must start the lecture before accessing the video.');
-      }
-
-      // Existing time-limit check (unchanged)
-      if (access.expiresAt && new Date() > access.expiresAt) {
-        throw new ForbiddenException('Your access to this lecture has expired.');
+      // View Limit Check — only for non-demo students with a video URL
+      if (session.videoUrl) {
+        await this.viewLimitService.assertCanWatch(sessionId, studentId);
       }
     }
-
-    // --- View Limit Check (new, independent of time limit) ---
-    // Only applies to sessions that have a video URL.
-    if (session.videoUrl) {
-      await this.viewLimitService.assertCanWatch(sessionId, studentId);
-    }
+    // --- End demo bypass ---
 
     if (!session.videoUrl) {
       throw new NotFoundException('Video not found for this session');

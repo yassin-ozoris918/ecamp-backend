@@ -113,6 +113,7 @@ model User {
   password              String
   role                  Role           @default(STUDENT)
   isActive              Boolean        @default(true)
+  isDemo                Boolean        @default(false) // Demo/preview account — bypasses all access restrictions
   deviceId              String? // Stores the unique hardware fingerprint
   profilePictureUrl     String?
   profilePictureMediaId String?        @unique

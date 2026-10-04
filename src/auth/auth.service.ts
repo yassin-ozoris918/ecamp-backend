@@ -174,8 +174,8 @@ export class AuthService {
     const passwordMatches = await bcrypt.compare(dto.password, user.password);
     if (!passwordMatches) throw new ForbiddenException('auth.errors.invalidCredentials');
 
-    // --- DEVICE BINDING LOGIC (STUDENTS ONLY) ---
-    if (user.role === Role.STUDENT) {
+    // --- DEVICE BINDING LOGIC (STUDENTS ONLY, non-demo) ---
+    if (user.role === Role.STUDENT && !(user as any).isDemo) {
       const finalDeviceId = headerDeviceId || dto.deviceId;
       
       try {
@@ -332,7 +332,7 @@ export class AuthService {
       throw new ForbiddenException('Account is suspended');
     }
 
-    if (user.role === Role.STUDENT) {
+    if (user.role === Role.STUDENT && !(user as any).isDemo) {
       if (!deviceIdHeader) {
         throw new ForbiddenException('Device ID is missing from request.');
       }

@@ -165,19 +165,32 @@ export class CoursesService {
     const whereClause: any = {
       // Filter out soft-deleted courses
     };
-    if (role === Role.INSTRUCTOR && userId) {
-      whereClause.instructors = {
-        some: { instructorId: userId },
-      };
-    } else if (role === Role.STUDENT && userId) {
-      const dbUser = await this.prisma.user.findUnique({ where: { id: userId } });
-      if (dbUser) {
-        whereClause.AND = [
-          { audienceType: dbUser.educationLevel },
-          ...this.getStudentTargetingCondition(dbUser)
-        ];
+
+    // --- Demo account bypass: skip ALL targeting/role filters ---
+    let isDemoUser = false;
+    if (userId) {
+      const dbUserForDemo = await this.prisma.user.findUnique({ where: { id: userId }, select: { isDemo: true } });
+      isDemoUser = (dbUserForDemo as any)?.isDemo === true;
+    }
+
+    if (!isDemoUser) {
+      if (role === Role.INSTRUCTOR && userId) {
+        whereClause.instructors = {
+          some: { instructorId: userId },
+        };
+      } else if (role === Role.STUDENT && userId) {
+        const dbUser = await this.prisma.user.findUnique({ where: { id: userId } });
+        if (dbUser) {
+          // Regular student: filter by their education level and segmentation
+          whereClause.AND = [
+            { audienceType: dbUser.educationLevel },
+            ...this.getStudentTargetingCondition(dbUser)
+          ];
+        }
       }
     }
+    // Demo user: no targeting filter — sees ALL courses across all education levels
+
 
     if (search) {
       const searchOr = [
