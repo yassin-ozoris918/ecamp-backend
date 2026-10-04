@@ -16,7 +16,7 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
-const DEMO_EMAIL = 'yassinstudy918@gmail.com';
+const DEMO_EMAIL = 'yassinozoris918@gmail.com';
 
 async function main() {
   console.log(`\n🔍 Looking up account: ${DEMO_EMAIL}`);
