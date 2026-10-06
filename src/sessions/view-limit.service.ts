@@ -37,6 +37,8 @@ export class ViewLimitService {
   ): Promise<{
     usedViews: number;
     maxViews: number | null;
+    grantedViews: number;
+    effectiveMaxViews: number | null;
     isExhausted: boolean;
   }> {
     const session = await this.prisma.session.findUnique({
@@ -53,9 +55,11 @@ export class ViewLimitService {
     });
 
     const usedViews = usage?.usedViews ?? 0;
-    const isExhausted = maxViews !== null && usedViews >= maxViews;
+    const grantedViews = usage?.grantedViews ?? 0;
+    const effectiveMaxViews = maxViews !== null ? maxViews + grantedViews : null;
+    const isExhausted = effectiveMaxViews !== null && usedViews >= effectiveMaxViews;
 
-    return { usedViews, maxViews, isExhausted };
+    return { usedViews, maxViews, grantedViews, effectiveMaxViews, isExhausted };
   }
 
   /**
@@ -64,14 +68,14 @@ export class ViewLimitService {
    * Does NOT consume a view — that happens via consumeView().
    */
   async assertCanWatch(sessionId: string, studentId: string): Promise<void> {
-    const { isExhausted, usedViews, maxViews } = await this.getViewStatus(
+    const { isExhausted, usedViews, effectiveMaxViews } = await this.getViewStatus(
       sessionId,
       studentId,
     );
 
     if (isExhausted) {
       throw new ForbiddenException(
-        `You have reached the maximum number of views allowed for this session (${usedViews}/${maxViews}).`,
+        `You have reached the maximum number of views allowed for this session (${usedViews}/${effectiveMaxViews}).`,
       );
     }
   }
@@ -134,8 +138,8 @@ export class ViewLimitService {
     }
     if (ps.consumed) {
       // Already consumed — idempotent. Return current state.
-      const { usedViews, maxViews } = await this.getViewStatus(sessionId, studentId);
-      return { usedViews, maxViews };
+      const { usedViews, effectiveMaxViews } = await this.getViewStatus(sessionId, studentId);
+      return { usedViews, maxViews: effectiveMaxViews };
     }
     if (new Date() > ps.expiresAt) {
       throw new BadRequestException('Playback session has expired. Please reload the video.');
@@ -163,14 +167,15 @@ export class ViewLimitService {
       }
 
       // Atomic guard: if already at or over limit, deny (race condition safety)
-      if (maxViews !== null && usage.usedViews >= maxViews) {
+      const effectiveMaxLimit = maxViews !== null ? maxViews + usage.grantedViews : null;
+      if (effectiveMaxLimit !== null && usage.usedViews >= effectiveMaxLimit) {
         // Mark the token as consumed so the frontend can't retry
         await tx.playbackSession.update({
           where: { id: playbackSessionId },
           data: { consumed: true },
         });
         throw new ForbiddenException(
-          `You have reached the maximum number of views allowed for this session (${usage.usedViews}/${maxViews}).`,
+          `You have reached the maximum number of views allowed for this session (${usage.usedViews}/${effectiveMaxLimit}).`,
         );
       }
 
@@ -186,9 +191,9 @@ export class ViewLimitService {
         data: { consumed: true },
       });
 
-      return updated.usedViews;
+      return { usedViews: updated.usedViews, effectiveMaxLimit };
     });
 
-    return { usedViews: result, maxViews };
+    return { usedViews: result.usedViews, maxViews: result.effectiveMaxLimit };
   }
 }

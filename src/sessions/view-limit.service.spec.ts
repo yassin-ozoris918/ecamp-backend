@@ -18,11 +18,12 @@ describe('ViewLimitService', () => {
     lecture: { maxViews },
   });
 
-  const makeUsage = (usedViews: number) => ({
+  const makeUsage = (usedViews: number, grantedViews: number = 0) => ({
     id: 'usage-1',
     studentId: 'student-1',
     sessionId: 'session-1',
     usedViews,
+    grantedViews,
   });
 
   const makePlaybackSession = (overrides: Partial<{

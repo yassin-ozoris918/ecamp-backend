@@ -435,6 +435,15 @@ export class AdminService {
       },
     });
 
+    const sessionViews = await this.prisma.studentSessionViewUsage.findMany({
+      where: { studentId },
+      include: {
+        session: {
+          select: { id: true, title: true, lecture: { select: { id: true, title: true, maxViews: true, course: { select: { id: true, title: true } } } } }
+        }
+      }
+    });
+
     const quizAttempts = await this.prisma.quizAttempt.findMany({
       where: { studentId },
       include: {
@@ -462,6 +471,17 @@ export class AdminService {
         courseTitle: l.lecture.course.title,
         activatedAt: l.activatedAt,
         expiresAt: l.expiresAt,
+      })),
+      sessionViews: sessionViews.map((sv) => ({
+        sessionId: sv.sessionId,
+        sessionTitle: sv.session.title,
+        lectureId: sv.session.lecture.id,
+        lectureTitle: sv.session.lecture.title,
+        courseTitle: sv.session.lecture.course.title,
+        usedViews: sv.usedViews,
+        grantedViews: sv.grantedViews,
+        maxViews: sv.session.lecture.maxViews,
+        effectiveMaxViews: sv.session.lecture.maxViews !== null ? sv.session.lecture.maxViews + sv.grantedViews : null,
       })),
       quizAttempts: quizAttempts.map((a) => {
         let earnedPoints = 0;
@@ -694,6 +714,64 @@ export class AdminService {
     } else {
       throw new BadRequestException('Invalid item type.');
     }
+  }
+
+  async grantSessionViews(studentId: string, sessionId: string, additionalViews: number, adminId: string) {
+    if (additionalViews <= 0 || !Number.isInteger(additionalViews)) {
+      throw new BadRequestException('Additional views must be a positive integer.');
+    }
+
+    const session = await this.prisma.session.findUnique({
+      where: { id: sessionId },
+      include: { lecture: true }
+    });
+
+    if (!session) {
+      throw new NotFoundException('Session not found');
+    }
+
+    if (session.lecture.maxViews === null) {
+      throw new BadRequestException('This lecture has unlimited views; no grant is necessary.');
+    }
+
+    const usage = await this.prisma.studentSessionViewUsage.findUnique({
+      where: { studentId_sessionId: { studentId, sessionId } }
+    });
+
+    if (!usage) {
+       throw new BadRequestException('Student has not started watching this session yet (no usage record found).');
+    }
+
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const result = await tx.studentSessionViewUsage.update({
+        where: { studentId_sessionId: { studentId, sessionId } },
+        data: { grantedViews: { increment: additionalViews } }
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: adminId,
+          action: 'ADMIN_GRANT_SESSION_VIEWS',
+          entity: 'Session',
+          entityId: sessionId,
+          details: JSON.stringify({ 
+            studentId, 
+            additionalViewsGranted: additionalViews,
+            newTotalGrantedViews: result.grantedViews,
+            originalMaxViews: session.lecture.maxViews,
+            effectiveLimit: session.lecture.maxViews! + result.grantedViews
+          }),
+        },
+      });
+
+      return result;
+    });
+
+    return { 
+      message: `Successfully granted ${additionalViews} additional views.`, 
+      grantedViews: updated.grantedViews, 
+      effectiveMaxViews: session.lecture.maxViews + updated.grantedViews 
+    };
   }
 
   async searchCatalog(query: string) {

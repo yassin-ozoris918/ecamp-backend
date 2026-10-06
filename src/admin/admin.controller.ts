@@ -180,6 +180,16 @@ export class AdminController {
     return this.adminService.overrideProgress(studentId, itemType, itemId);
   }
 
+  @Post('users/:id/sessions/:sessionId/grant-views')
+  async grantSessionViews(
+    @Param('id') studentId: string,
+    @Param('sessionId') sessionId: string,
+    @Body('additionalViews') additionalViews: number,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.adminService.grantSessionViews(studentId, sessionId, additionalViews, req.user.sub);
+  }
+
   // --- AUDIT ---
 
   @Get('audit-logs')
