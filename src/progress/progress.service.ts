@@ -221,9 +221,9 @@ export class ProgressService {
     const viewUsages = await this.prisma.studentSessionViewUsage.findMany({
       where: { studentId, sessionId: { in: sessions.map(s => s.id) } },
     });
-    const viewUsageMap = new Map<string, number>();
+    const viewUsageMap = new Map<string, { usedViews: number, grantedViews: number }>();
     for (const vu of viewUsages) {
-      viewUsageMap.set(vu.sessionId, vu.usedViews);
+      viewUsageMap.set(vu.sessionId, { usedViews: vu.usedViews, grantedViews: vu.grantedViews });
     }
     // maxViews comes from the lecture (null = unlimited)
     const lectureMaxViews = lectureInfo.maxViews ?? null;
@@ -250,20 +250,24 @@ export class ProgressService {
     if (isFullyLocked || !isStarted) {
       // STRICT WHITE-LISTING FOR LOCKED CONTENT
       playlist = [
-        ...sessions.map((s) => ({
-          id: s.id,
-          type: 'SESSION',
-          title: s.title,
-          orderIndex: s.sortOrder,
-          isCompleted: false,
-          isLocked: true,
-          video_url: null, // Hardcoded
-          duration: s.duration,
-          // Include view limit info even in locked state so UI can explain
-          maxViews: lectureMaxViews,
-          usedViews: viewUsageMap.get(s.id) ?? 0,
-          isViewExhausted: lectureMaxViews !== null && (viewUsageMap.get(s.id) ?? 0) >= lectureMaxViews,
-        })),
+        ...sessions.map((s) => {
+          const usage = viewUsageMap.get(s.id) ?? { usedViews: 0, grantedViews: 0 };
+          const effectiveMaxViews = lectureMaxViews !== null ? lectureMaxViews + usage.grantedViews : null;
+          return {
+            id: s.id,
+            type: 'SESSION',
+            title: s.title,
+            orderIndex: s.sortOrder,
+            isCompleted: false,
+            isLocked: true,
+            video_url: null, // Hardcoded
+            duration: s.duration,
+            // Include view limit info even in locked state so UI can explain
+            maxViews: effectiveMaxViews,
+            usedViews: usage.usedViews,
+            isViewExhausted: effectiveMaxViews !== null && usage.usedViews >= effectiveMaxViews,
+          };
+        }),
         ...quizzes.map((q) => ({
           id: q.id,
           type: 'QUIZ',
@@ -278,19 +282,23 @@ export class ProgressService {
     } else {
       // Unlocked Content
       playlist = [
-        ...sessions.map((s) => ({
-          id: s.id,
-          type: 'SESSION',
-          title: s.title,
-          orderIndex: s.sortOrder,
-          isCompleted: s.progress.length > 0 ? s.progress[0].isCompleted : false,
-          video_url: s.videoUrl,
-          duration: s.duration,
-          // View limit fields for the student to see usage
-          maxViews: lectureMaxViews,
-          usedViews: viewUsageMap.get(s.id) ?? 0,
-          isViewExhausted: lectureMaxViews !== null && (viewUsageMap.get(s.id) ?? 0) >= lectureMaxViews,
-        })),
+        ...sessions.map((s) => {
+          const usage = viewUsageMap.get(s.id) ?? { usedViews: 0, grantedViews: 0 };
+          const effectiveMaxViews = lectureMaxViews !== null ? lectureMaxViews + usage.grantedViews : null;
+          return {
+            id: s.id,
+            type: 'SESSION',
+            title: s.title,
+            orderIndex: s.sortOrder,
+            isCompleted: s.progress.length > 0 ? s.progress[0].isCompleted : false,
+            video_url: s.videoUrl,
+            duration: s.duration,
+            // View limit fields for the student to see usage
+            maxViews: effectiveMaxViews,
+            usedViews: usage.usedViews,
+            isViewExhausted: effectiveMaxViews !== null && usage.usedViews >= effectiveMaxViews,
+          };
+        }),
         ...quizzes.map((q) => {
           const passedAttempt = q.attempts.find((a) => a.status === 'PASSED');
           const isCompleted = !!passedAttempt;
