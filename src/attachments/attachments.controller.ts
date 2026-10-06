@@ -53,12 +53,17 @@ export class AttachmentsController {
   }
 
   @Get(':id/view')
-  async viewAttachment(@Param('id') id: string, @Req() req: RequestWithUser) {
+  async viewAttachment(
+    @Param('id') id: string,
+    @Req() req: RequestWithUser,
+    @Query('download') download?: string,
+  ) {
+    const isDownload = download === 'true';
     if (req.user.role === Role.STUDENT) {
-      const url = await this.attachmentsService.getStudentAttachmentViewUrl(req.user.sub, id);
+      const url = await this.attachmentsService.getStudentAttachmentViewUrl(req.user.sub, id, isDownload);
       return { url };
     } else {
-      const url = await this.attachmentsService.getInstructorAttachmentViewUrl(id);
+      const url = await this.attachmentsService.getInstructorAttachmentViewUrl(id, isDownload);
       return { url };
     }
   }

@@ -157,7 +157,7 @@ export class AttachmentsService {
     return result;
   }
 
-  async getStudentAttachmentViewUrl(studentId: string, attachmentId: string) {
+  async getStudentAttachmentViewUrl(studentId: string, attachmentId: string, forceDownload = false) {
     const hasAccess = await this.hasFileAccess(studentId, attachmentId);
     if (!hasAccess) {
       throw new ForbiddenException('You do not have access to this file.');
@@ -168,7 +168,7 @@ export class AttachmentsService {
     });
     if (!attachment) throw new NotFoundException('Attachment not found.');
 
-    return this.storage.generatePresignedGetUrl(attachment.fileUrl, 300);
+    return this.storage.generatePresignedGetUrl(attachment.fileUrl, 300, forceDownload);
   }
 
   async findById(id: string) {
@@ -179,9 +179,9 @@ export class AttachmentsService {
     return attachment;
   }
 
-  async getInstructorAttachmentViewUrl(id: string) {
+  async getInstructorAttachmentViewUrl(id: string, forceDownload = false) {
     const attachment = await this.findById(id);
-    return this.storage.generatePresignedGetUrl(attachment.fileUrl, 300);
+    return this.storage.generatePresignedGetUrl(attachment.fileUrl, 300, forceDownload);
   }
 
   async delete(id: string, instructorId: string, role: Role) {

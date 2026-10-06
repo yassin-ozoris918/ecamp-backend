@@ -211,7 +211,7 @@ export class StorageService {
     }
   }
 
-  async generatePresignedGetUrl(fileUrl: string, expiresIn: number = 300): Promise<string> {
+  async generatePresignedGetUrl(fileUrl: string, expiresIn: number = 300, forceDownload: boolean = false): Promise<string> {
     if (!this.s3Client) {
       return fileUrl; // Fallback for local storage
     }
@@ -232,6 +232,7 @@ export class StorageService {
     const command = new GetObjectCommand({
       Bucket: this.bucketName,
       Key: key,
+      ...(forceDownload ? { ResponseContentDisposition: 'attachment' } : {}),
     });
 
     try {
