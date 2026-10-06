@@ -130,6 +130,90 @@ export class AdminService {
     return { items, total, skip, take };
   }
 
+  async getStudentStats() {
+    const students = await this.prisma.user.findMany({
+      where: { role: 'STUDENT', deletedAt: null },
+      select: {
+        educationLevel: true,
+        highSchoolSystem: true,
+        highSchoolGrade: true,
+        traditionalBranch: true,
+        baccalaureatePath: true,
+        studyMode: true,
+        studyLanguage: true,
+        otherUniversityName: true,
+        otherFacultyName: true,
+        otherDepartmentName: true,
+        otherProgramName: true,
+        academicUniversity: { select: { nameEn: true, nameAr: true, isOther: true } },
+        academicFaculty: { select: { nameEn: true, nameAr: true, isOther: true } },
+        academicDepartment: { select: { nameEn: true, nameAr: true, isOther: true } },
+        academicProgram: { select: { nameEn: true, nameAr: true, isOther: true } },
+      }
+    });
+
+    const totalStudents = students.length;
+    let highSchoolTotal = 0;
+    let universityTotal = 0;
+
+    const highSchoolBreakdown = {
+      system: {} as Record<string, number>,
+      grade: {} as Record<string, number>,
+      branch: {} as Record<string, number>,
+      path: {} as Record<string, number>,
+    };
+
+    const universityBreakdown = {
+      university: {} as Record<string, number>,
+      faculty: {} as Record<string, number>,
+      department: {} as Record<string, number>,
+      program: {} as Record<string, number>,
+    };
+
+    for (const student of students) {
+      if (student.educationLevel === 'HIGH_SCHOOL') {
+        highSchoolTotal++;
+        if (student.highSchoolSystem) {
+          highSchoolBreakdown.system[student.highSchoolSystem] = (highSchoolBreakdown.system[student.highSchoolSystem] || 0) + 1;
+        }
+        if (student.highSchoolGrade) {
+          highSchoolBreakdown.grade[student.highSchoolGrade] = (highSchoolBreakdown.grade[student.highSchoolGrade] || 0) + 1;
+        }
+        if (student.traditionalBranch) {
+          highSchoolBreakdown.branch[student.traditionalBranch] = (highSchoolBreakdown.branch[student.traditionalBranch] || 0) + 1;
+        }
+        if (student.baccalaureatePath) {
+          highSchoolBreakdown.path[student.baccalaureatePath] = (highSchoolBreakdown.path[student.baccalaureatePath] || 0) + 1;
+        }
+      } else if (student.educationLevel === 'UNIVERSITY') {
+        universityTotal++;
+        const uniName = student.academicUniversity?.nameAr || student.academicUniversity?.nameEn || student.otherUniversityName || 'Unknown';
+        universityBreakdown.university[uniName] = (universityBreakdown.university[uniName] || 0) + 1;
+
+        const facName = student.academicFaculty?.nameAr || student.academicFaculty?.nameEn || student.otherFacultyName || 'Unknown';
+        universityBreakdown.faculty[facName] = (universityBreakdown.faculty[facName] || 0) + 1;
+
+        const depName = student.academicDepartment?.nameAr || student.academicDepartment?.nameEn || student.otherDepartmentName || 'Unknown';
+        if (depName !== 'Unknown') {
+          universityBreakdown.department[depName] = (universityBreakdown.department[depName] || 0) + 1;
+        }
+
+        const progName = student.academicProgram?.nameAr || student.academicProgram?.nameEn || student.otherProgramName || 'Unknown';
+        if (progName !== 'Unknown') {
+          universityBreakdown.program[progName] = (universityBreakdown.program[progName] || 0) + 1;
+        }
+      }
+    }
+
+    return {
+      totalStudents,
+      highSchoolTotal,
+      universityTotal,
+      highSchoolBreakdown,
+      universityBreakdown,
+    };
+  }
+
   async getUserById(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
