@@ -28,8 +28,6 @@ export class ActivationCodesService {
         whereClause.status = 'UNUSED';
       } else if (status === 'REDEEMED') {
         whereClause.status = 'REDEEMED';
-      } else if (status === 'DEACTIVATED') {
-        whereClause.deletedAt = { not: null };
       }
     }
     if (targetType && targetType !== 'All') {
@@ -127,18 +125,6 @@ export class ActivationCodesService {
 
     return this.prisma.$transaction(async (tx) => {
       await tx.activationCode.delete({ where: { id } });
-
-      await tx.activationCodeHistory.create({
-        data: {
-          codeId: id,
-          code: code.code,
-          action: 'REVOKED',
-          oldStatus: CodeStatus.UNUSED,
-          newStatus: CodeStatus.UNUSED,
-          actorId: actorId ?? null,
-        },
-      });
-
       return { message: 'Code deactivated successfully.' };
     });
   }
