@@ -72,9 +72,9 @@ export class CoursesController {
   @Roles(Role.STUDENT)
   @UseGuards(LevelIsolationGuard)
   @Get('student')
-  getCoursesForStudent(@Req() req: RequestWithUser) {
+  getCoursesForStudent(@Req() req: RequestWithUser, @Query('includeMaterialsOnly') includeMaterialsOnly?: string) {
     const user = req.user;
-    return this.coursesService.getCoursesForStudent(user.sub);
+    return this.coursesService.getCoursesForStudent(user.sub, includeMaterialsOnly === 'true');
   }
 
   @Roles(Role.ADMIN)
