@@ -41,7 +41,7 @@ export class CoursesController {
 
   // --- EXISTING CRUD OPERATIONS ---
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Get()
   findAll(
     @Req() req: RequestWithUser,
@@ -77,7 +77,7 @@ export class CoursesController {
     return this.coursesService.getCoursesForStudent(user.sub);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Post()
   create(
     @Body() createCourseDto: CreateCourseDto,
@@ -99,7 +99,7 @@ export class CoursesController {
     return this.coursesService.findAllForStudents(userProfile.educationLevel);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @UseInterceptors(InstructorOwnershipInterceptor)
   @Delete(':id/instructors/:targetInstructorId')
   removeInstructor(
@@ -115,28 +115,28 @@ export class CoursesController {
     );
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @UseInterceptors(InstructorOwnershipInterceptor)
   @Post(':id/attachments')
   addAttachments(@Param('id', ParseUUIDPipe) id: string, @Body() body: { attachments: { title: string; fileUrl: string }[] }, @Req() req: RequestWithUser) {
     return this.coursesService.addAttachments(id, body.attachments, req.user.sub, req.user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @UseInterceptors(InstructorOwnershipInterceptor)
   @Post(':id/intro')
   updateIntro(@Param('id', ParseUUIDPipe) id: string, @Body() body: { url: string }, @Req() req: RequestWithUser) {
     return this.coursesService.updateIntro(id, body.url, req.user.sub, req.user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @UseInterceptors(InstructorOwnershipInterceptor)
   @Patch(':id/publish')
   publish(@Param('id', ParseUUIDPipe) id: string, @Req() req: RequestWithUser) {
     return this.coursesService.publish(id, req.user.sub, req.user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @UseInterceptors(InstructorOwnershipInterceptor)
   @Patch(':id/unpublish')
   unpublish(@Param('id', ParseUUIDPipe) id: string, @Req() req: RequestWithUser) {
@@ -148,7 +148,7 @@ export class CoursesController {
     return this.coursesService.findOne(id);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @UseInterceptors(InstructorOwnershipInterceptor)
   @Get(':id/builder')
   getBuilderData(@Param('id', ParseUUIDPipe) id: string, @Req() req: RequestWithUser) {
@@ -156,7 +156,7 @@ export class CoursesController {
     return this.coursesService.getBuilderData(id, user.sub, user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @UseInterceptors(InstructorOwnershipInterceptor)
   @Put(':id')
   update(
@@ -168,7 +168,7 @@ export class CoursesController {
     return this.coursesService.update(id, updateCourseDto, user.sub, user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Post(':id/thumbnail')
   @UseInterceptors(
     InstructorOwnershipInterceptor,
@@ -188,7 +188,7 @@ export class CoursesController {
     return { message: 'Course thumbnail updated successfully', url };
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @UseInterceptors(InstructorOwnershipInterceptor)
   @Put(':id/status')
   updateStatus(
@@ -210,7 +210,7 @@ export class CoursesController {
     return this.coursesService.transferOwnership(id, newOwnerEmail);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @UseInterceptors(InstructorOwnershipInterceptor)
   @Delete(':id')
   remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: RequestWithUser) {

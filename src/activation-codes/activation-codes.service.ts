@@ -245,6 +245,10 @@ export class ActivationCodesService {
         const course = await tx.course.findUnique({ where: { id: dto.targetId } });
         if (!course) throw new NotFoundException('Course not found.');
 
+        if (course.type === 'MATERIALS_ONLY') {
+          throw new ForbiddenException('Materials-only courses cannot be enrolled using a course code.');
+        }
+
         const existingAccess = await tx.studentCourseAccess.findFirst({
           where: { studentId, courseId: dto.targetId, },
         });
@@ -278,7 +282,7 @@ export class ActivationCodesService {
           },
         });
       } else if (dto.targetType === 'FILE' || dto.targetType === 'COURSE_FILES') {
-        const eligibleCourses = await this.coursesService.getCoursesForStudent(studentId);
+        const eligibleCourses = await this.coursesService.getCoursesForStudent(studentId, true);
         const eligibleCourseIds = eligibleCourses.map(c => c.id);
 
         let attachment: any = null;

@@ -115,6 +115,7 @@ export class CoursesService {
         targetFacultyId: dto.targetFacultyId !== undefined ? normalize(dto.targetFacultyId) : null,
         targetDepartmentId: dto.targetDepartmentId !== undefined ? normalize(dto.targetDepartmentId) : null,
         targetProgramId: dto.targetProgramId !== undefined ? normalize(dto.targetProgramId) : null,
+        type: dto.type || 'NORMAL',
         targetGroups: dto.targetGroups ? {
           create: dto.targetGroups.map(g => ({
             targetHighSchoolSystem: g.targetHighSchoolSystem !== undefined ? normalize(g.targetHighSchoolSystem) : null,
@@ -181,9 +182,10 @@ export class CoursesService {
       } else if (role === Role.STUDENT && userId) {
         const dbUser = await this.prisma.user.findUnique({ where: { id: userId } });
         if (dbUser) {
-          // Regular student: filter by their education level and segmentation
+          // Regular student: filter by their education level, segmentation and course type
           whereClause.AND = [
             { audienceType: dbUser.educationLevel },
+            { type: 'NORMAL' },
             ...this.getStudentTargetingCondition(dbUser)
           ];
         }
@@ -683,7 +685,7 @@ export class CoursesService {
     return this.prisma.course.delete({ where: { id } });
   }
 
-  async getCoursesForStudent(userId: string) {
+  async getCoursesForStudent(userId: string, includeMaterialsOnly = false) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
@@ -697,6 +699,7 @@ export class CoursesService {
     return this.prisma.course.findMany({
       where: {
         status: 'PUBLISHED',
+        ...(includeMaterialsOnly ? {} : { type: 'NORMAL' }),
         ...(isDemo ? {} : {
           AND: [
             { audienceType: user.educationLevel },
@@ -739,6 +742,7 @@ export class CoursesService {
   async getPublishedCourses(audienceType?: any) {
     const whereClause: any = {
       status: 'PUBLISHED',
+      type: 'NORMAL',
       };
     if (audienceType) {
       whereClause.audienceType = audienceType;
@@ -785,6 +789,7 @@ export class CoursesService {
       where: {
         audienceType: level,
         status: 'PUBLISHED',
+        type: 'NORMAL',
         },
       include: {
         instructors: {

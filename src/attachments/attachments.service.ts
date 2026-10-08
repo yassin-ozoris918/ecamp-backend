@@ -38,14 +38,18 @@ export class AttachmentsService {
   async hasFileAccess(studentId: string, attachmentId: string): Promise<boolean> {
     const attachment = await this.prisma.attachment.findUnique({
       where: { id: attachmentId, deletedAt: null },
-      include: { lecture: true },
+      include: { lecture: { include: { course: true } } },
     });
-    if (!attachment || !attachment.lecture || !attachment.lecture.courseId) return false;
+    if (!attachment || !attachment.lecture || !attachment.lecture.courseId || !attachment.lecture.course) return false;
 
-    // Must be eligible for the course
-    const eligibleCourses = await this.coursesService.getCoursesForStudent(studentId);
+    // Must be eligible for the course (this checks targeting)
+    const eligibleCourses = await this.coursesService.getCoursesForStudent(studentId, true);
     if (!eligibleCourses.some(c => c.id === attachment.lecture.courseId)) {
       return false;
+    }
+
+    if (attachment.lecture.course.type === 'MATERIALS_ONLY') {
+      return true;
     }
 
     const lectureAccess = await this.prisma.studentLectureAccess.findFirst({
@@ -73,7 +77,7 @@ export class AttachmentsService {
   }
 
   async getFilesForStudent(studentId: string, search?: string, courseId?: string, accessFilter?: string) {
-    const eligibleCourses = await this.coursesService.getCoursesForStudent(studentId);
+    const eligibleCourses = await this.coursesService.getCoursesForStudent(studentId, true);
     const eligibleCourseIds = eligibleCourses.map(c => c.id);
 
     if (courseId && !eligibleCourseIds.includes(courseId)) {
@@ -90,7 +94,7 @@ export class AttachmentsService {
         ...(search ? { title: { contains: search, mode: 'insensitive' } } : {}),
       },
       include: {
-        lecture: { select: { id: true, title: true, course: { select: { id: true, title: true } } } },
+        lecture: { select: { id: true, title: true, course: { select: { id: true, title: true, type: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -113,11 +117,15 @@ export class AttachmentsService {
       let accessStatus = 'LOCKED';
       let accessSource: string | null = null;
       
+      const courseType = attachment.lecture?.course?.type;
       const courseId = attachment.lecture?.course?.id;
       if (!courseId || !attachment.lecture) return null; // Skip attachments that somehow don't belong to a lecture or course
 
       const hasCourseAccess = courseAccesses.some(ca => ca.courseId === courseId);
-      if (hasCourseAccess) {
+      if (courseType === 'MATERIALS_ONLY') {
+        accessStatus = 'UNLOCKED';
+        accessSource = 'MATERIALS_ONLY';
+      } else if (hasCourseAccess) {
         accessStatus = 'UNLOCKED';
         accessSource = 'COURSE';
       } else {

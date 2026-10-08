@@ -20,7 +20,7 @@ export class CertificatesController {
   constructor(private readonly certificatesService: CertificatesService) {}
 
   // Instructor manually issues a certificate to a student
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Post('issue')
   issueCertificate(
     @Body() body: { studentEmail: string; courseId: string },
@@ -35,7 +35,7 @@ export class CertificatesController {
   }
 
   // Instructor views certificates for a course
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Get('course/:courseId')
   getCertificatesForCourse(@Param('courseId') courseId: string) {
     return this.certificatesService.getCertificatesForCourse(courseId);

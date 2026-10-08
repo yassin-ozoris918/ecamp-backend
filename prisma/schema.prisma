@@ -65,6 +65,11 @@ enum ActivationCodeType {
   COURSE_FILES
 }
 
+enum CourseType {
+  NORMAL
+  MATERIALS_ONLY
+}
+
 enum CourseStatus {
   DRAFT
   PUBLISHED
@@ -201,6 +206,7 @@ model Course {
   id                       String         @id @default(uuid())
   title                    String
   description              String?
+  type                     CourseType     @default(NORMAL)
   thumbnailUrl             String?
   thumbnailMediaId         String?        @unique
   thumbnailMedia           Media?         @relation("CourseThumbnail", fields: [thumbnailMediaId], references: [id], onDelete: SetNull)

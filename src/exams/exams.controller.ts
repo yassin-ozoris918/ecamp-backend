@@ -32,7 +32,7 @@ export class ExamsController {
 
   // --- INSTRUCTOR/ADMIN ENDPOINTS ---
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Post()
   createExam(
     @Body() body: CreateExamDto,
@@ -41,7 +41,7 @@ export class ExamsController {
     return this.examsService.createExam(body, req.user.sub, req.user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Put(':id')
   updateExam(
     @Param('id') id: string,
@@ -51,7 +51,7 @@ export class ExamsController {
     return this.examsService.updateExam(id, body, req.user.sub, req.user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Get('admin/:id')
   async getAdminExam(@Param('id') id: string, @Req() req: RequestWithUser) {
     return this.examsService.getAdminExam(id, req.user.sub, req.user.role);
@@ -71,13 +71,13 @@ export class ExamsController {
     return this.examsService.addQuestion(examId, body, req.user.sub, req.user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Get('course/:courseId')
   getExamsForCourse(@Param('courseId') courseId: string) {
     return this.examsService.getExamsForCourse(courseId);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Put(':id/publish')
   publishExam(
     @Param('id') examId: string,
@@ -87,7 +87,7 @@ export class ExamsController {
     return this.examsService.publishExam(examId, isPublished, req.user.sub, req.user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Delete(':id')
   deleteExam(@Param('id') examId: string, @Req() req: RequestWithUser) {
     return this.examsService.deleteExam(examId, req.user.sub, req.user.role);
@@ -117,7 +117,7 @@ export class ExamsController {
 
   // --- INSTRUCTOR GRADING ---
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Put('attempts/:attemptId/grade')
   gradePendingEssays(
     @Param('attemptId') attemptId: string,
@@ -133,7 +133,7 @@ export class ExamsController {
     );
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Post('attempts/:id/evaluate-subjective')
   evaluateSubjective(
     @Param('id') attemptId: string,
@@ -141,7 +141,7 @@ export class ExamsController {
     return this.aiService.evaluateSubjectiveAnswers(attemptId);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Patch('responses/:responseId/override')
   overrideScore(
     @Param('responseId') responseId: string,

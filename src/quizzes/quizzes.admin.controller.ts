@@ -31,7 +31,7 @@ export class QuizzesAdminController {
     return this.quizzesService.syncQuizQuestions(id, body.questions, req.user.sub, req.user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Post('questions')
   async addManualQuestion(@Body() dto: CreateQuizQuestionDto) {
     return this.prisma.quizQuestion.create({
@@ -52,7 +52,7 @@ export class QuizzesAdminController {
     });
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Delete('questions/:id')
   async deleteQuestion(@Param('id') id: string) {
     return this.prisma.quizQuestion.delete({ where: { id } });
@@ -65,7 +65,7 @@ export class QuizzesAdminController {
    * Lightweight paginated list of submitted attempts for a quiz.
    * Accessible by INSTRUCTOR (own courses only) and ADMIN.
    */
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Get(':quizId/attempts')
   async getQuizAttempts(
     @Param('quizId') quizId: string,
@@ -95,7 +95,7 @@ export class QuizzesAdminController {
    * IMPORTANT: This route must be declared BEFORE the generic :id route
    * to avoid 'attempts' being matched as a quiz ID.
    */
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Get('attempts/:attemptId/review')
   async getAttemptReview(
     @Param('attemptId') attemptId: string,
@@ -112,7 +112,7 @@ export class QuizzesAdminController {
    * GET /admin/quizzes/attempts/:attemptId/responses
    * (legacy raw endpoint — kept for backward compatibility)
    */
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Get('attempts/:attemptId/responses')
   async getAttemptResponses(@Param('attemptId') attemptId: string, @Req() req: RequestWithUser) {
     const attempt = await this.prisma.quizAttempt.findUnique({
@@ -131,7 +131,7 @@ export class QuizzesAdminController {
     return attempt.responses;
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Patch('responses/:responseId/override')
   async overrideScore(
     @Param('responseId') responseId: string,

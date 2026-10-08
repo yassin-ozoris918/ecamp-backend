@@ -301,13 +301,38 @@ export class LecturesService {
   }
 
   // --- Phase D: Secure Streaming Token ---
-  async getSecureStreamToken(sessionId: string, studentId: string) {
+  async getSecureStreamToken(sessionId: string, studentId: string, role?: Role) {
     const session = await this.prisma.session.findUnique({
       where: { id: sessionId, },
       include: { lecture: true },
     });
 
     if (!session) throw new NotFoundException('Session not found');
+
+    if (role === Role.INSTRUCTOR) {
+      await this.verifyCourseOwnership(session.lecture.courseId, studentId, role);
+      // Instructor bypasses all time limits and view limits
+      let videoId = session.videoUrl;
+      if (!videoId) throw new NotFoundException('Video not found');
+      
+      if (
+        videoId.startsWith('/uploads/') || 
+        videoId.startsWith('http://') || 
+        videoId.startsWith('https://')
+      ) {
+        if (!videoId.includes('cloudflarestream.com')) {
+          return { playbackUrl: videoId, playbackSessionId: 'instructor-bypass' };
+        }
+      }
+      if (videoId.includes('cloudflarestream.com')) {
+        const match = videoId.match(/([a-f0-9]{32})/);
+        if (match) videoId = match[1];
+      }
+      return {
+        playbackUrl: this.cloudflareService.generateSignedUrl(videoId),
+        playbackSessionId: 'instructor-bypass',
+      };
+    }
 
     // --- Demo account bypass: skip all access, expiry, and view-limit checks ---
     const student = await this.prisma.user.findUnique({ where: { id: studentId } });

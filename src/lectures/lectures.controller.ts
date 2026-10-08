@@ -17,6 +17,7 @@ import { imageFileFilter, UPLOAD_LIMITS } from '../common/config/upload.config';
 import { StorageService } from '../storage/storage.service';
 import { LecturesService } from './lectures.service';
 import { CreateLectureDto } from './dto/create-lecture.dto';
+import { UpdateLectureDto } from './dto/update-lecture.dto';
 import { ReorderItemsPayloadDto } from './dto/reorder-items.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -38,7 +39,7 @@ export class LecturesController {
     private readonly viewLimitService: ViewLimitService,
   ) {}
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Post()
   create(@Body() dto: CreateLectureDto, @Req() req: RequestWithUser) {
     const user = req.user;
@@ -46,25 +47,28 @@ export class LecturesController {
   }
 
   // Get secure playback token for Cloudflare + view-limit check + playback session token
-  @Roles(Role.STUDENT)
+  @Roles(Role.STUDENT, Role.INSTRUCTOR)
   @UseGuards(DeviceRestrictionGuard)
   @Get('sessions/:id/stream-token')
   getSecureStreamToken(@Param('id') id: string, @Req() req: RequestWithUser) {
     const user = req.user;
-    return this.lecturesService.getSecureStreamToken(id, user.sub);
+    return this.lecturesService.getSecureStreamToken(id, user.sub, user.role);
   }
 
   // Get view status for a specific session (used by frontend to show usage)
-  @Roles(Role.STUDENT)
+  @Roles(Role.STUDENT, Role.INSTRUCTOR)
   @UseGuards(DeviceRestrictionGuard)
   @Get('sessions/:id/view-status')
   getViewStatus(@Param('id') id: string, @Req() req: RequestWithUser) {
+    if (req.user.role === Role.INSTRUCTOR) {
+      return { usedViews: 0, maxViews: null, grantedViews: 0, effectiveMaxViews: null, isExhausted: false };
+    }
     return this.viewLimitService.getViewStatus(id, req.user.sub);
   }
 
   // Consume one view for a session (called when threshold is reached)
   // Uses playbackSessionId for idempotency — safe to retry.
-  @Roles(Role.STUDENT)
+  @Roles(Role.STUDENT, Role.INSTRUCTOR)
   @UseGuards(DeviceRestrictionGuard)
   @Post('sessions/:id/consume-view')
   consumeView(
@@ -72,6 +76,9 @@ export class LecturesController {
     @Body() body: { playbackSessionId: string },
     @Req() req: RequestWithUser,
   ) {
+    if (req.user.role === Role.INSTRUCTOR) {
+      return { usedViews: 0, maxViews: null };
+    }
     if (!body.playbackSessionId) {
       throw new BadRequestException('playbackSessionId is required.');
     }
@@ -83,10 +90,13 @@ export class LecturesController {
     return this.lecturesService.findByCourse(courseId);
   }
 
-  @Roles(Role.STUDENT)
+  @Roles(Role.STUDENT, Role.INSTRUCTOR)
   @Post(':id/start-access')
   startAccess(@Param('id') id: string, @Req() req: RequestWithUser) {
     const user = req.user;
+    if (user.role === Role.INSTRUCTOR) {
+      return { success: true, isStarted: true, activatedAt: new Date(), expiresAt: null };
+    }
     return this.lecturesService.startAccess(id, user.sub);
   }
 
@@ -95,25 +105,25 @@ export class LecturesController {
     return this.lecturesService.findOne(id);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Put(':id')
   update(
     @Param('id') id: string,
-    @Body() dto: Partial<CreateLectureDto>,
+    @Body() dto: UpdateLectureDto,
     @Req() req: RequestWithUser,
   ) {
     const user = req.user;
     return this.lecturesService.update(id, dto, user.sub, user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Delete(':id')
   remove(@Param('id') id: string, @Req() req: RequestWithUser) {
     const user = req.user;
     return this.lecturesService.remove(id, user.sub, user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Put(':id/reorder')
   reorder(
     @Param('id') id: string,
@@ -124,7 +134,7 @@ export class LecturesController {
     return this.lecturesService.reorder(id, dto.items, user.sub, user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Post(':id/thumbnail')
   @UseInterceptors(
     FileInterceptor('file', {

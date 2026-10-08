@@ -36,7 +36,7 @@ export class SessionsController {
 
   // --- EXISTING CRUD OPERATIONS ---
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Post()
   create(@Body() dto: CreateSessionDto, @Req() req: RequestWithUser) {
     const user = req.user;
@@ -54,7 +54,7 @@ export class SessionsController {
     return this.sessionsService.findOne(id);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Put(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
@@ -65,7 +65,7 @@ export class SessionsController {
     return this.sessionsService.update(id, dto, user.sub, user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Delete(':id')
   remove(@Param('id', ParseUUIDPipe) id: string, @Req() req: RequestWithUser) {
     const user = req.user;
@@ -74,7 +74,7 @@ export class SessionsController {
 
   // --- NEW PHASE 14 VIDEO UPLOAD OPERATION ---
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Post(':id/video/upload/init')
   async initUpload(
     @Param('id', ParseUUIDPipe) id: string,
@@ -106,7 +106,7 @@ export class SessionsController {
     return { uploadUrl, objectKey, assetUrl, expiresIn: 3600 };
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Post(':id/video/upload/complete')
   async completeUpload(
     @Param('id', ParseUUIDPipe) id: string,
@@ -138,7 +138,7 @@ export class SessionsController {
     };
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Post(':id/upload-video')
   @UseInterceptors(
     FileInterceptor('video', {

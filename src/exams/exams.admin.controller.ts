@@ -21,13 +21,13 @@ export class ExamsAdminController {
   ) {}
 
   @Put(':id')
-  @Roles(Role.ADMIN, Role.INSTRUCTOR)
+  @Roles(Role.ADMIN)
   async updateExam(@Param('id') id: string, @Body() dto: UpdateExamDto, @Req() req: RequestWithUser) {
     return this.examsService.updateExam(id, dto, req.user.sub, req.user.role);
   }
 
   @Post(':id/extract')
-  @Roles(Role.ADMIN, Role.INSTRUCTOR)
+  @Roles(Role.ADMIN)
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: UPLOAD_LIMITS.EXAM },
@@ -52,7 +52,7 @@ export class ExamsAdminController {
   }
 
   @Post('attempts/:attemptId/evaluate-ai')
-  @Roles(Role.ADMIN, Role.INSTRUCTOR)
+  @Roles(Role.ADMIN)
   async evaluateAttemptAi(@Param('attemptId') attemptId: string, @Req() req: RequestWithUser) {
     const attempt = await this.prisma.examAttempt.findUnique({
       where: { id: attemptId },
@@ -66,7 +66,7 @@ export class ExamsAdminController {
   }
 
   @Patch('responses/:responseId/override')
-  @Roles(Role.ADMIN, Role.INSTRUCTOR)
+  @Roles(Role.ADMIN)
   async overrideScore(
     @Param('responseId') responseId: string,
     @Body('points') points: number,

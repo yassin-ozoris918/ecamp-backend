@@ -76,6 +76,7 @@ describe('View Limit System (e2e)', () => {
         studyLanguage: StudyLanguage.ARABIC,
         highSchoolGrade: HighSchoolGrade.GRADE_2,
         traditionalBranch: TraditionalBranch.SCIENCE,
+        deviceId: 'test-device-id',
       },
     });
     studentId = student.id;
@@ -152,6 +153,7 @@ describe('View Limit System (e2e)', () => {
     const res = await request(app.getHttpServer())
       .get(`/lectures/sessions/${sessionId}/stream-token`)
       .set('Authorization', `Bearer ${studentToken}`)
+      .set('x-device-id', 'test-device-id')
       .expect(200);
     return res.body;
   }
@@ -160,6 +162,7 @@ describe('View Limit System (e2e)', () => {
     return request(app.getHttpServer())
       .post(`/lectures/sessions/${sessionId}/consume-view`)
       .set('Authorization', `Bearer ${studentToken}`)
+      .set('x-device-id', 'test-device-id')
       .send({ playbackSessionId });
   }
 
@@ -167,7 +170,9 @@ describe('View Limit System (e2e)', () => {
     const res = await request(app.getHttpServer())
       .get(`/lectures/sessions/${sessionId}/view-status`)
       .set('Authorization', `Bearer ${studentToken}`)
-      .expect(200);
+      .set('x-device-id', 'test-device-id');
+    if (res.status !== 200) console.log('[DEBUG 403]', res.status, res.body);
+    expect(res.status).toBe(200);
     return res.body as { usedViews: number; maxViews: number | null; isExhausted: boolean };
   }
 
@@ -262,6 +267,7 @@ describe('View Limit System (e2e)', () => {
     await request(app.getHttpServer())
       .get(`/lectures/sessions/${sessionAId}/stream-token`)
       .set('Authorization', `Bearer ${studentToken}`)
+      .set('x-device-id', 'test-device-id')
       .expect(403);
   });
 
@@ -277,6 +283,7 @@ describe('View Limit System (e2e)', () => {
     const res = await request(app.getHttpServer())
       .get(`/lectures/sessions/${sessionBId}/stream-token`)
       .set('Authorization', `Bearer ${studentToken}`)
+      .set('x-device-id', 'test-device-id')
       .expect(200);
     expect(res.body.playbackSessionId).toBeDefined();
   });
@@ -333,6 +340,7 @@ describe('View Limit System (e2e)', () => {
     const res = await request(app.getHttpServer())
       .get(`/lectures/sessions/${sessionAId}/stream-token`)
       .set('Authorization', `Bearer ${studentToken}`)
+      .set('x-device-id', 'test-device-id')
       .expect(200);
     expect(res.body.playbackSessionId).toBeDefined();
 
@@ -352,6 +360,7 @@ describe('View Limit System (e2e)', () => {
     await request(app.getHttpServer())
       .get(`/lectures/sessions/${sessionBId}/stream-token`)
       .set('Authorization', `Bearer ${studentToken}`)
+      .set('x-device-id', 'test-device-id')
       .expect(403); // usedViews(1) >= maxViews(1)
 
     // Usage is NOT reset

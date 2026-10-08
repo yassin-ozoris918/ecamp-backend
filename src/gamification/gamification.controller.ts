@@ -11,7 +11,7 @@ import type { RequestWithUser } from '../auth/interfaces/request-with-user.inter
 export class GamificationController {
   constructor(private readonly gamificationService: GamificationService) {}
 
-  @Roles(Role.STUDENT, Role.ADMIN, Role.INSTRUCTOR)
+  @Roles(Role.STUDENT, Role.ADMIN)
   @Get('leaderboard')
   getLeaderboard(@Query('limit') limit?: string) {
     const parsedLimit = limit ? parseInt(limit, 10) : 50;

@@ -8,7 +8,7 @@ import { Role } from '@prisma/client';
 import type { RequestWithUser } from '../auth/interfaces/request-with-user.interface';
 
 @UseGuards(AuthGuard('jwt'), RolesGuard)
-@Roles(Role.INSTRUCTOR, Role.ADMIN)
+@Roles(Role.ADMIN)
 @Controller('reorder')
 export class ReorderController {
   constructor(private readonly reorderService: ReorderService) {}

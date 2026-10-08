@@ -12,25 +12,25 @@ import type { RequestWithUser } from '../auth/interfaces/request-with-user.inter
 export class ChaptersController {
   constructor(private readonly chaptersService: ChaptersService) {}
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Post()
   create(@Body() dto: CreateChapterDto, @Req() req: RequestWithUser) {
     return this.chaptersService.create(dto, req.user.sub, req.user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Get('course/:courseId')
   findAllByCourse(@Param('courseId') courseId: string) {
     return this.chaptersService.findAllByCourse(courseId);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Put(':id')
   update(@Param('id') id: string, @Body() dto: UpdateChapterDto, @Req() req: RequestWithUser) {
     return this.chaptersService.update(id, dto, req.user.sub, req.user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Delete(':id')
   remove(@Param('id') id: string, @Req() req: RequestWithUser) {
     return this.chaptersService.remove(id, req.user.sub, req.user.role);

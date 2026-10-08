@@ -18,7 +18,7 @@ export class CourseAttachmentsController {
 
   @Post()
   @UseGuards(RolesGuard)
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @UseInterceptors(
     FileInterceptor('file', {
       limits: { fileSize: UPLOAD_LIMITS.ATTACHMENT },
@@ -47,7 +47,7 @@ export class CourseAttachmentsController {
 
   @Delete(':id')
   @UseGuards(RolesGuard)
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   async deleteAttachment(@Param('id') id: string, @Req() req: RequestWithUser) {
     return this.courseAttachmentsService.delete(id, req.user.sub, req.user.role);
   }

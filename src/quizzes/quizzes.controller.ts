@@ -29,14 +29,14 @@ export class QuizzesController {
 
   // --- INSTRUCTOR/ADMIN ENDPOINTS ---
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Post()
   createQuiz(@Body() dto: CreateQuizDto, @Req() req: RequestWithUser) {
     const user = req.user;
     return this.quizzesService.createQuiz(dto, user.sub, user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Put(':id')
   updateQuiz(
     @Param('id', ParseUUIDPipe) id: string,
@@ -47,14 +47,14 @@ export class QuizzesController {
     return this.quizzesService.updateQuiz(id, dto, user.sub, user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Delete(':id')
   deleteQuiz(@Param('id', ParseUUIDPipe) id: string, @Req() req: RequestWithUser) {
     const user = req.user;
     return this.quizzesService.deleteQuiz(id, user.sub, user.role);
   }
 
-  @Roles(Role.INSTRUCTOR, Role.ADMIN)
+  @Roles(Role.ADMIN)
   @Post('questions')
   addQuestion(@Body() dto: AddQuestionDto, @Req() req: RequestWithUser) {
     const user = req.user;

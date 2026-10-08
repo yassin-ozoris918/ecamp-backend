@@ -1,6 +1,6 @@
 import { IsNotEmpty, IsOptional, IsString, IsEnum, IsBoolean, ValidateNested, IsArray } from 'class-validator';
 import { Type } from 'class-transformer';
-import { EducationLevel, HighSchoolSystem, StudyMode, StudyLanguage, HighSchoolGrade, TraditionalBranch, BaccalaureatePath } from '@prisma/client';
+import { EducationLevel, HighSchoolSystem, StudyMode, StudyLanguage, HighSchoolGrade, TraditionalBranch, BaccalaureatePath, CourseType } from '@prisma/client';
 
 export class CourseTargetGroupDto {
   @IsOptional()
@@ -60,6 +60,10 @@ export class CreateCourseDto {
   @IsOptional()
   @IsBoolean()
   isFree?: boolean;
+
+  @IsOptional()
+  @IsEnum(CourseType)
+  type?: CourseType;
 
   @IsOptional()
   @IsEnum(HighSchoolSystem)
