@@ -41,7 +41,7 @@ export class CoursesController {
 
   // --- EXISTING CRUD OPERATIONS ---
 
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.INSTRUCTOR)
   @Get()
   findAll(
     @Req() req: RequestWithUser,
