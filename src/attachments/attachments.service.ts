@@ -48,10 +48,6 @@ export class AttachmentsService {
       return false;
     }
 
-    if (attachment.lecture.course.type === 'MATERIALS_ONLY') {
-      return true;
-    }
-
     const lectureAccess = await this.prisma.studentLectureAccess.findFirst({
       where: { studentId, lectureId: attachment.lectureId },
     });
@@ -122,10 +118,7 @@ export class AttachmentsService {
       if (!courseId || !attachment.lecture) return null; // Skip attachments that somehow don't belong to a lecture or course
 
       const hasCourseAccess = courseAccesses.some(ca => ca.courseId === courseId);
-      if (courseType === 'MATERIALS_ONLY') {
-        accessStatus = 'UNLOCKED';
-        accessSource = 'MATERIALS_ONLY';
-      } else if (hasCourseAccess) {
+      if (hasCourseAccess) {
         accessStatus = 'UNLOCKED';
         accessSource = 'COURSE';
       } else {
