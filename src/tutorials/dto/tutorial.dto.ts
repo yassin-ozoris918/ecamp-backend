@@ -1,5 +1,6 @@
 import { IsString, IsOptional, IsInt, IsBoolean, IsEnum, IsArray, ValidateNested, IsUUID } from 'class-validator';
 import { Type } from 'class-transformer';
+import { PartialType } from '@nestjs/mapped-types';
 import { VideoSourceType, HighSchoolSystem, StudyMode, StudyLanguage, HighSchoolGrade, TraditionalBranch, BaccalaureatePath } from '@prisma/client';
 
 export class CreateCategoryDto {
@@ -112,4 +113,4 @@ export class CreateTutorialDto {
   targetGroups?: TargetGroupDto[];
 }
 
-export class UpdateTutorialDto extends CreateTutorialDto {}
+export class UpdateTutorialDto extends PartialType(CreateTutorialDto) {}
