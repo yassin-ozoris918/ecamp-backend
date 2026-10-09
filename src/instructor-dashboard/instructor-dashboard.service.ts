@@ -132,10 +132,11 @@ export class InstructorDashboardService {
     });
 
     const data = paginatedIds.map(id => {
-      const s = studentsData.find(u => u.id === id)!;
+      const s = studentsData.find(u => u.id === id);
+      if (!s) return null;
       return {
         ...s,
-        enrollmentDate: studentMap.get(s.id)
+        enrollmentDate: studentMap.get(id)
       };
     }).filter(Boolean);
 
