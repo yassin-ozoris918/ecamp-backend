@@ -53,10 +53,30 @@ export class InstructorDashboardService {
   async getCourseAnalytics(instructorId: string, courseId: string) {
     await this.checkCourseAssignment(instructorId, courseId);
     
-    const enrolledStudents = await this.prisma.studentCourseAccess.count({ where: { courseId } });
+    const courseAccessStudents = await this.prisma.studentCourseAccess.findMany({
+      where: { courseId },
+      select: { studentId: true }
+    });
+    
+    const lectureAccessStudents = await this.prisma.studentLectureAccess.groupBy({
+      by: ['studentId'],
+      where: { lecture: { courseId } }
+    });
+
+    const fullCourseStudentsSet = new Set(courseAccessStudents.map(s => s.studentId));
+    const lectureAccessStudentsSet = new Set(lectureAccessStudents.map(s => s.studentId));
+
+    const uniqueStudents = new Set([
+      ...fullCourseStudentsSet,
+      ...lectureAccessStudentsSet
+    ]);
+    const enrolledStudents = uniqueStudents.size;
+    const fullCourseEnrolled = fullCourseStudentsSet.size;
+    const lectureOnlyEnrolled = enrolledStudents - fullCourseEnrolled;
+
     const startedStudents = await this.prisma.studentLectureAccess.groupBy({
       by: ['studentId'],
-      where: { lecture: { courseId } },
+      where: { lecture: { courseId }, isStarted: true },
     });
     const studentsStarted = startedStudents.length;
 
@@ -67,6 +87,8 @@ export class InstructorDashboardService {
 
     return {
       enrolledStudents,
+      fullCourseEnrolled,
+      lectureOnlyEnrolled,
       studentsStarted,
       totalLectures,
       completedProgress,
@@ -78,19 +100,46 @@ export class InstructorDashboardService {
     await this.checkCourseAssignment(instructorId, courseId);
     const skip = (page - 1) * limit;
 
-    const [total, students] = await Promise.all([
-      this.prisma.studentCourseAccess.count({ where: { courseId } }),
-      this.prisma.studentCourseAccess.findMany({
-        where: { courseId },
-        skip,
-        take: limit,
-        include: {
-          student: { select: { id: true, fullName: true, email: true, profilePictureUrl: true, createdAt: true } }
-        }
-      })
-    ]);
+    const courseAccess = await this.prisma.studentCourseAccess.findMany({
+      where: { courseId },
+      select: { studentId: true, createdAt: true }
+    });
+    
+    const lectureAccess = await this.prisma.studentLectureAccess.findMany({
+      where: { lecture: { courseId } },
+      select: { studentId: true, createdAt: true },
+      orderBy: { createdAt: 'asc' }
+    });
 
-    return { data: students.map(s => ({ ...s.student, enrollmentDate: s.createdAt })), total, page, limit };
+    const studentMap = new Map<string, Date>();
+    courseAccess.forEach(a => studentMap.set(a.studentId, a.createdAt));
+    lectureAccess.forEach(a => {
+      if (!studentMap.has(a.studentId) || a.createdAt < studentMap.get(a.studentId)!) {
+        studentMap.set(a.studentId, a.createdAt);
+      }
+    });
+
+    const uniqueStudentIds = Array.from(studentMap.keys());
+    const total = uniqueStudentIds.length;
+    
+    const sortedIds = uniqueStudentIds.sort((a, b) => studentMap.get(b)!.getTime() - studentMap.get(a)!.getTime());
+    
+    const paginatedIds = sortedIds.slice(skip, skip + limit);
+    
+    const studentsData = await this.prisma.user.findMany({
+      where: { id: { in: paginatedIds } },
+      select: { id: true, fullName: true, email: true, profilePictureUrl: true, createdAt: true }
+    });
+
+    const data = paginatedIds.map(id => {
+      const s = studentsData.find(u => u.id === id)!;
+      return {
+        ...s,
+        enrollmentDate: studentMap.get(s.id)
+      };
+    }).filter(Boolean);
+
+    return { data, total, page, limit };
   }
 
   async getCourseLectures(instructorId: string, courseId: string) {
@@ -111,10 +160,22 @@ export class InstructorDashboardService {
   async getLectureAnalytics(instructorId: string, courseId: string, lectureId: string) {
     await this.checkCourseAssignment(instructorId, courseId);
     
-    const enrolledStudents = await this.prisma.studentCourseAccess.count({ where: { courseId } });
-    const watchedStudents = await this.prisma.studentLectureAccess.count({
-      where: { lectureId }
+    const courseAccessStudents = await this.prisma.studentCourseAccess.findMany({
+      where: { courseId },
+      select: { studentId: true }
     });
+    const thisLectureAccessStudents = await this.prisma.studentLectureAccess.findMany({
+      where: { lectureId },
+      select: { studentId: true, isStarted: true }
+    });
+
+    const uniqueEnrolledIds = new Set([
+      ...courseAccessStudents.map(s => s.studentId),
+      ...thisLectureAccessStudents.map(s => s.studentId)
+    ]);
+    const enrolledStudents = uniqueEnrolledIds.size;
+
+    const watchedStudents = thisLectureAccessStudents.filter(s => s.isStarted).length;
 
     return {
       enrolledStudents,
@@ -129,11 +190,12 @@ export class InstructorDashboardService {
     const skip = (page - 1) * limit;
 
     const [total, watchers] = await Promise.all([
-      this.prisma.studentLectureAccess.count({ where: { lectureId } }),
+      this.prisma.studentLectureAccess.count({ where: { lectureId, isStarted: true } }),
       this.prisma.studentLectureAccess.findMany({
-        where: { lectureId },
+        where: { lectureId, isStarted: true },
         skip,
         take: limit,
+        orderBy: { activatedAt: 'desc' },
         include: {
           student: { select: { id: true, fullName: true, email: true, profilePictureUrl: true } }
         }
@@ -147,19 +209,25 @@ export class InstructorDashboardService {
     await this.checkCourseAssignment(instructorId, courseId);
     const skip = (page - 1) * limit;
 
-    const courseStudents = await this.prisma.studentCourseAccess.findMany({
+    const courseAccess = await this.prisma.studentCourseAccess.findMany({
       where: { courseId },
       select: { studentId: true }
     });
-    const courseStudentIds = courseStudents.map(s => s.studentId);
-
-    const watchedStudents = await this.prisma.studentLectureAccess.findMany({
+    
+    const thisLectureAccess = await this.prisma.studentLectureAccess.findMany({
       where: { lectureId },
-      select: { studentId: true }
+      select: { studentId: true, isStarted: true }
     });
-    const watchedStudentIds = new Set(watchedStudents.map(s => s.studentId));
 
-    const unwatchedStudentIds = courseStudentIds.filter(id => !watchedStudentIds.has(id));
+    const canWatchIds = new Set([
+      ...courseAccess.map(s => s.studentId),
+      ...thisLectureAccess.map(s => s.studentId)
+    ]);
+
+    const watchedIds = new Set(thisLectureAccess.filter(s => s.isStarted).map(s => s.studentId));
+
+    const unwatchedStudentIds = Array.from(canWatchIds).filter(id => !watchedIds.has(id));
+    const total = unwatchedStudentIds.length;
     const paginatedIds = unwatchedStudentIds.slice(skip, skip + limit);
 
     const students = await this.prisma.user.findMany({
@@ -167,6 +235,6 @@ export class InstructorDashboardService {
       select: { id: true, fullName: true, email: true, profilePictureUrl: true }
     });
 
-    return { data: students, total: unwatchedStudentIds.length, page, limit };
+    return { data: students, total, page, limit };
   }
 }
