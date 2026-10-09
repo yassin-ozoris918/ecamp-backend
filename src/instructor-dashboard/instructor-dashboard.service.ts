@@ -58,9 +58,9 @@ export class InstructorDashboardService {
       select: { studentId: true }
     });
     
-    const lectureAccessStudents = await this.prisma.studentLectureAccess.groupBy({
-      by: ['studentId'],
-      where: { lecture: { courseId } }
+    const lectureAccessStudents = await this.prisma.studentLectureAccess.findMany({
+      where: { lecture: { courseId } },
+      select: { studentId: true }
     });
 
     const fullCourseStudentsSet = new Set(courseAccessStudents.map(s => s.studentId));
@@ -74,11 +74,11 @@ export class InstructorDashboardService {
     const fullCourseEnrolled = fullCourseStudentsSet.size;
     const lectureOnlyEnrolled = enrolledStudents - fullCourseEnrolled;
 
-    const startedStudents = await this.prisma.studentLectureAccess.groupBy({
-      by: ['studentId'],
+    const startedStudents = await this.prisma.studentLectureAccess.findMany({
       where: { lecture: { courseId }, isStarted: true },
+      select: { studentId: true }
     });
-    const studentsStarted = startedStudents.length;
+    const studentsStarted = new Set(startedStudents.map(s => s.studentId)).size;
 
     const totalLectures = await this.prisma.lecture.count({ where: { courseId } });
     const completedProgress = await this.prisma.sessionProgress.count({
