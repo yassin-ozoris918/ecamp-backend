@@ -73,3 +73,15 @@ export class InstructorDashboardController {
     return this.dashboardService.getLectureUnwatchedStudents(req.user.sub, courseId, lectureId, parseInt(page, 10), parseInt(limit, 10));
   }
 }
+
+@UseGuards(AuthGuard('jwt'), RolesGuard)
+@Roles(Role.INSTRUCTOR, Role.ADMIN)
+@Controller('instructor/dashboard')
+export class InstructorDashboardStatsController {
+  constructor(private readonly dashboardService: InstructorDashboardService) {}
+
+  @Get('stats')
+  async getDashboardStats(@Req() req: RequestWithUser) {
+    return this.dashboardService.getDashboardStats(req.user.sub);
+  }
+}

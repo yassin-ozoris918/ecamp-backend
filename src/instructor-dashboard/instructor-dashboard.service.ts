@@ -38,6 +38,44 @@ export class InstructorDashboardService {
     return assignments.map(a => a.course);
   }
 
+  async getDashboardStats(instructorId: string) {
+    const myCourses = await this.prisma.courseInstructor.findMany({
+      where: { instructorId },
+      select: { courseId: true }
+    });
+    const courseIds = myCourses.map(c => c.courseId);
+
+    const courseAccess = await this.prisma.studentCourseAccess.findMany({
+      where: { courseId: { in: courseIds } },
+      select: { studentId: true }
+    });
+    
+    const lectureAccess = await this.prisma.studentLectureAccess.findMany({
+      where: { lecture: { courseId: { in: courseIds } } },
+      select: { studentId: true }
+    });
+
+    const uniqueMyStudents = new Set([
+      ...courseAccess.map(a => a.studentId),
+      ...lectureAccess.map(a => a.studentId)
+    ]);
+    const myTotalStudents = uniqueMyStudents.size;
+
+    const totalHighSchoolStudents = await this.prisma.user.count({
+      where: { role: 'STUDENT', educationLevel: 'HIGH_SCHOOL', isDemo: false, deletedAt: null }
+    });
+
+    const totalUniversityStudents = await this.prisma.user.count({
+      where: { role: 'STUDENT', educationLevel: 'UNIVERSITY', isDemo: false, deletedAt: null }
+    });
+
+    return {
+      myTotalStudents,
+      totalHighSchoolStudents,
+      totalUniversityStudents
+    };
+  }
+
   async getCourseOverview(instructorId: string, courseId: string) {
     await this.checkCourseAssignment(instructorId, courseId);
     return this.prisma.course.findUnique({
