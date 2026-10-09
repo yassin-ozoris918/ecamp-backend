@@ -1088,6 +1088,7 @@ model AcademicUniversity {
   students    User[]               @relation("StudentUniversity")
   courses     Course[]             @relation("CourseTargetUniversity")
   courseTargetGroups CourseTargetGroup[] @relation("GroupTargetUniversity")
+  helpVideoTargetGroups HelpVideoTargetGroup[] @relation("HelpVideoTargetUniversity")
 
   @@index([sortOrder])
 }
@@ -1108,6 +1109,7 @@ model AcademicFaculty {
   students    User[]               @relation("StudentFaculty")
   courses     Course[]             @relation("CourseTargetFaculty")
   courseTargetGroups CourseTargetGroup[] @relation("GroupTargetFaculty")
+  helpVideoTargetGroups HelpVideoTargetGroup[] @relation("HelpVideoTargetFaculty")
 
   @@index([universityId])
 }
@@ -1129,6 +1131,7 @@ model AcademicDepartment {
   students   User[]             @relation("StudentDepartment")
   courses    Course[]           @relation("CourseTargetDepartment")
   courseTargetGroups CourseTargetGroup[] @relation("GroupTargetDepartment")
+  helpVideoTargetGroups HelpVideoTargetGroup[] @relation("HelpVideoTargetDepartment")
 
   @@index([facultyId])
   @@index([universityId])
@@ -1151,7 +1154,78 @@ model AcademicProgram {
   students   User[]              @relation("StudentProgram")
   courses    Course[]            @relation("CourseTargetProgram")
   courseTargetGroups CourseTargetGroup[] @relation("GroupTargetProgram")
+  helpVideoTargetGroups HelpVideoTargetGroup[] @relation("HelpVideoTargetProgram")
 
   @@index([departmentId])
   @@index([facultyId])
+}
+
+enum VideoSourceType {
+  CLOUDFLARE
+  EXTERNAL
+}
+
+model HelpCategory {
+  id          String      @id @default(uuid())
+  titleAr     String
+  titleEn     String
+  sortOrder   Int         @default(0)
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  videos      HelpVideo[]
+}
+
+model HelpVideo {
+  id             String          @id @default(uuid())
+  titleAr        String
+  titleEn        String
+  descriptionAr  String?
+  descriptionEn  String?
+  sourceType     VideoSourceType @default(CLOUDFLARE)
+  cloudflareId   String?
+  externalUrl    String?
+  thumbnailUrl   String?
+  sortOrder      Int             @default(0)
+  isActive       Boolean         @default(true)
+  isPublic       Boolean         @default(true) 
+  
+  categoryId     String
+  category       HelpCategory    @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  targetGroups   HelpVideoTargetGroup[]
+}
+
+model HelpVideoTargetGroup {
+  id             String     @id @default(uuid())
+  helpVideoId    String
+  helpVideo      HelpVideo  @relation(fields: [helpVideoId], references: [id], onDelete: Cascade)
+
+  targetHighSchoolSystem  HighSchoolSystem?
+  targetStudyMode         StudyMode?
+  targetStudyLanguage     StudyLanguage?
+  targetHighSchoolGrade   HighSchoolGrade?
+  targetTraditionalBranch TraditionalBranch?
+  targetBaccalaureatePath BaccalaureatePath?
+  targetUniversityId      String?
+  targetFacultyId         String?
+  targetDepartmentId      String?
+  targetProgramId         String?
+
+  targetUniversityRel AcademicUniversity? @relation("HelpVideoTargetUniversity", fields: [targetUniversityId], references: [id], onDelete: Restrict)
+  targetFacultyRel    AcademicFaculty?    @relation("HelpVideoTargetFaculty", fields: [targetFacultyId], references: [id], onDelete: Restrict)
+  targetDepartmentRel AcademicDepartment? @relation("HelpVideoTargetDepartment", fields: [targetDepartmentId], references: [id], onDelete: Restrict)
+  targetProgramRel    AcademicProgram?    @relation("HelpVideoTargetProgram", fields: [targetProgramId], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([helpVideoId])
+  @@index([targetUniversityId])
+  @@index([targetFacultyId])
+  @@index([targetDepartmentId])
+  @@index([targetProgramId])
 }

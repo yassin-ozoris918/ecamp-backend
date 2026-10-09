@@ -42,6 +42,7 @@ import { ReorderModule } from './reorder/reorder.module';
 import { ExportModule } from './export/export.module';
 import { ProfileUpdateRequestsModule } from './profile-update-requests/profile-update-requests.module';
 import { AcademicDataModule } from './academic-data/academic-data.module';
+import { TutorialsModule } from './tutorials/tutorials.module';
 
 @Module({
   imports: [
@@ -142,6 +143,7 @@ import { AcademicDataModule } from './academic-data/academic-data.module';
     ExportModule,
     ProfileUpdateRequestsModule,
     AcademicDataModule,
+    TutorialsModule,
   ],
   controllers: [AppController],
   providers: [
