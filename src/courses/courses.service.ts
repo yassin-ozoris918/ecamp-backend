@@ -526,23 +526,18 @@ export class CoursesService {
   }
 
   async assignInstructor(courseId: string, instructorId: string) {
-    const existing = await this.prisma.courseInstructor.findFirst({
-      where: { courseId, instructorId, },
+    const existingActive = await this.prisma.courseInstructor.findFirst({
+      where: { courseId, instructorId },
     });
     
-    if (existing && !existing.deletedAt) {
+    if (existingActive) {
       throw new ConflictException('This instructor is already assigned to this course.');
     }
 
-    if (existing && existing.deletedAt) {
-      return this.prisma.courseInstructor.update({
-        where: { courseId_instructorId: { courseId, instructorId } },
-        data: { deletedAt: null, assignedAt: new Date() }
-      });
-    }
-
-    return this.prisma.courseInstructor.create({
-      data: { courseId, instructorId },
+    return this.prisma.courseInstructor.upsert({
+      where: { courseId_instructorId: { courseId, instructorId } },
+      update: { deletedAt: null, assignedAt: new Date() },
+      create: { courseId, instructorId },
     });
   }
 
@@ -585,12 +580,13 @@ export class CoursesService {
 
     // Wrap in transaction: clear old instructors, set new one, log it
     return this.prisma.$transaction(async (tx) => {
-      await tx.courseInstructor.updateMany({
+      await tx.courseInstructor.deleteMany({
         where: { courseId, },
-        data: { deletedAt: new Date() },
       });
-      const newInstructor = await tx.courseInstructor.create({
-        data: { courseId, instructorId: userToAdd.id },
+      const newInstructor = await tx.courseInstructor.upsert({
+        where: { courseId_instructorId: { courseId, instructorId: userToAdd.id } },
+        update: { deletedAt: null, assignedAt: new Date() },
+        create: { courseId, instructorId: userToAdd.id },
       });
       await tx.auditLog.create({
         data: {
