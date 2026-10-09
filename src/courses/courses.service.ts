@@ -140,7 +140,10 @@ export class CoursesService {
       },
       include: {
         instructors: {
-          where: { instructor: { role: { not: Role.ADMIN } } },
+          where: { 
+            instructor: { role: { not: Role.ADMIN } },
+            deletedAt: null
+          },
           include: {
             instructor: {
               select: {
@@ -220,7 +223,10 @@ export class CoursesService {
         take,
         include: {
           instructors: {
-            where: { instructor: { role: { not: Role.ADMIN } } },
+            where: { 
+              instructor: { role: { not: Role.ADMIN } },
+              deletedAt: null
+            },
             include: {
               instructor: {
                 select: {
@@ -256,7 +262,10 @@ export class CoursesService {
           }
         },
         instructors: {
-          where: { instructor: { role: { not: Role.ADMIN } } },
+          where: { 
+            instructor: { role: { not: Role.ADMIN } },
+            deletedAt: null
+          },
           include: {
             instructor: {
               select: {
@@ -520,7 +529,17 @@ export class CoursesService {
     const existing = await this.prisma.courseInstructor.findFirst({
       where: { courseId, instructorId, },
     });
-    if (existing) throw new ConflictException('This instructor is already assigned to this course.');
+    
+    if (existing && !existing.deletedAt) {
+      throw new ConflictException('This instructor is already assigned to this course.');
+    }
+
+    if (existing && existing.deletedAt) {
+      return this.prisma.courseInstructor.update({
+        where: { courseId_instructorId: { courseId, instructorId } },
+        data: { deletedAt: null, assignedAt: new Date() }
+      });
+    }
 
     return this.prisma.courseInstructor.create({
       data: { courseId, instructorId },
@@ -545,11 +564,10 @@ export class CoursesService {
       );
     }
 
-    return this.prisma.courseInstructor.update({
+    return this.prisma.courseInstructor.delete({
       where: {
         courseId_instructorId: { courseId, instructorId: targetInstructorId },
       },
-      data: { deletedAt: new Date() },
     });
   }
 
@@ -709,7 +727,10 @@ export class CoursesService {
       },
       include: {
         instructors: {
-          where: { instructor: { role: { not: Role.ADMIN } } },
+          where: { 
+            instructor: { role: { not: Role.ADMIN } },
+            deletedAt: null
+          },
           include: {
             instructor: {
               select: {
@@ -754,7 +775,10 @@ export class CoursesService {
       include: {
         // Get the instructor's name (but hide their sensitive data like email/password)
         instructors: {
-          where: { instructor: { role: { not: Role.ADMIN } } },
+          where: { 
+            instructor: { role: { not: Role.ADMIN } },
+            deletedAt: null
+          },
           include: {
             instructor: {
               select: {
@@ -793,7 +817,10 @@ export class CoursesService {
         },
       include: {
         instructors: {
-          where: { instructor: { role: { not: Role.ADMIN } } },
+          where: { 
+            instructor: { role: { not: Role.ADMIN } },
+            deletedAt: null
+          },
           include: { instructor: { select: { id: true, fullName: true, profilePictureUrl: true } } },
         },
       },
