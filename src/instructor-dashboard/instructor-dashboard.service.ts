@@ -85,6 +85,96 @@ export class InstructorDashboardService {
       where: { isCompleted: true, session: { lecture: { courseId } } }
     });
 
+    // 1. Progress Distribution
+    const allSessions = await this.prisma.session.count({ where: { lecture: { courseId } } });
+    const progressDistribution = { '0': 0, '1-50': 0, '51-99': 0, '100': 0 };
+
+    if (allSessions > 0) {
+      const studentProgress = await this.prisma.sessionProgress.findMany({
+        where: { session: { lecture: { courseId } }, isCompleted: true },
+        select: { studentId: true }
+      });
+      
+      const counts = studentProgress.reduce((acc, p) => {
+        acc[p.studentId] = (acc[p.studentId] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      uniqueStudents.forEach(studentId => {
+        const completed = counts[studentId] || 0;
+        const percentage = (completed / allSessions) * 100;
+        if (percentage === 0) progressDistribution['0']++;
+        else if (percentage <= 50) progressDistribution['1-50']++;
+        else if (percentage < 100) progressDistribution['51-99']++;
+        else progressDistribution['100']++;
+      });
+    } else {
+       progressDistribution['0'] = uniqueStudents.size;
+    }
+
+    // 2. Enrollments Timeline (Last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0,0,0,0);
+    
+    const timelineData = await this.prisma.studentCourseAccess.findMany({
+      where: { courseId, createdAt: { gte: sevenDaysAgo } },
+      select: { createdAt: true }
+    });
+    
+    const timelineGroups = timelineData.reduce((acc, curr) => {
+      const date = curr.createdAt.toISOString().split('T')[0];
+      acc[date] = (acc[date] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const enrollmentsTimeline = Array.from({ length: 7 }).map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      const dateStr = d.toISOString().split('T')[0];
+      return {
+        date: dateStr,
+        count: timelineGroups[dateStr] || 0
+      };
+    });
+
+    // 3. Top Lectures
+    const allLecturesWithCounts = await this.prisma.lecture.findMany({
+      where: { courseId },
+      include: { _count: { select: { studentAccess: true } } }
+    });
+    const topLectures = allLecturesWithCounts
+      .sort((a, b) => b._count.studentAccess - a._count.studentAccess)
+      .slice(0, 3)
+      .map(l => ({ id: l.id, title: l.title, watches: l._count.studentAccess }));
+
+    // 4. Recent Activity Feed
+    const recentCourseAccess = await this.prisma.studentCourseAccess.findMany({
+      where: { courseId },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: { student: { select: { fullName: true } } }
+    });
+    const recentLectureAccess = await this.prisma.studentLectureAccess.findMany({
+      where: { lecture: { courseId } },
+      orderBy: { createdAt: 'desc' },
+      take: 5,
+      include: { student: { select: { fullName: true } }, lecture: { select: { title: true } } }
+    });
+    const recentActivity = [
+      ...recentCourseAccess.map(a => ({
+        type: 'ENROLLMENT',
+        studentName: a.student?.fullName || 'Unknown Student',
+        date: a.createdAt
+      })),
+      ...recentLectureAccess.map(a => ({
+        type: 'LECTURE_ACCESS',
+        studentName: a.student?.fullName || 'Unknown Student',
+        lectureTitle: a.lecture?.title,
+        date: a.createdAt
+      }))
+    ].sort((a, b) => b.date.getTime() - a.date.getTime()).slice(0, 5);
+
     return {
       enrolledStudents,
       fullCourseEnrolled,
@@ -92,7 +182,11 @@ export class InstructorDashboardService {
       studentsStarted,
       totalLectures,
       completedProgress,
-      courseCompletionEstimate: enrolledStudents > 0 ? (studentsStarted / enrolledStudents) * 100 : 0
+      courseCompletionEstimate: enrolledStudents > 0 ? (studentsStarted / enrolledStudents) * 100 : 0,
+      progressDistribution,
+      enrollmentsTimeline,
+      topLectures,
+      recentActivity
     };
   }
 
