@@ -43,6 +43,7 @@ export class InstructorDashboardService {
     return this.prisma.course.findUnique({
       where: { id: courseId },
       include: {
+        attachments: { select: { id: true, title: true, fileUrl: true, type: true } },
         _count: {
           select: { lectures: true, chapters: true, studentAccess: true },
         },
@@ -243,6 +244,7 @@ export class InstructorDashboardService {
       where: { courseId },
       include: {
         chapter: { select: { title: true } },
+        attachments: { select: { id: true, title: true, fileUrl: true, type: true, createdAt: true } },
         _count: { select: { studentAccess: true, sessions: true } }
       },
       orderBy: [
