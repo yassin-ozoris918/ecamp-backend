@@ -148,7 +148,7 @@ export class CoursesController {
     return this.coursesService.findOne(id);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.INSTRUCTOR)
   @UseInterceptors(InstructorOwnershipInterceptor)
   @Get(':id/builder')
   getBuilderData(@Param('id', ParseUUIDPipe) id: string, @Req() req: RequestWithUser) {
