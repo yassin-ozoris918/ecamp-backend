@@ -65,7 +65,7 @@ export class QuizzesAdminController {
    * Lightweight paginated list of submitted attempts for a quiz.
    * Accessible by INSTRUCTOR (own courses only) and ADMIN.
    */
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.INSTRUCTOR)
   @Get(':quizId/attempts')
   async getQuizAttempts(
     @Param('quizId') quizId: string,
@@ -95,7 +95,7 @@ export class QuizzesAdminController {
    * IMPORTANT: This route must be declared BEFORE the generic :id route
    * to avoid 'attempts' being matched as a quiz ID.
    */
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.INSTRUCTOR)
   @Get('attempts/:attemptId/review')
   async getAttemptReview(
     @Param('attemptId') attemptId: string,
@@ -112,7 +112,7 @@ export class QuizzesAdminController {
    * GET /admin/quizzes/attempts/:attemptId/responses
    * (legacy raw endpoint — kept for backward compatibility)
    */
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.INSTRUCTOR)
   @Get('attempts/:attemptId/responses')
   async getAttemptResponses(@Param('attemptId') attemptId: string, @Req() req: RequestWithUser) {
     const attempt = await this.prisma.quizAttempt.findUnique({
