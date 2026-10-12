@@ -1037,8 +1037,9 @@ export class AdminService {
     mismatchOnly?: boolean;
     skip?: number;
     take?: number;
+    all?: boolean;
   }) {
-    const { search = '', mismatchOnly = false, skip = 0, take = 100 } = opts;
+    const { search = '', mismatchOnly = false, skip = 0, take = 50, all = false } = opts;
 
     // --- 1. Parse device-issues.log ---
     const logPath = path.join(process.cwd(), 'device-issues.log');
@@ -1060,6 +1061,8 @@ export class AdminService {
               studentName: null, // enriched later
               deviceFingerprint: parsed.receivedFinalId,
               expectedDevice: parsed.expectedDeviceId,
+              rawHeaderDeviceId: parsed.rawHeaderDeviceId ?? null,
+              rawDtoDeviceId: parsed.rawDtoDeviceId ?? null,
               action: parsed.isMatch ? 'LOGIN_OK' : 'LOGIN_MISMATCH',
               isMatch: parsed.isMatch,
               ipAddress: parsed.ipAddress,
@@ -1090,7 +1093,7 @@ export class AdminService {
     // --- 3. Fetch DeviceHistory DB events ---
     const dbEvents = await this.prisma.deviceHistory.findMany({
       orderBy: { createdAt: 'desc' },
-      take: 500, // cap to avoid loading entire history
+      ...(all ? {} : { take: 1000 }),
       include: { student: { select: { fullName: true, email: true } } },
     });
 
@@ -1103,6 +1106,8 @@ export class AdminService {
       studentName: e.student.fullName,
       deviceFingerprint: e.deviceFingerprint,
       expectedDevice: null,
+      rawHeaderDeviceId: null,
+      rawDtoDeviceId: null,
       action: e.action, // REGISTERED | RESET | REMOVED | REPLACED
       isMatch: true, // DB events are authoritative (not mismatches)
       ipAddress: e.ipAddress ?? null,
@@ -1113,6 +1118,14 @@ export class AdminService {
     let merged = [...fileEntries, ...dbEntries].sort(
       (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
     );
+
+    // Calculate overall stats before user search/mismatch filters
+    const stats = {
+      totalEvents: merged.length,
+      matchedLogins: merged.filter((e) => e.isMatch && e.source === 'LOGIN_ATTEMPT').length,
+      mismatchLogins: merged.filter((e) => !e.isMatch && e.source === 'LOGIN_ATTEMPT').length,
+      dbHistoryEvents: merged.filter((e) => e.source === 'DEVICE_HISTORY').length,
+    };
 
     // --- 5. Apply filters ---
     if (mismatchOnly) {
@@ -1125,14 +1138,17 @@ export class AdminService {
           e.studentEmail?.toLowerCase().includes(q) ||
           e.studentName?.toLowerCase().includes(q) ||
           e.studentId?.toLowerCase().includes(q) ||
-          e.deviceFingerprint?.toLowerCase().includes(q),
+          e.deviceFingerprint?.toLowerCase().includes(q) ||
+          e.expectedDevice?.toLowerCase().includes(q) ||
+          e.ipAddress?.toLowerCase().includes(q) ||
+          e.browser?.toLowerCase().includes(q),
       );
     }
 
     const total = merged.length;
-    const items = merged.slice(skip, skip + take);
+    const items = all ? merged : merged.slice(skip, skip + take);
 
-    return { total, items };
+    return { total, items, stats };
   }
 }
 

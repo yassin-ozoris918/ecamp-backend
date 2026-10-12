@@ -223,12 +223,26 @@ export class AdminController {
     @Query('mismatchOnly') mismatchOnly?: string,
     @Query('skip') skip?: string,
     @Query('take') take?: string,
+    @Query('all') all?: string,
   ) {
     return this.adminService.getDeviceLogs({
       search: search || '',
       mismatchOnly: mismatchOnly === 'true',
       skip: skip ? parseInt(skip, 10) : 0,
-      take: take ? parseInt(take, 10) : 100,
+      take: take ? parseInt(take, 10) : 50,
+      all: all === 'true',
+    });
+  }
+
+  @Get('device-logs/export')
+  async exportDeviceLogs(
+    @Query('search') search?: string,
+    @Query('mismatchOnly') mismatchOnly?: string,
+  ) {
+    return this.adminService.getDeviceLogs({
+      search: search || '',
+      mismatchOnly: mismatchOnly === 'true',
+      all: true,
     });
   }
 
