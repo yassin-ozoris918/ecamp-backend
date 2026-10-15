@@ -218,15 +218,22 @@ export class AuthService {
           where: {
             studentId: user.id,
             deviceFingerprint: user.deviceId,
+            browser: { not: null },
           },
-          orderBy: { createdAt: 'asc' },
+          orderBy: { lastLoginAt: 'desc' },
+        })) || (await this.prisma.deviceSession.findFirst({
+          where: {
+            studentId: user.id,
+            deviceFingerprint: user.deviceId,
+          },
+          orderBy: { lastLoginAt: 'desc' },
         })) || (await this.prisma.deviceHistory.findFirst({
           where: {
             studentId: user.id,
             deviceFingerprint: user.deviceId,
             action: 'REGISTERED',
           },
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: 'desc' },
         }));
 
         const registeredDevice = parseDeviceDetails(registeredRecord?.browser, registeredRecord?.createdAt);
@@ -365,15 +372,22 @@ export class AuthService {
           where: {
             studentId: user.id,
             deviceFingerprint: user.deviceId,
+            browser: { not: null },
           },
-          orderBy: { createdAt: 'asc' },
+          orderBy: { lastLoginAt: 'desc' },
+        })) || (await this.prisma.deviceSession.findFirst({
+          where: {
+            studentId: user.id,
+            deviceFingerprint: user.deviceId,
+          },
+          orderBy: { lastLoginAt: 'desc' },
         })) || (await this.prisma.deviceHistory.findFirst({
           where: {
             studentId: user.id,
             deviceFingerprint: user.deviceId,
             action: 'REGISTERED',
           },
-          orderBy: { createdAt: 'asc' },
+          orderBy: { createdAt: 'desc' },
         }));
 
         const registeredDevice = parseDeviceDetails(registeredRecord?.browser, registeredRecord?.createdAt);

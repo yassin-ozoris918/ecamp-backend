@@ -60,18 +60,20 @@ export class SentryFilter implements ExceptionFilter {
       Sentry.captureException(exception);
     });
 
-    // Determine standard response message
+    // Determine standard response message and extra fields
     let message = exception.message || 'Internal server error';
-    let code: string | undefined = undefined;
+    let extraFields: Record<string, any> = {};
+
     if (exception instanceof HttpException) {
       const resp = exception.getResponse();
-      if (typeof resp === 'object') {
-        if ((resp as any).message) {
-          message = (resp as any).message;
+      if (typeof resp === 'string') {
+        message = resp;
+      } else if (typeof resp === 'object' && resp !== null) {
+        const { message: m, ...rest } = resp as any;
+        if (m) {
+          message = m;
         }
-        if ((resp as any).code) {
-          code = (resp as any).code;
-        }
+        extraFields = rest;
       }
     }
 
@@ -80,7 +82,7 @@ export class SentryFilter implements ExceptionFilter {
       timestamp: new Date().toISOString(),
       path: request.url,
       message,
-      ...(code && { code }),
+      ...extraFields,
     });
   }
 }
