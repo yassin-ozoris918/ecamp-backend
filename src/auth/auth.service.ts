@@ -213,7 +213,10 @@ export class AuthService {
 
       // Scenario B check must happen before the transaction (throws)
       if (user.deviceId && user.deviceId !== finalDeviceId) {
-        throw new ForbiddenException('auth.errors.unrecognizedDevice');
+        throw new ForbiddenException({
+          message: 'auth.errors.unrecognizedDevice',
+          code: 'UNRECOGNIZED_DEVICE',
+        });
       }
 
       await this.prisma.$transaction(async (tx) => {
@@ -337,7 +340,10 @@ export class AuthService {
         throw new ForbiddenException('Device ID is missing from request.');
       }
       if (user.deviceId && user.deviceId !== deviceIdHeader) {
-        throw new ForbiddenException('auth.errors.unrecognizedDevice');
+        throw new ForbiddenException({
+          message: 'auth.errors.unrecognizedDevice',
+          code: 'UNRECOGNIZED_DEVICE',
+        });
       }
     }
 
