@@ -16,6 +16,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MaintenancePolicy } from './policies/maintenance.policy';
 
 import { validateUniversitySegmentation, validateStudentSegmentation, normalizeEducationProfile } from '../common/utils/segmentation-validation.util';
+import { parseDeviceDetails } from '../common/utils/device-parser.util';
 
 @Injectable()
 export class AuthService {
@@ -213,9 +214,29 @@ export class AuthService {
 
       // Scenario B check must happen before the transaction (throws)
       if (user.deviceId && user.deviceId !== finalDeviceId) {
+        const registeredRecord = (await this.prisma.deviceSession.findFirst({
+          where: {
+            studentId: user.id,
+            deviceFingerprint: user.deviceId,
+          },
+          orderBy: { createdAt: 'asc' },
+        })) || (await this.prisma.deviceHistory.findFirst({
+          where: {
+            studentId: user.id,
+            deviceFingerprint: user.deviceId,
+            action: 'REGISTERED',
+          },
+          orderBy: { createdAt: 'asc' },
+        }));
+
+        const registeredDevice = parseDeviceDetails(registeredRecord?.browser, registeredRecord?.createdAt);
+        const currentDevice = parseDeviceDetails(browser, new Date());
+
         throw new ForbiddenException({
           message: 'auth.errors.unrecognizedDevice',
           code: 'UNRECOGNIZED_DEVICE',
+          registeredDevice,
+          currentDevice,
         });
       }
 
@@ -340,9 +361,27 @@ export class AuthService {
         throw new ForbiddenException('Device ID is missing from request.');
       }
       if (user.deviceId && user.deviceId !== deviceIdHeader) {
+        const registeredRecord = (await this.prisma.deviceSession.findFirst({
+          where: {
+            studentId: user.id,
+            deviceFingerprint: user.deviceId,
+          },
+          orderBy: { createdAt: 'asc' },
+        })) || (await this.prisma.deviceHistory.findFirst({
+          where: {
+            studentId: user.id,
+            deviceFingerprint: user.deviceId,
+            action: 'REGISTERED',
+          },
+          orderBy: { createdAt: 'asc' },
+        }));
+
+        const registeredDevice = parseDeviceDetails(registeredRecord?.browser, registeredRecord?.createdAt);
+
         throw new ForbiddenException({
           message: 'auth.errors.unrecognizedDevice',
           code: 'UNRECOGNIZED_DEVICE',
+          registeredDevice,
         });
       }
     }
