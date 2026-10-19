@@ -1,12 +1,43 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { CacheModule } from '@nestjs/cache-manager';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { ThrottlerModule, ThrottlerGuard, ThrottlerStorage, ThrottlerStorageService } from '@nestjs/throttler';
+import { ThrottlerStorageRecord } from '@nestjs/throttler/dist/throttler-storage-record.interface';
 import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { redisInsStore } from 'cache-manager-redis-yet';
 import { createClient } from 'redis';
 import { ThrottlerStorageRedisService } from '@nest-lab/throttler-storage-redis';
 import Redis from 'ioredis';
+
+class ResilientThrottlerStorage implements ThrottlerStorage {
+  private readonly fallbackStorage = new ThrottlerStorageService();
+  private redisFailed = false;
+
+  constructor(private readonly redisStorage: ThrottlerStorage) {}
+
+  async increment(
+    key: string,
+    ttl: number,
+    limit: number,
+    blockDuration: number,
+    throttlerName: string,
+  ): Promise<ThrottlerStorageRecord> {
+    if (!this.redisFailed) {
+      try {
+        return await this.redisStorage.increment(key, ttl, limit, blockDuration, throttlerName);
+      } catch (err: any) {
+        console.warn(
+          `[Throttler] Redis rate-limiter failed (${err?.message || err}). Falling back to in-memory rate limiter.`,
+        );
+        this.redisFailed = true;
+        setTimeout(() => {
+          this.redisFailed = false;
+        }, 60000);
+      }
+    }
+    return this.fallbackStorage.increment(key, ttl, limit, blockDuration, throttlerName);
+  }
+}
 
 // Existing Imports
 import { AppController } from './app.controller';
@@ -59,8 +90,11 @@ import { TutorialsModule } from './tutorials/tutorials.module';
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => {
         try {
+          const host = configService.get<string>('REDIS_HOST');
+          if (!host || host === 'none' || host === 'disabled' || host === 'in-memory') {
+            return { ttl: 60 * 1000 };
+          }
           const useTls = configService.get<string>('REDIS_TLS') === 'true';
-          const host = configService.get<string>('REDIS_HOST') || 'localhost';
           const port = configService.get<string>('REDIS_PORT') || '6379';
           const password = configService.get<string>('REDIS_PASSWORD');
           
@@ -78,7 +112,7 @@ import { TutorialsModule } from './tutorials/tutorials.module';
           const store = redisInsStore(client as any, { ttl: 60 * 1000 });
           return { store };
         } catch (e) {
-          console.warn('Redis not running, falling back to in-memory cache');
+          console.warn('Redis not available, falling back to in-memory cache');
           return { ttl: 60 * 1000 };
         }
       },
@@ -89,19 +123,32 @@ import { TutorialsModule } from './tutorials/tutorials.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
-        let storage;
+        let storage: ThrottlerStorage = new ThrottlerStorageService();
         try {
-          const useTls = configService.get<string>('REDIS_TLS') === 'true';
-          const host = configService.get<string>('REDIS_HOST') || 'localhost';
-          const port = configService.get<string>('REDIS_PORT') || '6379';
-          const password = configService.get<string>('REDIS_PASSWORD');
-          
-          const protocol = useTls ? 'rediss' : 'redis';
-          const url = password ? `${protocol}://default:${encodeURIComponent(password)}@${host}:${port}` : `${protocol}://${host}:${port}`;
+          const host = configService.get<string>('REDIS_HOST');
+          if (host && host !== 'none' && host !== 'disabled' && host !== 'in-memory') {
+            const useTls = configService.get<string>('REDIS_TLS') === 'true';
+            const port = configService.get<string>('REDIS_PORT') || '6379';
+            const password = configService.get<string>('REDIS_PASSWORD');
+            
+            const protocol = useTls ? 'rediss' : 'redis';
+            const url = password ? `${protocol}://default:${encodeURIComponent(password)}@${host}:${port}` : `${protocol}://${host}:${port}`;
 
-          storage = new ThrottlerStorageRedisService(new Redis(url, { maxRetriesPerRequest: 3 }));
-        } catch {
-          console.warn('Redis not running, rate limiter falling back to in-memory storage');
+            const redisClient = new Redis(url, {
+              maxRetriesPerRequest: 1,
+              enableOfflineQueue: false,
+              lazyConnect: true,
+            });
+
+            redisClient.on('error', (err) => {
+              console.warn('[Throttler] Redis connection warning:', err.message);
+            });
+
+            const redisStorage = new ThrottlerStorageRedisService(redisClient);
+            storage = new ResilientThrottlerStorage(redisStorage);
+          }
+        } catch (err: any) {
+          console.warn('Redis rate limiter setup failed, using in-memory storage:', err?.message || err);
         }
         return {
           throttlers: [
