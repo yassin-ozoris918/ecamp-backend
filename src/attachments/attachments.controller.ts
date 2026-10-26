@@ -1,4 +1,6 @@
-import { Controller, Post, Get, Delete, Patch, Param, Body, UseInterceptors, UploadedFile, UseGuards, InternalServerErrorException, Logger, Req, Query } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Patch, Param, Body, UseInterceptors, UploadedFile, UseGuards, InternalServerErrorException, Logger, Req, Res, Query, StreamableFile } from '@nestjs/common';
+import type { Response } from 'express';
+import { Readable } from 'stream';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { attachmentFileFilter, UPLOAD_LIMITS } from '../common/config/upload.config';
 import { AttachmentsService } from './attachments.service';
@@ -62,11 +64,33 @@ export class AttachmentsController {
     const isDownload = download === 'true';
     if (req.user.role === Role.STUDENT) {
       const url = await this.attachmentsService.getStudentAttachmentViewUrl(req.user.sub, id, isDownload);
-      return { url };
+      // url === null => view-only file: the client must use GET :id/stream (no direct URL is ever issued)
+      return { url, viewOnly: url === null };
     } else {
       const url = await this.attachmentsService.getInstructorAttachmentViewUrl(id, isDownload);
-      return { url };
+      return { url, viewOnly: false };
     }
+  }
+
+  /** Authenticated, inline-only byte stream used for view-only files. Never sets attachment disposition. */
+  @Get(':id/stream')
+  async streamAttachment(
+    @Param('id') id: string,
+    @Req() req: RequestWithUser,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const file = req.user.role === Role.STUDENT
+      ? await this.attachmentsService.getStudentAttachmentStream(req.user.sub, id)
+      : await this.attachmentsService.getInstructorAttachmentStream(id);
+
+    res.set({
+      'Content-Type': file.contentType,
+      'Content-Disposition': 'inline',
+      'Cache-Control': 'no-store, private',
+      'X-Content-Type-Options': 'nosniff',
+      ...(file.contentLength ? { 'Content-Length': String(file.contentLength) } : {}),
+    });
+    return new StreamableFile(file.stream as Readable);
   }
 
   @Get('lecture/:lectureId')

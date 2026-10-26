@@ -243,6 +243,52 @@ export class StorageService {
     }
   }
 
+  /**
+   * Opens a file for proxying through the API (works for R2 and local storage).
+   * Used for view-only files: the browser never receives a direct or signed URL.
+   */
+  async getObjectForStreaming(fileUrl: string): Promise<{
+    stream: NodeJS.ReadableStream;
+    contentType: string;
+    contentLength?: number;
+  }> {
+    if (!this.s3Client) {
+      const rel = fileUrl.replace(/^\/?uploads\//, '');
+      const filePath = path.resolve(this.localUploadDir, rel);
+      if (!filePath.startsWith(path.resolve(this.localUploadDir) + path.sep)) {
+        throw new BadRequestException('Invalid file path.');
+      }
+      let stat: fs.Stats;
+      try {
+        stat = await fs.promises.stat(filePath);
+      } catch {
+        throw new InternalServerErrorException('File not found in storage.');
+      }
+      const ext = path.extname(filePath).toLowerCase();
+      const types: Record<string, string> = {
+        '.pdf': 'application/pdf',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+      };
+      return {
+        stream: fs.createReadStream(filePath),
+        contentType: types[ext] ?? 'application/octet-stream',
+        contentLength: stat.size,
+      };
+    }
+
+    const res = await this.getFileStream(fileUrl);
+    if (!res.Body) throw new InternalServerErrorException('Failed to fetch file.');
+    return {
+      stream: res.Body as unknown as NodeJS.ReadableStream,
+      contentType: res.ContentType ?? 'application/octet-stream',
+      contentLength: res.ContentLength,
+    };
+  }
+
   async getFileStream(fileUrl: string) {
     if (!this.s3Client) {
       throw new InternalServerErrorException('Direct file streaming is only supported with Cloudflare R2.');

@@ -207,8 +207,27 @@ export class AttachmentsService {
       throw new ForbiddenException('Downloading is disabled for this file. You can only view it online.');
     }
 
-    // Restricted files are always served with an explicit inline disposition.
-    return this.storage.generatePresignedGetUrl(attachment.fileUrl, 300, forceDownload, !canDownload);
+    // View-only files never get a direct/signed URL (a browser PDF viewer would expose Download/Print).
+    // Students must use the proxied stream endpoint instead.
+    if (!canDownload) return null;
+
+    return this.storage.generatePresignedGetUrl(attachment.fileUrl, 300, forceDownload);
+  }
+
+  async getStudentAttachmentStream(studentId: string, attachmentId: string) {
+    const hasAccess = await this.hasFileAccess(studentId, attachmentId);
+    if (!hasAccess) throw new ForbiddenException('You do not have access to this file.');
+    return this.openStream(attachmentId);
+  }
+
+  async getInstructorAttachmentStream(attachmentId: string) {
+    return this.openStream(attachmentId);
+  }
+
+  private async openStream(attachmentId: string) {
+    const attachment = await this.findById(attachmentId);
+    const obj = await this.storage.getObjectForStreaming(attachment.fileUrl);
+    return { ...obj, title: attachment.title };
   }
 
   async findById(id: string) {
