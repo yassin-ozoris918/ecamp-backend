@@ -77,20 +77,35 @@ export class AttachmentsController {
   async streamAttachment(
     @Param('id') id: string,
     @Req() req: RequestWithUser,
-    @Res({ passthrough: true }) res: Response,
+    @Res() res: Response,
   ) {
-    const file = req.user.role === Role.STUDENT
-      ? await this.attachmentsService.getStudentAttachmentStream(req.user.sub, id)
-      : await this.attachmentsService.getInstructorAttachmentStream(id);
+    try {
+      const file = req.user.role === Role.STUDENT
+        ? await this.attachmentsService.getStudentAttachmentStream(req.user.sub, id)
+        : await this.attachmentsService.getInstructorAttachmentStream(id);
 
-    res.set({
-      'Content-Type': file.contentType,
-      'Content-Disposition': 'inline',
-      'Cache-Control': 'no-store, private',
-      'X-Content-Type-Options': 'nosniff',
-      ...(file.contentLength ? { 'Content-Length': String(file.contentLength) } : {}),
-    });
-    return new StreamableFile(file.stream as Readable);
+      res.set({
+        'Content-Type': file.contentType || 'application/pdf',
+        'Content-Disposition': 'inline',
+        'Cache-Control': 'no-store, private',
+        'X-Content-Type-Options': 'nosniff',
+        ...(file.contentLength ? { 'Content-Length': String(file.contentLength) } : {}),
+      });
+
+      const nodeStream = file.stream as Readable;
+      nodeStream.on('error', (err) => {
+        this.logger.error('Stream piping error', err);
+        if (!res.headersSent) {
+          res.status(500).json({ message: 'Error streaming file.' });
+        }
+      });
+      nodeStream.pipe(res);
+    } catch (err: any) {
+      this.logger.error('Stream endpoint error', err);
+      if (!res.headersSent) {
+        res.status(err.status || 500).json({ message: err.message || 'Failed to stream file.' });
+      }
+    }
   }
 
   @Get('lecture/:lectureId')
