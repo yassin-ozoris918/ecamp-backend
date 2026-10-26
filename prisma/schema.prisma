@@ -234,6 +234,8 @@ model Course {
 
   validityDays Int?
   isFree       Boolean      @default(false)
+  // Default download policy for all lecture files in this course (can be overridden per file)
+  allowFileDownload Boolean   @default(true)
   status       CourseStatus @default(DRAFT)
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
@@ -931,6 +933,8 @@ model Attachment {
   type        AttachmentType @default(OTHER)
   orderIndex  Int            @default(0)
   isPublished Boolean        @default(true)
+  // Per-file override of Course.allowFileDownload. null = inherit from course.
+  allowDownload Boolean?
   createdAt   DateTime       @default(now())
   deletedAt   DateTime?
 

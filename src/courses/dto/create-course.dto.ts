@@ -62,6 +62,10 @@ export class CreateCourseDto {
   isFree?: boolean;
 
   @IsOptional()
+  @IsBoolean()
+  allowFileDownload?: boolean;
+
+  @IsOptional()
   @IsEnum(CourseType)
   type?: CourseType;
 

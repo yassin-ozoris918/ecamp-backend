@@ -41,6 +41,8 @@ export class CourseAttachmentsController {
   }
 
   @Get('course/:courseId')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.INSTRUCTOR)
   async getByCourse(@Param('courseId') courseId: string) {
     return this.courseAttachmentsService.findAllByCourse(courseId);
   }

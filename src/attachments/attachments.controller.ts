@@ -1,8 +1,9 @@
-import { Controller, Post, Get, Delete, Param, Body, UseInterceptors, UploadedFile, UseGuards, InternalServerErrorException, Logger, Req, Query } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Patch, Param, Body, UseInterceptors, UploadedFile, UseGuards, InternalServerErrorException, Logger, Req, Query } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { attachmentFileFilter, UPLOAD_LIMITS } from '../common/config/upload.config';
 import { AttachmentsService } from './attachments.service';
 import { CreateAttachmentDto } from './dto/create-attachment.dto';
+import { UpdateAttachmentDownloadDto } from './dto/update-attachment-download.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -85,6 +86,17 @@ export class AttachmentsController {
     }
     
     return attachments;
+  }
+
+  @Patch(':id/download-policy')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN)
+  async updateDownloadPolicy(
+    @Param('id') id: string,
+    @Body() body: UpdateAttachmentDownloadDto,
+    @Req() req: RequestWithUser,
+  ) {
+    return this.attachmentsService.updateDownloadPolicy(id, body.allowDownload, req.user.sub, req.user.role);
   }
 
   @Delete(':id')

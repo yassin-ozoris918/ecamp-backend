@@ -24,15 +24,46 @@ export class AttachmentsService {
         lectureId: dto.lectureId,
         fileUrl: fileUrl,
         type: dto.type || 'OTHER',
+        allowDownload: dto.allowDownload ?? null,
       },
     });
   }
 
+  /**
+   * Effective download policy: the per-file override wins; when it is null the
+   * course-level default applies. Anything unresolvable is treated as NOT allowed.
+   */
+  private resolveCanDownload(allowDownload: boolean | null | undefined, courseAllow: boolean | null | undefined): boolean {
+    if (allowDownload === true) return true;
+    if (allowDownload === false) return false;
+    return courseAllow === true;
+  }
+
+  async updateDownloadPolicy(id: string, allowDownload: boolean | null, instructorId: string, role: Role) {
+    const attachment = await this.prisma.attachment.findFirst({
+      where: { id, deletedAt: null },
+      include: { lecture: { select: { courseId: true } } },
+    });
+    if (!attachment) throw new NotFoundException('Attachment not found.');
+    await this.verifyCourseOwnership(attachment.lecture.courseId, instructorId, role);
+
+    return this.prisma.attachment.update({
+      where: { id },
+      data: { allowDownload },
+    });
+  }
+
   async findAllByLecture(lectureId: string) {
-    return this.prisma.attachment.findMany({
+    const items = await this.prisma.attachment.findMany({
       where: { lectureId, deletedAt: null },
+      include: { lecture: { select: { course: { select: { allowFileDownload: true } } } } },
       orderBy: { createdAt: 'asc' },
     });
+    return items.map(({ lecture, ...att }) => ({
+      ...att,
+      courseAllowsDownload: lecture?.course?.allowFileDownload ?? true,
+      canDownload: this.resolveCanDownload(att.allowDownload, lecture?.course?.allowFileDownload),
+    }));
   }
 
   async hasFileAccess(studentId: string, attachmentId: string): Promise<boolean> {
@@ -90,7 +121,7 @@ export class AttachmentsService {
         ...(search ? { title: { contains: search, mode: 'insensitive' } } : {}),
       },
       include: {
-        lecture: { select: { id: true, title: true, course: { select: { id: true, title: true, type: true } } } },
+        lecture: { select: { id: true, title: true, course: { select: { id: true, title: true, type: true, allowFileDownload: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -148,10 +179,11 @@ export class AttachmentsService {
         id: attachment.id,
         title: attachment.title,
         type: attachment.type,
-        course: attachment.lecture.course,
+        course: { id: attachment.lecture.course.id, title: attachment.lecture.course.title, type: attachment.lecture.course.type },
         lecture: { id: attachment.lecture.id, title: attachment.lecture.title },
         accessStatus,
         accessSource,
+        canDownload: this.resolveCanDownload(attachment.allowDownload, attachment.lecture.course.allowFileDownload),
       };
     }).filter(Boolean);
 
@@ -166,10 +198,17 @@ export class AttachmentsService {
 
     const attachment = await this.prisma.attachment.findUnique({
       where: { id: attachmentId, deletedAt: null },
+      include: { lecture: { select: { course: { select: { allowFileDownload: true } } } } },
     });
     if (!attachment) throw new NotFoundException('Attachment not found.');
 
-    return this.storage.generatePresignedGetUrl(attachment.fileUrl, 300, forceDownload);
+    const canDownload = this.resolveCanDownload(attachment.allowDownload, attachment.lecture?.course?.allowFileDownload);
+    if (forceDownload && !canDownload) {
+      throw new ForbiddenException('Downloading is disabled for this file. You can only view it online.');
+    }
+
+    // Restricted files are always served with an explicit inline disposition.
+    return this.storage.generatePresignedGetUrl(attachment.fileUrl, 300, forceDownload, !canDownload);
   }
 
   async findById(id: string) {

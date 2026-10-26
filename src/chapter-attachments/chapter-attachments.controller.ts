@@ -41,6 +41,8 @@ export class ChapterAttachmentsController {
   }
 
   @Get('chapter/:chapterId')
+  @UseGuards(RolesGuard)
+  @Roles(Role.ADMIN, Role.INSTRUCTOR)
   async getByChapter(@Param('chapterId') chapterId: string) {
     return this.chapterAttachmentsService.findAllByChapter(chapterId);
   }
