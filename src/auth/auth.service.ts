@@ -86,7 +86,7 @@ export class AuthService {
           profilePictureUrl: dto.profilePictureUrl,
           role: Role.STUDENT,
           deviceId: finalDeviceId || null,
-          isActive: false, // Students require manual approval by an admin
+          isActive: true, // Auto-approve on registration ("Pending" manual approval is currently on hold)
         },
       });
     } catch (error: any) {
@@ -122,7 +122,8 @@ export class AuthService {
       });
     }
 
-    if (user.role === Role.STUDENT) {
+    // Hold "Pending" flow: only return PENDING_APPROVAL if student is created with isActive: false
+    if (user.role === Role.STUDENT && !user.isActive) {
       return {
         status: 'PENDING_APPROVAL',
         user: {
@@ -140,9 +141,11 @@ export class AuthService {
       };
     }
 
-    // Fallback for non-students (if this endpoint ever allows other roles)
+    // Issue tokens and return full profile for approved users
     const tokens = await this.getTokens(user.id, user.email, user.role);
     await this.updateRefreshToken(user.id, tokens.refreshToken);
+
+    this.eventEmitter.emit('user.login', user.id);
 
     return {
       ...tokens,
@@ -157,6 +160,21 @@ export class AuthService {
         is_active: user.isActive,
         phone_number: user.phoneNumber,
         parent_phone_number: user.parentPhoneNumber,
+        educationLevel: user.educationLevel,
+        highSchoolSystem: user.highSchoolSystem,
+        studyMode: user.studyMode,
+        studyLanguage: user.studyLanguage,
+        highSchoolGrade: user.highSchoolGrade,
+        traditionalBranch: user.traditionalBranch,
+        baccalaureatePath: user.baccalaureatePath,
+        universityId: user.universityId,
+        facultyId: user.facultyId,
+        departmentId: user.departmentId,
+        programId: user.programId,
+        otherUniversityName: user.otherUniversityName,
+        otherFacultyName: user.otherFacultyName,
+        otherDepartmentName: user.otherDepartmentName,
+        otherProgramName: user.otherProgramName,
       },
     };
   }
