@@ -13,6 +13,7 @@ import {
   UseInterceptors,
   UploadedFile,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { TutorialsService } from './tutorials.service';
 import { CreateCategoryDto, CreateTutorialDto, UpdateTutorialDto } from './dto/tutorial.dto';
@@ -24,6 +25,7 @@ import type { RequestWithUser } from '../auth/interfaces/request-with-user.inter
 import { FileInterceptor } from '@nestjs/platform-express';
 import { videoFileFilter, UPLOAD_LIMITS, MIME_TYPES } from '../common/config/upload.config';
 import { StorageService } from '../storage/storage.service';
+import { CloudflareService } from '../cloudflare/cloudflare.service';
 
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('tutorials')
@@ -31,6 +33,7 @@ export class TutorialsController {
   constructor(
     private readonly tutorialsService: TutorialsService,
     private readonly storageService: StorageService,
+    @Optional() private readonly cloudflareService?: CloudflareService,
   ) {}
 
   // --- Admin Endpoints ---
@@ -94,13 +97,27 @@ export class TutorialsController {
       throw new BadRequestException(`File size exceeds limit.`);
     }
 
+    if (this.cloudflareService?.isConfigured()) {
+      const { uploadUrl, objectKey, assetUrl } =
+        await this.cloudflareService.createDirectUploadUrl({
+          filename: body.filename,
+        });
+      return {
+        uploadUrl,
+        objectKey,
+        assetUrl,
+        provider: 'CLOUDFLARE_STREAM',
+        expiresIn: 3600,
+      };
+    }
+
     const { uploadUrl, objectKey, assetUrl } = await this.storageService.generatePresignedUrl(
       'videos',
       body.filename,
       body.mimetype,
       body.fileSize,
     );
-    return { uploadUrl, objectKey, assetUrl, expiresIn: 3600 };
+    return { uploadUrl, objectKey, assetUrl, provider: 'R2', expiresIn: 3600 };
   }
 
   @Roles(Role.ADMIN)
@@ -112,7 +129,16 @@ export class TutorialsController {
     if (!body.objectKey || !body.assetUrl) {
       throw new BadRequestException('Object key and asset URL required.');
     }
-    const exists = await this.storageService.verifyR2Object(body.objectKey);
+
+    const isCloudflareStream =
+      this.cloudflareService?.isConfigured() &&
+      (Boolean(this.cloudflareService.extractVideoUid(body.objectKey)) ||
+        body.assetUrl.includes('cloudflarestream.com'));
+
+    const exists = isCloudflareStream
+      ? await this.cloudflareService!.verifyVideoExists(body.objectKey)
+      : await this.storageService.verifyR2Object(body.objectKey);
+
     if (!exists) {
       throw new BadRequestException('File not found in storage.');
     }
@@ -134,7 +160,13 @@ export class TutorialsController {
     if (!file) {
       throw new BadRequestException('No video file uploaded.');
     }
-    const videoUrl = await this.storageService.uploadFile(file, 'videos');
+    const videoUrl = this.cloudflareService?.isConfigured()
+      ? await this.cloudflareService.uploadVideoBuffer(
+          file.buffer,
+          file.originalname,
+          file.mimetype,
+        )
+      : await this.storageService.uploadFile(file, 'videos');
     return this.tutorialsService.updateTutorialVideoUrl(id, videoUrl);
   }
 

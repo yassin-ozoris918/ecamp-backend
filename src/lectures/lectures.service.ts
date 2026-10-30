@@ -135,7 +135,17 @@ export class LecturesService {
       urlsToDelete.push(att.fileUrl);
     }
     for (const session of lecture.sessions || []) {
-      if (session.videoUrl) urlsToDelete.push(session.videoUrl);
+      if (session.videoUrl) {
+        if (
+          session.videoUrl.includes('cloudflarestream.com') ||
+          session.videoUrl.includes('videodelivery.net') ||
+          /^[a-f0-9]{32}$/i.test(session.videoUrl)
+        ) {
+          await this.cloudflareService.deleteVideo?.(session.videoUrl);
+        } else {
+          urlsToDelete.push(session.videoUrl);
+        }
+      }
     }
 
     if (urlsToDelete.length > 0) {
@@ -320,12 +330,18 @@ export class LecturesService {
         videoId.startsWith('http://') || 
         videoId.startsWith('https://')
       ) {
-        if (!videoId.includes('cloudflarestream.com')) {
+        if (
+          !videoId.includes('cloudflarestream.com') &&
+          !videoId.includes('videodelivery.net')
+        ) {
           return { playbackUrl: videoId, playbackSessionId: 'instructor-bypass' };
         }
       }
-      if (videoId.includes('cloudflarestream.com')) {
-        const match = videoId.match(/([a-f0-9]{32})/);
+      if (
+        videoId.includes('cloudflarestream.com') ||
+        videoId.includes('videodelivery.net')
+      ) {
+        const match = videoId.match(/\/([a-f0-9]{32})(?:\/|\?|$)/i);
         if (match) videoId = match[1];
       }
       return {
@@ -387,14 +403,20 @@ export class LecturesService {
       videoId.startsWith('http://') || 
       videoId.startsWith('https://')
     ) {
-      // Unless it is explicitly a cloudflarestream.com URL, return direct URL
-      if (!videoId.includes('cloudflarestream.com')) {
+      // Unless it is explicitly a cloudflarestream.com or videodelivery.net URL, return direct URL
+      if (
+        !videoId.includes('cloudflarestream.com') &&
+        !videoId.includes('videodelivery.net')
+      ) {
         return { playbackUrl: videoId, playbackSessionId };
       }
     }
 
-    if (videoId.includes('cloudflarestream.com')) {
-      const match = videoId.match(/([a-f0-9]{32})/);
+    if (
+      videoId.includes('cloudflarestream.com') ||
+      videoId.includes('videodelivery.net')
+    ) {
+      const match = videoId.match(/\/([a-f0-9]{32})(?:\/|\?|$)/i);
       if (match) videoId = match[1];
     }
 
@@ -404,4 +426,3 @@ export class LecturesService {
     };
   }
 }
-

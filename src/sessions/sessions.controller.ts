@@ -12,6 +12,7 @@ import {
   UploadedFile,
   ParseUUIDPipe,
   BadRequestException,
+  Optional,
 } from '@nestjs/common';
 import { SessionsService } from './sessions.service';
 import { CreateSessionDto } from './dto/create-session.dto';
@@ -21,10 +22,11 @@ import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '@prisma/client';
 import type { RequestWithUser } from '../auth/interfaces/request-with-user.interface';
 
-// --- New Imports for Phase 14 Storage ---
+// --- New Imports for Phase 14 Storage & Cloudflare Stream ---
 import { FileInterceptor } from '@nestjs/platform-express';
 import { videoFileFilter, UPLOAD_LIMITS, MIME_TYPES } from '../common/config/upload.config';
-import { StorageService } from '../storage/storage.service'; // Adjust path if necessary
+import { StorageService } from '../storage/storage.service';
+import { CloudflareService } from '../cloudflare/cloudflare.service';
 
 @UseGuards(AuthGuard('jwt'), RolesGuard)
 @Controller('sessions')
@@ -32,6 +34,7 @@ export class SessionsController {
   constructor(
     private readonly sessionsService: SessionsService,
     private readonly storageService: StorageService,
+    @Optional() private readonly cloudflareService?: CloudflareService,
   ) {}
 
   // --- EXISTING CRUD OPERATIONS ---
@@ -96,6 +99,21 @@ export class SessionsController {
     // Authorization check
     await this.sessionsService.verifySessionOwnershipById(id, req.user.sub, req.user.role);
 
+    if (this.cloudflareService?.isConfigured()) {
+      const { uploadUrl, objectKey, assetUrl } =
+        await this.cloudflareService.createDirectUploadUrl({
+          filename: body.filename,
+        });
+
+      return {
+        uploadUrl,
+        objectKey,
+        assetUrl,
+        provider: 'CLOUDFLARE_STREAM',
+        expiresIn: 3600,
+      };
+    }
+
     const { uploadUrl, objectKey, assetUrl } = await this.storageService.generatePresignedUrl(
       'videos',
       body.filename,
@@ -103,7 +121,7 @@ export class SessionsController {
       body.fileSize,
     );
 
-    return { uploadUrl, objectKey, assetUrl, expiresIn: 3600 };
+    return { uploadUrl, objectKey, assetUrl, provider: 'R2', expiresIn: 3600 };
   }
 
   @Roles(Role.ADMIN)
@@ -120,7 +138,15 @@ export class SessionsController {
     // Authorization check (redundant since updateVideoUrl also checks, but good for validation phase)
     await this.sessionsService.verifySessionOwnershipById(id, req.user.sub, req.user.role);
 
-    const exists = await this.storageService.verifyR2Object(body.objectKey);
+    const isCloudflareStream =
+      this.cloudflareService?.isConfigured() &&
+      (Boolean(this.cloudflareService.extractVideoUid(body.objectKey)) ||
+        body.assetUrl.includes('cloudflarestream.com'));
+
+    const exists = isCloudflareStream
+      ? await this.cloudflareService!.verifyVideoExists(body.objectKey)
+      : await this.storageService.verifyR2Object(body.objectKey);
+
     if (!exists) {
       throw new BadRequestException('File not found in storage. Upload may have failed.');
     }
@@ -155,8 +181,14 @@ export class SessionsController {
       throw new BadRequestException('No video file uploaded.');
     }
 
-    // 1. Stream directly to Cloudflare R2 inside the 'videos' folder
-    const videoUrl = await this.storageService.uploadFile(file, 'videos');
+    // 1. Upload directly to Cloudflare Stream (if configured) or R2 fallback
+    const videoUrl = this.cloudflareService?.isConfigured()
+      ? await this.cloudflareService.uploadVideoBuffer(
+          file.buffer,
+          file.originalname,
+          file.mimetype,
+        )
+      : await this.storageService.uploadFile(file, 'videos');
 
     // 2. Persist the asset URL to the database
     const updatedSession = await this.sessionsService.updateVideoUrl(

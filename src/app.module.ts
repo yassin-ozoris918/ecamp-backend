@@ -55,6 +55,7 @@ import { ProgressModule } from './progress/progress.module';
 import { ExamsModule } from './exams/exams.module';
 import { AiModule } from './ai/ai.module';
 import { StorageModule } from './storage/storage.module';
+import { CloudflareModule } from './cloudflare/cloudflare.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { SystemAuditInterceptor } from './common/interceptors/audit.interceptor';
@@ -176,6 +177,7 @@ import { TutorialsModule } from './tutorials/tutorials.module';
     ExamsModule,
     AiModule,
     StorageModule,
+    CloudflareModule,
     NotificationsModule,
     AnalyticsModule,
     UsersModule,

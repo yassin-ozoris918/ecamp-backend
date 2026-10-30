@@ -1,6 +1,7 @@
-import { Module } from '@nestjs/common';
+import { Module, Global } from '@nestjs/common';
 import { CloudflareService } from './cloudflare.service';
 
+@Global()
 @Module({
   providers: [CloudflareService],
   exports: [CloudflareService],
