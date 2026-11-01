@@ -223,6 +223,7 @@ export class AdminService {
         email: true,
         role: true,
         isActive: true,
+        isDemo: true,
         educationLevel: true,
         phoneNumber: true,
         parentPhoneNumber: true,
@@ -232,13 +233,36 @@ export class AdminService {
         deviceId: true,
         lastLoginAt: true,
         createdAt: true,
+        updatedAt: true,
+        highSchoolSystem: true,
+        studyMode: true,
+        studyLanguage: true,
+        highSchoolGrade: true,
+        traditionalBranch: true,
+        baccalaureatePath: true,
+        universityId: true,
+        facultyId: true,
+        departmentId: true,
+        programId: true,
+        otherUniversityName: true,
+        otherFacultyName: true,
+        otherDepartmentName: true,
+        otherProgramName: true,
+        academicUniversity: { select: { id: true, nameAr: true, nameEn: true, isOther: true } },
+        academicFaculty: { select: { id: true, nameAr: true, nameEn: true, isOther: true } },
+        academicDepartment: { select: { id: true, nameAr: true, nameEn: true, isOther: true } },
+        academicProgram: { select: { id: true, nameAr: true, nameEn: true, isOther: true } },
+        riskProfile: true,
         _count: {
           select: {
+            accessedCourses: true,
             accessedLectures: true,
             quizAttempts: true,
             examAttempts: true,
             deviceSessions: true,
             certificates: true,
+            redeemedCodes: true,
+            playbackSessions: true,
           },
         },
       },
@@ -508,102 +532,976 @@ export class AdminService {
   }
 
   async getStudentProgress(studentId: string) {
-    const lectures = await this.prisma.studentLectureAccess.findMany({
-      where: { studentId, },
-      include: {
-        lecture: {
-          include: {
-            course: { select: { id: true, title: true } },
+    const [
+      student,
+      courseAccesses,
+      lectures,
+      sessionViews,
+      playbackSessions,
+      sessionProgress,
+      quizAttempts,
+      examAttempts,
+      redeemedCodes,
+      codeHistory,
+      fileAccesses,
+      deviceHistory,
+      deviceSessions,
+      certificates,
+      badges,
+      adminAuditLogs,
+    ] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: studentId },
+        select: {
+          id: true,
+          fullName: true,
+          email: true,
+          phoneNumber: true,
+          parentPhoneNumber: true,
+          educationLevel: true,
+          createdAt: true,
+          lastLoginAt: true,
+          isActive: true,
+          isDemo: true,
+          xp: true,
+          streakDays: true,
+          deviceId: true,
+        },
+      }),
+      this.prisma.studentCourseAccess.findMany({
+        where: { studentId },
+        include: {
+          course: {
+            select: {
+              id: true,
+              title: true,
+              type: true,
+              isFree: true,
+              validityDays: true,
+              status: true,
+            },
           },
         },
-      },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.studentLectureAccess.findMany({
+        where: { studentId },
+        include: {
+          lecture: {
+            include: {
+              course: { select: { id: true, title: true, isFree: true } },
+              chapter: { select: { id: true, title: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.studentSessionViewUsage.findMany({
+        where: { studentId },
+        include: {
+          session: {
+            select: {
+              id: true,
+              title: true,
+              duration: true,
+              sortOrder: true,
+              lecture: {
+                select: {
+                  id: true,
+                  title: true,
+                  maxViews: true,
+                  chapter: { select: { id: true, title: true } },
+                  course: { select: { id: true, title: true } },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      this.prisma.playbackSession.findMany({
+        where: { studentId },
+        include: {
+          videoSession: {
+            select: {
+              id: true,
+              title: true,
+              duration: true,
+              sortOrder: true,
+              lecture: {
+                select: {
+                  id: true,
+                  title: true,
+                  maxViews: true,
+                  chapter: { select: { id: true, title: true } },
+                  course: { select: { id: true, title: true } },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { createdAt: 'asc' },
+      }),
+      this.prisma.sessionProgress.findMany({
+        where: { studentId },
+        include: {
+          session: {
+            select: {
+              id: true,
+              title: true,
+              duration: true,
+              sortOrder: true,
+              lecture: {
+                select: {
+                  id: true,
+                  title: true,
+                  maxViews: true,
+                  chapter: { select: { id: true, title: true } },
+                  course: { select: { id: true, title: true } },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { updatedAt: 'desc' },
+      }),
+      this.prisma.quizAttempt.findMany({
+        where: { studentId },
+        include: {
+          quiz: {
+            select: {
+              id: true,
+              title: true,
+              passGrade: true,
+              maxAttempts: true,
+              lecture: {
+                select: {
+                  id: true,
+                  title: true,
+                  course: { select: { id: true, title: true } },
+                },
+              },
+            },
+          },
+          responses: { select: { earnedPoints: true, questionPoints: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.examAttempt.findMany({
+        where: { studentId },
+        include: {
+          exam: {
+            select: {
+              id: true,
+              title: true,
+              passGrade: true,
+              maxAttempts: true,
+              course: { select: { id: true, title: true } },
+              lecture: {
+                select: {
+                  id: true,
+                  title: true,
+                  course: { select: { id: true, title: true } },
+                },
+              },
+            },
+          },
+          responses: { select: { earnedPoints: true, question: { select: { points: true } } } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.activationCode.findMany({
+        where: { studentId },
+        include: {
+          redeemedLecture: {
+            select: { id: true, title: true, course: { select: { id: true, title: true } } },
+          },
+          redeemedCourse: { select: { id: true, title: true } },
+          redeemedAttachment: {
+            select: {
+              id: true,
+              title: true,
+              lecture: { select: { id: true, title: true, course: { select: { id: true, title: true } } } },
+            },
+          },
+        },
+        orderBy: { redeemedAt: 'desc' },
+      }),
+      this.prisma.activationCodeHistory.findMany({
+        where: { studentId },
+        include: {
+          redeemedLecture: {
+            select: { id: true, title: true, course: { select: { id: true, title: true } } },
+          },
+          redeemedCourse: { select: { id: true, title: true } },
+          redeemedAttachment: {
+            select: {
+              id: true,
+              title: true,
+              lecture: { select: { id: true, title: true, course: { select: { id: true, title: true } } } },
+            },
+          },
+          actor: { select: { id: true, fullName: true, role: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.studentFileAccess.findMany({
+        where: { studentId },
+        include: {
+          attachment: {
+            select: {
+              id: true,
+              title: true,
+              type: true,
+              lecture: { select: { id: true, title: true, course: { select: { id: true, title: true } } } },
+            },
+          },
+          course: { select: { id: true, title: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.deviceHistory.findMany({
+        where: { studentId },
+        orderBy: { createdAt: 'desc' },
+      }),
+      this.prisma.deviceSession.findMany({
+        where: { studentId },
+        orderBy: { lastLoginAt: 'desc' },
+      }),
+      this.prisma.certificate.findMany({
+        where: { studentId },
+        include: { course: { select: { id: true, title: true } } },
+        orderBy: { issuedAt: 'desc' },
+      }),
+      this.prisma.studentBadge.findMany({
+        where: { studentId },
+        include: { badge: true },
+        orderBy: { earnedAt: 'desc' },
+      }),
+      this.prisma.auditLog.findMany({
+        where: {
+          OR: [
+            { entityId: studentId },
+            { details: { contains: studentId } },
+          ],
+        },
+        include: {
+          user: { select: { id: true, fullName: true, email: true } },
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
+    ]);
+
+    // Build lookup maps
+    const courseAccessMap = new Map(courseAccesses.map((ca) => [ca.courseId, ca]));
+    const lectureAccessMap = new Map(lectures.map((la) => [la.lectureId, la]));
+    const usageMap = new Map(sessionViews.map((sv) => [sv.sessionId, sv]));
+    const progressMap = new Map(sessionProgress.map((sp) => [sp.sessionId, sp]));
+
+    const playbacksBySessionMap = new Map<string, typeof playbackSessions>();
+    for (const ps of playbackSessions) {
+      const list = playbacksBySessionMap.get(ps.sessionId) || [];
+      list.push(ps);
+      playbacksBySessionMap.set(ps.sessionId, list);
+    }
+
+    // Collect all touched courseIds
+    const touchedCourseIds = new Set<string>();
+    for (const ca of courseAccesses) if (ca.courseId) touchedCourseIds.add(ca.courseId);
+    for (const la of lectures) if (la.lecture?.course?.id) touchedCourseIds.add(la.lecture.course.id);
+    for (const sv of sessionViews) if (sv.session?.lecture?.course?.id) touchedCourseIds.add(sv.session.lecture.course.id);
+    for (const ps of playbackSessions) if (ps.videoSession?.lecture?.course?.id) touchedCourseIds.add(ps.videoSession.lecture.course.id);
+    for (const sp of sessionProgress) if (sp.session?.lecture?.course?.id) touchedCourseIds.add(sp.session.lecture.course.id);
+    for (const qa of quizAttempts) if (qa.quiz?.lecture?.course?.id) touchedCourseIds.add(qa.quiz.lecture.course.id);
+    for (const ea of examAttempts) {
+      if (ea.exam?.course?.id) touchedCourseIds.add(ea.exam.course.id);
+      if (ea.exam?.lecture?.course?.id) touchedCourseIds.add(ea.exam.lecture.course.id);
+    }
+    for (const rc of redeemedCodes) {
+      if (rc.redeemedCourseId) touchedCourseIds.add(rc.redeemedCourseId);
+      if (rc.redeemedLecture?.course?.id) touchedCourseIds.add(rc.redeemedLecture.course.id);
+    }
+    for (const fa of fileAccesses) {
+      if (fa.courseId) touchedCourseIds.add(fa.courseId);
+      if (fa.attachment?.lecture?.course?.id) touchedCourseIds.add(fa.attachment.lecture.course.id);
+    }
+    for (const cert of certificates) if (cert.courseId) touchedCourseIds.add(cert.courseId);
+
+    const relevantCourses = touchedCourseIds.size > 0
+      ? await this.prisma.course.findMany({
+          where: { id: { in: Array.from(touchedCourseIds) } },
+          include: {
+            lectures: {
+              orderBy: { sortOrder: 'asc' },
+              include: {
+                chapter: { select: { id: true, title: true, orderIndex: true } },
+                sessions: {
+                  orderBy: { sortOrder: 'asc' },
+                },
+                quizzes: {
+                  orderBy: { sortOrder: 'asc' },
+                  select: { id: true, title: true, passGrade: true, maxAttempts: true },
+                },
+              },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        })
+      : [];
+
+    const visitedSessionIds = new Set<string>();
+    const allVideosWatched: any[] = [];
+
+    const coursesHistory = relevantCourses.map((course) => {
+      const ca = courseAccessMap.get(course.id);
+      const now = new Date();
+      const courseCodes = redeemedCodes
+        .filter((rc) => rc.redeemedCourseId === course.id)
+        .map((rc) => ({
+          id: rc.id,
+          code: rc.code,
+          targetType: rc.targetType,
+          redeemedAt: rc.redeemedAt || rc.createdAt,
+        }));
+
+      let unlockedLecturesCount = 0;
+      let startedLecturesCount = 0;
+      let totalVideosInCourse = 0;
+      let watchedVideosCount = 0;
+      let completedVideosCount = 0;
+      let totalVideoWatchesCount = 0;
+      let totalStreamOpensCount = 0;
+
+      const courseLectures = course.lectures.map((lec) => {
+        const la = lectureAccessMap.get(lec.id);
+        const lectureCodes = redeemedCodes
+          .filter((rc) => rc.redeemedLectureId === lec.id)
+          .map((rc) => ({
+            id: rc.id,
+            code: rc.code,
+            targetType: rc.targetType,
+            redeemedAt: rc.redeemedAt || rc.createdAt,
+          }));
+
+        let lectureWatchedVideos = 0;
+        let lectureCompletedVideos = 0;
+        let lectureTotalWatches = 0;
+        let lectureTotalStreamOpens = 0;
+
+        const videos = lec.sessions.map((s) => {
+          visitedSessionIds.add(s.id);
+          const usage = usageMap.get(s.id);
+          const prog = progressMap.get(s.id);
+          const playbacks = playbacksBySessionMap.get(s.id) || [];
+
+          const usedViews = usage?.usedViews ?? 0;
+          const grantedViews = usage?.grantedViews ?? 0;
+          const maxViews = lec.maxViews ?? null;
+          const effectiveMaxViews = maxViews !== null ? maxViews + grantedViews : null;
+          const remainingViews = effectiveMaxViews !== null ? Math.max(0, effectiveMaxViews - usedViews) : null;
+          const streamOpensCount = playbacks.length;
+          const consumedPlaybacksCount = playbacks.filter((p) => p.consumed).length;
+          const watchCount = Math.max(usedViews, consumedPlaybacksCount);
+          const isCompleted = Boolean(prog?.isCompleted);
+          const isWatched = watchCount > 0 || streamOpensCount > 0 || isCompleted;
+
+          const firstWatchedAt =
+            playbacks.length > 0
+              ? playbacks[0].createdAt
+              : usage
+                ? usage.createdAt
+                : isCompleted
+                  ? prog?.createdAt || null
+                  : null;
+          const lastWatchedAt =
+            playbacks.length > 0
+              ? playbacks[playbacks.length - 1].createdAt
+              : usage
+                ? usage.updatedAt
+                : isCompleted
+                  ? prog?.completedAt || prog?.updatedAt || null
+                  : null;
+
+          const playbackLogs = playbacks.map((p, idx) => ({
+            index: idx + 1,
+            id: p.id,
+            openedAt: p.createdAt,
+            consumed: p.consumed,
+            expiresAt: p.expiresAt,
+          }));
+
+          totalVideosInCourse++;
+          if (isWatched) {
+            watchedVideosCount++;
+            lectureWatchedVideos++;
+          }
+          if (isCompleted) {
+            completedVideosCount++;
+            lectureCompletedVideos++;
+          }
+          totalVideoWatchesCount += watchCount;
+          lectureTotalWatches += watchCount;
+          totalStreamOpensCount += streamOpensCount;
+          lectureTotalStreamOpens += streamOpensCount;
+
+          const videoRecord = {
+            sessionId: s.id,
+            sessionTitle: s.title,
+            duration: s.duration,
+            hasVideo: Boolean(s.videoUrl || s.videoMediaId),
+            lectureId: lec.id,
+            lectureTitle: lec.title,
+            chapterTitle: lec.chapter?.title || null,
+            courseId: course.id,
+            courseTitle: course.title,
+            usedViews,
+            grantedViews,
+            maxViews,
+            effectiveMaxViews,
+            remainingViews,
+            streamOpensCount,
+            consumedPlaybacksCount,
+            watchCount,
+            isWatched,
+            isCompleted,
+            completedAt: prog?.completedAt || null,
+            firstWatchedAt,
+            lastWatchedAt,
+            playbackLogs,
+          };
+
+          if (isWatched || usage) {
+            allVideosWatched.push(videoRecord);
+          }
+
+          return videoRecord;
+        });
+
+        const lectureQuizAttempts = quizAttempts.filter((qa) => qa.quiz?.lecture?.id === lec.id);
+        const quizzes = lec.quizzes.map((q) => {
+          const attemptsForQuiz = lectureQuizAttempts.filter((a) => a.quizId === q.id);
+          const bestScore = attemptsForQuiz.length > 0 ? Math.max(...attemptsForQuiz.map((a) => a.score)) : null;
+          const isPassed = attemptsForQuiz.some((a) => a.status === 'PASSED');
+          return {
+            quizId: q.id,
+            quizTitle: q.title,
+            passGrade: q.passGrade,
+            maxAttempts: q.maxAttempts,
+            attemptsCount: attemptsForQuiz.length,
+            bestScore,
+            isPassed,
+          };
+        });
+
+        const hasActivity = lectureWatchedVideos > 0 || lectureCompletedVideos > 0 || lectureQuizAttempts.length > 0 || lectureCodes.length > 0;
+        const isUnlocked = Boolean(la || ca || course.isFree || hasActivity);
+        const isStarted = Boolean(la?.isStarted || (ca && lectureWatchedVideos > 0) || (course.isFree && lectureWatchedVideos > 0));
+        const unlockedAt = la?.createdAt || ca?.createdAt || null;
+        const activatedAt = la?.activatedAt || ca?.activatedAt || null;
+        const expiresAt = la?.expiresAt || ca?.expiresAt || null;
+        const isExpired = Boolean(expiresAt && new Date(expiresAt) < now);
+
+        if (isUnlocked) unlockedLecturesCount++;
+        if (isStarted) startedLecturesCount++;
+
+        return {
+          lectureId: lec.id,
+          lectureTitle: lec.title,
+          chapterId: lec.chapter?.id || null,
+          chapterTitle: lec.chapter?.title || null,
+          maxViews: lec.maxViews,
+          validityDays: lec.validityDays,
+          durationDays: lec.durationDays,
+          durationHours: lec.durationHours,
+          durationMinutes: lec.durationMinutes,
+          isUnlocked,
+          isStarted,
+          unlockedAt,
+          activatedAt,
+          expiresAt,
+          timerPausedAt: la?.timerPausedAt || null,
+          isExpired,
+          codesUsed: lectureCodes,
+          totalVideosCount: videos.length,
+          watchedVideosCount: lectureWatchedVideos,
+          completedVideosCount: lectureCompletedVideos,
+          totalWatchesCount: lectureTotalWatches,
+          totalStreamOpensCount: lectureTotalStreamOpens,
+          videos,
+          quizzes,
+        };
+      });
+
+      const hasDirectCourseAccess = Boolean(ca);
+      const courseExpiresAt = ca?.expiresAt || null;
+      const isCourseExpired = Boolean(courseExpiresAt && new Date(courseExpiresAt) < now);
+
+      return {
+        courseId: course.id,
+        courseTitle: course.title,
+        isFree: course.isFree,
+        type: course.type,
+        hasDirectCourseAccess,
+        unlockedAt: ca?.createdAt || null,
+        activatedAt: ca?.activatedAt || null,
+        expiresAt: courseExpiresAt,
+        isExpired: isCourseExpired,
+        codesUsed: courseCodes,
+        totalLecturesCount: courseLectures.length,
+        unlockedLecturesCount,
+        startedLecturesCount,
+        totalVideosCount: totalVideosInCourse,
+        watchedVideosCount,
+        completedVideosCount,
+        totalVideoWatchesCount,
+        totalStreamOpensCount,
+        lectures: courseLectures,
+      };
     });
 
-    const sessionViews = await this.prisma.studentSessionViewUsage.findMany({
-      where: { studentId },
-      include: {
-        session: {
-          select: { id: true, title: true, lecture: { select: { id: true, title: true, maxViews: true, course: { select: { id: true, title: true } } } } }
-        }
+    // Ensure any orphaned/soft-deleted session with view usage or playback is also in allVideosWatched
+    for (const sv of sessionViews) {
+      if (!visitedSessionIds.has(sv.sessionId)) {
+        visitedSessionIds.add(sv.sessionId);
+        const playbacks = playbacksBySessionMap.get(sv.sessionId) || [];
+        const prog = progressMap.get(sv.sessionId);
+        const maxViews = sv.session.lecture.maxViews ?? null;
+        const effectiveMaxViews = maxViews !== null ? maxViews + sv.grantedViews : null;
+        const remainingViews = effectiveMaxViews !== null ? Math.max(0, effectiveMaxViews - sv.usedViews) : null;
+        const streamOpensCount = playbacks.length;
+        const consumedPlaybacksCount = playbacks.filter((p) => p.consumed).length;
+        const watchCount = Math.max(sv.usedViews, consumedPlaybacksCount);
+        const isCompleted = Boolean(prog?.isCompleted);
+        allVideosWatched.push({
+          sessionId: sv.sessionId,
+          sessionTitle: sv.session.title,
+          duration: sv.session.duration,
+          hasVideo: true,
+          lectureId: sv.session.lecture.id,
+          lectureTitle: sv.session.lecture.title,
+          chapterTitle: sv.session.lecture.chapter?.title || null,
+          courseId: sv.session.lecture.course.id,
+          courseTitle: sv.session.lecture.course.title,
+          usedViews: sv.usedViews,
+          grantedViews: sv.grantedViews,
+          maxViews,
+          effectiveMaxViews,
+          remainingViews,
+          streamOpensCount,
+          consumedPlaybacksCount,
+          watchCount,
+          isWatched: true,
+          isCompleted,
+          completedAt: prog?.completedAt || null,
+          firstWatchedAt: playbacks[0]?.createdAt || sv.createdAt,
+          lastWatchedAt: playbacks[playbacks.length - 1]?.createdAt || sv.updatedAt,
+          playbackLogs: playbacks.map((p, idx) => ({
+            index: idx + 1,
+            id: p.id,
+            openedAt: p.createdAt,
+            consumed: p.consumed,
+            expiresAt: p.expiresAt,
+          })),
+        });
       }
+    }
+
+    const mappedQuizAttempts = quizAttempts.map((a) => {
+      let earnedPoints = 0;
+      let totalPoints = 0;
+      for (const r of a.responses) {
+        if (r.earnedPoints != null) earnedPoints += r.earnedPoints;
+        if (r.questionPoints != null) totalPoints += r.questionPoints;
+      }
+      return {
+        attemptId: a.id,
+        quizId: a.quizId,
+        quizTitle: a.quiz?.title,
+        lectureId: a.quiz?.lecture?.id || null,
+        lectureTitle: a.quiz?.lecture?.title || null,
+        courseId: a.quiz?.lecture?.course?.id || null,
+        courseTitle: a.quiz?.lecture?.course?.title || null,
+        score: a.score,
+        status: a.status,
+        passGrade: a.quiz?.passGrade,
+        startedAt: a.startedAt,
+        submittedAt: a.submittedAt,
+        createdAt: a.createdAt,
+        earnedPoints,
+        totalPoints,
+      };
     });
 
-    const quizAttempts = await this.prisma.quizAttempt.findMany({
-      where: { studentId },
-      include: {
-        quiz: { select: { id: true, title: true, passGrade: true } },
-        responses: { select: { earnedPoints: true, questionPoints: true } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
+    const mappedExamAttempts = examAttempts.map((a) => {
+      let earnedPoints = 0;
+      let totalPoints = 0;
+      for (const r of a.responses) {
+        if (r.earnedPoints != null) earnedPoints += r.earnedPoints;
+        if (r.question?.points != null) totalPoints += r.question.points;
+      }
+      return {
+        attemptId: a.id,
+        examId: a.examId,
+        examTitle: a.exam?.title,
+        courseId: a.exam?.course?.id || a.exam?.lecture?.course?.id || null,
+        courseTitle: a.exam?.course?.title || a.exam?.lecture?.course?.title || null,
+        lectureTitle: a.exam?.lecture?.title || null,
+        score: a.score,
+        status: a.status,
+        passGrade: a.exam?.passGrade,
+        startedAt: a.startedAt,
+        submittedAt: a.submittedAt,
+        createdAt: a.createdAt,
+        earnedPoints,
+        totalPoints,
+      };
     });
 
-    const examAttempts = await this.prisma.examAttempt.findMany({
-      where: { studentId },
-      include: {
-        exam: { select: { id: true, title: true, passGrade: true } },
-        responses: { select: { earnedPoints: true, question: { select: { points: true } } } },
-      },
-      orderBy: { createdAt: 'desc' },
-      take: 50,
-    });
+    // Build complete chronological timeline from registration to now
+    const timeline: Array<{
+      id: string;
+      timestamp: Date | string;
+      category:
+        | 'REGISTRATION'
+        | 'COURSE_ACCESS'
+        | 'LECTURE_ACCESS'
+        | 'CODE_REDEMPTION'
+        | 'VIDEO_WATCH'
+        | 'VIDEO_COMPLETE'
+        | 'QUIZ_ATTEMPT'
+        | 'EXAM_ATTEMPT'
+        | 'FILE_ACCESS'
+        | 'DEVICE_EVENT'
+        | 'ADMIN_ACTION'
+        | 'CERTIFICATE'
+        | 'BADGE';
+      action: string;
+      title: string;
+      details: string;
+    }> = [];
+
+    if (student?.createdAt) {
+      timeline.push({
+        id: `reg_${student.id}`,
+        timestamp: student.createdAt,
+        category: 'REGISTRATION',
+        action: 'ACCOUNT_REGISTERED',
+        title: `Student Account Registered (${student.fullName})`,
+        details: `Email: ${student.email}${student.phoneNumber ? ` | Phone: ${student.phoneNumber}` : ''} | Level: ${student.educationLevel}`,
+      });
+    }
+
+    for (const ch of codeHistory) {
+      const targetName =
+        ch.redeemedCourse?.title ||
+        (ch.redeemedLecture ? `${ch.redeemedLecture.title} (${ch.redeemedLecture.course?.title || ''})` : '') ||
+        ch.redeemedAttachment?.title ||
+        'Content';
+      timeline.push({
+        id: `code_hist_${ch.id}`,
+        timestamp: ch.createdAt,
+        category: 'CODE_REDEMPTION',
+        action: `CODE_${ch.action}`,
+        title: `Activation Code ${ch.action}: ${ch.code}`,
+        details: `Target: ${targetName}${ch.ipAddress ? ` | IP: ${ch.ipAddress}` : ''}`,
+      });
+    }
+
+    // If there are redeemedCodes without codeHistory entries, add them
+    const historyCodeIds = new Set(codeHistory.map((ch) => ch.codeId));
+    for (const rc of redeemedCodes) {
+      if (!historyCodeIds.has(rc.id) && rc.redeemedAt) {
+        const targetName =
+          rc.redeemedCourse?.title ||
+          (rc.redeemedLecture ? `${rc.redeemedLecture.title} (${rc.redeemedLecture.course?.title || ''})` : '') ||
+          rc.redeemedAttachment?.title ||
+          'Content';
+        timeline.push({
+          id: `code_red_${rc.id}`,
+          timestamp: rc.redeemedAt,
+          category: 'CODE_REDEMPTION',
+          action: 'CODE_REDEEMED',
+          title: `Activation Code Redeemed: ${rc.code}`,
+          details: `Type: ${rc.targetType} | Target: ${targetName}`,
+        });
+      }
+    }
+
+    for (const ca of courseAccesses) {
+      timeline.push({
+        id: `ca_${ca.id}`,
+        timestamp: ca.createdAt,
+        category: 'COURSE_ACCESS',
+        action: 'COURSE_UNLOCKED',
+        title: `Course Access Unlocked: ${ca.course.title}`,
+        details: `Activated: ${ca.activatedAt ? new Date(ca.activatedAt).toISOString() : 'Yes'}${ca.expiresAt ? ` | Expires: ${new Date(ca.expiresAt).toISOString()}` : ' | No Expiry'}`,
+      });
+    }
+
+    for (const la of lectures) {
+      timeline.push({
+        id: `la_unlock_${la.id}`,
+        timestamp: la.createdAt,
+        category: 'LECTURE_ACCESS',
+        action: 'LECTURE_UNLOCKED',
+        title: `Lecture Unlocked: ${la.lecture.title}`,
+        details: `Course: ${la.lecture.course.title}${la.lecture.chapter?.title ? ` | Chapter: ${la.lecture.chapter.title}` : ''}`,
+      });
+      if (la.isStarted && la.activatedAt) {
+        timeline.push({
+          id: `la_start_${la.id}`,
+          timestamp: la.activatedAt,
+          category: 'LECTURE_ACCESS',
+          action: 'LECTURE_STARTED',
+          title: `Lecture Started: ${la.lecture.title}`,
+          details: `Course: ${la.lecture.course.title}${la.expiresAt ? ` | Expires At: ${new Date(la.expiresAt).toISOString()}` : ' | Unlimited Time'}`,
+        });
+      }
+    }
+
+    for (const ps of playbackSessions) {
+      timeline.push({
+        id: `ps_${ps.id}`,
+        timestamp: ps.createdAt,
+        category: 'VIDEO_WATCH',
+        action: ps.consumed ? 'VIDEO_VIEW_CONSUMED' : 'VIDEO_STREAM_OPENED',
+        title: `${ps.consumed ? 'Watched Video (Confirmed View)' : 'Opened Video Stream'}: ${ps.videoSession.title}`,
+        details: `Lecture: ${ps.videoSession.lecture.title} | Course: ${ps.videoSession.lecture.course.title}`,
+      });
+    }
+
+    for (const sp of sessionProgress) {
+      if (sp.isCompleted) {
+        timeline.push({
+          id: `sp_${sp.id}`,
+          timestamp: sp.completedAt || sp.updatedAt || sp.createdAt,
+          category: 'VIDEO_COMPLETE',
+          action: 'VIDEO_COMPLETED',
+          title: `Completed Video: ${sp.session.title}`,
+          details: `Lecture: ${sp.session.lecture.title} | Course: ${sp.session.lecture.course.title}`,
+        });
+      }
+    }
+
+    for (const qa of mappedQuizAttempts) {
+      timeline.push({
+        id: `qa_${qa.attemptId}`,
+        timestamp: qa.submittedAt || qa.startedAt || qa.createdAt,
+        category: 'QUIZ_ATTEMPT',
+        action: `QUIZ_${qa.status}`,
+        title: `Quiz Attempt (${qa.status}): ${qa.quizTitle || 'Quiz'}`,
+        details: `Score: ${qa.score}% (${qa.earnedPoints}/${qa.totalPoints} pts)${qa.lectureTitle ? ` | Lecture: ${qa.lectureTitle}` : ''}${qa.courseTitle ? ` | Course: ${qa.courseTitle}` : ''}`,
+      });
+    }
+
+    for (const ea of mappedExamAttempts) {
+      timeline.push({
+        id: `ea_${ea.attemptId}`,
+        timestamp: ea.submittedAt || ea.startedAt || ea.createdAt,
+        category: 'EXAM_ATTEMPT',
+        action: `EXAM_${ea.status}`,
+        title: `Exam Attempt (${ea.status}): ${ea.examTitle || 'Exam'}`,
+        details: `Score: ${ea.score ?? 0}% (${ea.earnedPoints}/${ea.totalPoints} pts)${ea.courseTitle ? ` | Course: ${ea.courseTitle}` : ''}`,
+      });
+    }
+
+    for (const fa of fileAccesses) {
+      timeline.push({
+        id: `fa_${fa.id}`,
+        timestamp: fa.createdAt,
+        category: 'FILE_ACCESS',
+        action: 'FILE_ACCESS_GRANTED',
+        title: `File Access Unlocked: ${fa.attachment?.title || fa.course?.title || 'Files'}`,
+        details: `Source: ${fa.source}${fa.course?.title ? ` | Course: ${fa.course.title}` : ''}`,
+      });
+    }
+
+    for (const dh of deviceHistory) {
+      timeline.push({
+        id: `dh_${dh.id}`,
+        timestamp: dh.createdAt,
+        category: 'DEVICE_EVENT',
+        action: `DEVICE_${dh.action}`,
+        title: `Device ${dh.action}: ${dh.deviceFingerprint}`,
+        details: `${dh.ipAddress ? `IP: ${dh.ipAddress}` : ''}${dh.browser ? ` | Browser: ${dh.browser}` : ''}`,
+      });
+    }
+
+    for (const al of adminAuditLogs) {
+      timeline.push({
+        id: `al_${al.id}`,
+        timestamp: al.createdAt,
+        category: 'ADMIN_ACTION',
+        action: al.action,
+        title: `Admin Action: ${al.action}`,
+        details: `By: ${al.user?.fullName || 'Admin'}${al.details ? ` | ${al.details}` : ''}`,
+      });
+    }
+
+    for (const cert of certificates) {
+      timeline.push({
+        id: `cert_${cert.id}`,
+        timestamp: cert.issuedAt,
+        category: 'CERTIFICATE',
+        action: 'CERTIFICATE_ISSUED',
+        title: `Certificate Issued: ${cert.course.title}`,
+        details: `Course: ${cert.course.title}`,
+      });
+    }
+
+    for (const b of badges) {
+      timeline.push({
+        id: `badge_${b.id}`,
+        timestamp: b.earnedAt,
+        category: 'BADGE',
+        action: 'BADGE_EARNED',
+        title: `Badge Earned: ${b.badge.name}`,
+        details: b.badge.description,
+      });
+    }
+
+    // Sort timeline chronologically from registration (oldest) to now (newest)
+    timeline.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+    const totalConfirmedVideoWatches = allVideosWatched.reduce((sum, v) => sum + (v.watchCount || 0), 0);
+    const totalVideoStreamOpens = allVideosWatched.reduce((sum, v) => sum + (v.streamOpensCount || 0), 0);
+    const totalUniqueVideosWatched = allVideosWatched.filter((v) => v.isWatched).length;
+    const totalVideosCompleted = allVideosWatched.filter((v) => v.isCompleted).length;
+
+    const summaryStats = {
+      registeredAt: student?.createdAt || null,
+      lastLoginAt: student?.lastLoginAt || null,
+      reportGeneratedAt: new Date(),
+      totalCoursesTouched: coursesHistory.length,
+      totalDirectCourseAccesses: courseAccesses.length,
+      totalLecturesUnlocked: lectures.length,
+      totalLecturesStarted: lectures.filter((l) => l.isStarted).length,
+      totalUniqueVideosWatched,
+      totalConfirmedVideoWatches,
+      totalVideoStreamOpens,
+      totalVideosCompleted,
+      totalCodesRedeemed: redeemedCodes.length,
+      totalQuizAttempts: mappedQuizAttempts.length,
+      passedQuizzesCount: mappedQuizAttempts.filter((q) => q.status === 'PASSED').length,
+      failedQuizzesCount: mappedQuizAttempts.filter((q) => q.status === 'FAILED').length,
+      totalExamAttempts: mappedExamAttempts.length,
+      passedExamsCount: mappedExamAttempts.filter((e) => e.status === 'PASSED').length,
+      failedExamsCount: mappedExamAttempts.filter((e) => e.status === 'FAILED').length,
+      totalDeviceEvents: deviceHistory.length,
+      totalFilesUnlocked: fileAccesses.length,
+      totalCertificates: certificates.length,
+    };
 
     return {
+      summaryStats,
+      courseAccesses: courseAccesses.map((ca) => ({
+        id: ca.id,
+        courseId: ca.courseId,
+        courseTitle: ca.course.title,
+        isFree: ca.course.isFree,
+        createdAt: ca.createdAt,
+        activatedAt: ca.activatedAt,
+        expiresAt: ca.expiresAt,
+      })),
       lectures: lectures.map((l) => ({
         lectureId: l.lectureId,
         lectureTitle: l.lecture.title,
+        chapterTitle: l.lecture.chapter?.title || null,
+        courseId: l.lecture.course.id,
         courseTitle: l.lecture.course.title,
+        isStarted: l.isStarted,
+        createdAt: l.createdAt,
         activatedAt: l.activatedAt,
         expiresAt: l.expiresAt,
+        timerPausedAt: l.timerPausedAt,
       })),
-      sessionViews: sessionViews.map((sv) => ({
-        sessionId: sv.sessionId,
-        sessionTitle: sv.session.title,
-        lectureId: sv.session.lecture.id,
-        lectureTitle: sv.session.lecture.title,
-        courseTitle: sv.session.lecture.course.title,
-        usedViews: sv.usedViews,
-        grantedViews: sv.grantedViews,
-        maxViews: sv.session.lecture.maxViews,
-        effectiveMaxViews: sv.session.lecture.maxViews !== null ? sv.session.lecture.maxViews + sv.grantedViews : null,
-      })),
-      quizAttempts: quizAttempts.map((a) => {
-        let earnedPoints = 0;
-        let totalPoints = 0;
-        for (const r of a.responses) {
-          if (r.earnedPoints != null) earnedPoints += r.earnedPoints;
-          if (r.questionPoints != null) totalPoints += r.questionPoints;
-        }
+      sessionViews: sessionViews.map((sv) => {
+        const playbacks = playbacksBySessionMap.get(sv.sessionId) || [];
+        const prog = progressMap.get(sv.sessionId);
         return {
-          attemptId: a.id,
-          quizId: a.quizId,
-          quizTitle: a.quiz?.title,
-          score: a.score,
-          status: a.status,
-          passGrade: a.quiz?.passGrade,
-          submittedAt: a.submittedAt,
-          earnedPoints,
-          totalPoints,
+          sessionId: sv.sessionId,
+          sessionTitle: sv.session.title,
+          duration: sv.session.duration,
+          lectureId: sv.session.lecture.id,
+          lectureTitle: sv.session.lecture.title,
+          chapterTitle: sv.session.lecture.chapter?.title || null,
+          courseId: sv.session.lecture.course.id,
+          courseTitle: sv.session.lecture.course.title,
+          usedViews: sv.usedViews,
+          grantedViews: sv.grantedViews,
+          maxViews: sv.session.lecture.maxViews,
+          effectiveMaxViews:
+            sv.session.lecture.maxViews !== null ? sv.session.lecture.maxViews + sv.grantedViews : null,
+          streamOpensCount: playbacks.length,
+          consumedPlaybacksCount: playbacks.filter((p) => p.consumed).length,
+          isCompleted: Boolean(prog?.isCompleted),
+          completedAt: prog?.completedAt || null,
+          firstWatchedAt: playbacks[0]?.createdAt || sv.createdAt,
+          lastWatchedAt: playbacks[playbacks.length - 1]?.createdAt || sv.updatedAt,
+          playbackLogs: playbacks.map((p, idx) => ({
+            index: idx + 1,
+            id: p.id,
+            openedAt: p.createdAt,
+            consumed: p.consumed,
+            expiresAt: p.expiresAt,
+          })),
         };
       }),
-      examAttempts: examAttempts.map((a) => {
-        let earnedPoints = 0;
-        let totalPoints = 0;
-        for (const r of a.responses) {
-          if (r.earnedPoints != null) earnedPoints += r.earnedPoints;
-          if (r.question?.points != null) totalPoints += r.question.points;
-        }
-        return {
-          examId: a.examId,
-          examTitle: a.exam?.title,
-          score: a.score,
-          status: a.status,
-          passGrade: a.exam?.passGrade,
-          submittedAt: a.submittedAt,
-          earnedPoints,
-          totalPoints,
-        };
-      }),
+      coursesHistory,
+      allVideosWatched,
+      quizAttempts: mappedQuizAttempts,
+      examAttempts: mappedExamAttempts,
+      redeemedCodes: redeemedCodes.map((rc) => ({
+        id: rc.id,
+        code: rc.code,
+        status: rc.status,
+        targetType: rc.targetType,
+        redeemedAt: rc.redeemedAt,
+        createdAt: rc.createdAt,
+        courseTitle: rc.redeemedCourse?.title || rc.redeemedLecture?.course?.title || rc.redeemedAttachment?.lecture?.course?.title || null,
+        lectureTitle: rc.redeemedLecture?.title || rc.redeemedAttachment?.lecture?.title || null,
+        attachmentTitle: rc.redeemedAttachment?.title || null,
+      })),
+      codeHistory: codeHistory.map((ch) => ({
+        id: ch.id,
+        code: ch.code,
+        action: ch.action,
+        oldStatus: ch.oldStatus,
+        newStatus: ch.newStatus,
+        ipAddress: ch.ipAddress,
+        browser: ch.browser,
+        createdAt: ch.createdAt,
+        courseTitle: ch.redeemedCourse?.title || ch.redeemedLecture?.course?.title || ch.redeemedAttachment?.lecture?.course?.title || null,
+        lectureTitle: ch.redeemedLecture?.title || ch.redeemedAttachment?.lecture?.title || null,
+        attachmentTitle: ch.redeemedAttachment?.title || null,
+        actorName: ch.actor?.fullName || null,
+      })),
+      fileAccesses: fileAccesses.map((fa) => ({
+        id: fa.id,
+        source: fa.source,
+        createdAt: fa.createdAt,
+        attachmentTitle: fa.attachment?.title || null,
+        attachmentType: fa.attachment?.type || null,
+        lectureTitle: fa.attachment?.lecture?.title || null,
+        courseTitle: fa.course?.title || fa.attachment?.lecture?.course?.title || null,
+      })),
+      deviceHistory,
+      deviceSessions,
+      certificates: certificates.map((c) => ({
+        id: c.id,
+        courseId: c.courseId,
+        courseTitle: c.course.title,
+        issuedAt: c.issuedAt,
+        pdfUrl: c.pdfUrl,
+      })),
+      badges: badges.map((b) => ({
+        id: b.id,
+        badgeId: b.badgeId,
+        name: b.badge.name,
+        description: b.badge.description,
+        earnedAt: b.earnedAt,
+      })),
+      timeline,
     };
   }
 
