@@ -493,13 +493,30 @@ export class AdminService {
    *
    * Rows are hard-deleted on purpose: the (studentId, courseId) / (studentId, lectureId) unique
    * constraints would otherwise block the student from redeeming a new code.
+   *
+   * A full snapshot of the removed rows is stored in SystemAuditLog (actionType COURSE_RELOCKED)
+   * inside the same transaction, so an accidental relock can be undone via restoreCourseRelock().
    */
   async relockCourse(courseId: string, actorId: string, ipAddress?: string) {
     const course = await this.prisma.course.findUnique({ where: { id: courseId } });
     if (!course) throw new NotFoundException('Course not found');
 
+    const fileAccessWhere = {
+      OR: [
+        { courseId },
+        { attachment: { lecture: { courseId } } },
+      ],
+    };
+
     const result = await this.prisma.$transaction(async (tx) => {
-      // Record a REVOKED entry in each affected code's history (code itself stays REDEEMED)
+      // 1. Snapshot everything we're about to remove (used for undo)
+      const [courseRows, lectureRows, fileRows] = await Promise.all([
+        tx.studentCourseAccess.findMany({ where: { courseId } }),
+        tx.studentLectureAccess.findMany({ where: { lecture: { courseId } } }),
+        tx.studentFileAccess.findMany({ where: fileAccessWhere }),
+      ]);
+
+      // 2. Record a REVOKED entry in each affected code's history (code itself stays REDEEMED)
       const affectedCodes = await tx.activationCode.findMany({
         where: {
           status: CodeStatus.REDEEMED,
@@ -530,46 +547,280 @@ export class AdminService {
         });
       }
 
-      const courseAccess = await tx.studentCourseAccess.deleteMany({
-        where: { courseId },
-      });
-      const lectureAccess = await tx.studentLectureAccess.deleteMany({
-        where: { lecture: { courseId } },
-      });
-      const fileAccess = await tx.studentFileAccess.deleteMany({
-        where: {
-          OR: [
-            { courseId },
-            { attachment: { lecture: { courseId } } },
-          ],
-        },
-      });
+      // 3. Remove access
+      const courseAccess = await tx.studentCourseAccess.deleteMany({ where: { courseId } });
+      const lectureAccess = await tx.studentLectureAccess.deleteMany({ where: { lecture: { courseId } } });
+      const fileAccess = await tx.studentFileAccess.deleteMany({ where: fileAccessWhere });
 
-      return {
+      const counts = {
         courseAccessRemoved: courseAccess.count,
         lectureAccessRemoved: lectureAccess.count,
         fileAccessRemoved: fileAccess.count,
         codesRevoked: affectedCodes.length,
       };
-    }, { timeout: 60000 });
 
-    try {
-      await this.prisma.systemAuditLog.create({
+      // 4. Persist the snapshot atomically with the delete — if this fails, nothing is removed
+      const log = await tx.systemAuditLog.create({
         data: {
           actorId,
           actionType: 'COURSE_RELOCKED',
-          payload: JSON.stringify({ courseId, courseTitle: course.title, ...result }),
+          payload: JSON.stringify({
+            version: 2,
+            courseId,
+            courseTitle: course.title,
+            ...counts,
+            restoredAt: null,
+            snapshot: {
+              courseAccess: courseRows,
+              lectureAccess: lectureRows,
+              fileAccess: fileRows,
+            },
+          }),
           ipAddress: ipAddress ?? null,
         },
       });
-    } catch {
-      // Audit logging must never break the operation itself
-    }
+
+      return { relockId: log.id, ...counts };
+    }, { timeout: 120000 });
 
     return {
       message: `Course "${course.title}" has been relocked. Students must redeem a new code to regain access.`,
       ...result,
     };
+  }
+
+  /** List past relocks of a course (newest first), without the heavy snapshot data. */
+  async getCourseRelocks(courseId: string) {
+    const logs = await this.prisma.systemAuditLog.findMany({
+      where: { actionType: 'COURSE_RELOCKED', payload: { contains: courseId } },
+      orderBy: { createdAt: 'desc' },
+      include: { actor: { select: { fullName: true, email: true } } },
+    });
+
+    return logs
+      .map((log) => {
+        const p = this.parseRelockPayload(log.payload);
+        if (!p || p.courseId !== courseId) return null;
+        return {
+          id: log.id,
+          createdAt: log.createdAt,
+          actorName: log.actor?.fullName ?? null,
+          courseAccessRemoved: p.courseAccessRemoved ?? 0,
+          lectureAccessRemoved: p.lectureAccessRemoved ?? 0,
+          fileAccessRemoved: p.fileAccessRemoved ?? 0,
+          codesRevoked: p.codesRevoked ?? 0,
+          // Relocks made before snapshots existed can only be rebuilt from activation-code history
+          restoreMode: p.snapshot ? 'EXACT' : 'FROM_CODES',
+          restoredAt: p.restoredAt ?? null,
+        };
+      })
+      .filter(Boolean);
+  }
+
+  /**
+   * Undo a relock: give access back ONLY to the students who had it before that relock.
+   * Students who already redeemed a new code in the meantime keep their new access (duplicates are skipped).
+   */
+  async restoreCourseRelock(relockId: string, actorId: string, ipAddress?: string) {
+    const log = await this.prisma.systemAuditLog.findUnique({ where: { id: relockId } });
+    if (!log || log.actionType !== 'COURSE_RELOCKED') throw new NotFoundException('Relock record not found');
+
+    const payload = this.parseRelockPayload(log.payload);
+    if (!payload?.courseId) throw new BadRequestException('Relock record is unreadable');
+    if (payload.restoredAt) throw new BadRequestException('This relock has already been restored');
+
+    const course = await this.prisma.course.findUnique({ where: { id: payload.courseId } });
+    if (!course) throw new NotFoundException('Course not found');
+
+    const toDate = (v: any) => (v ? new Date(v) : null);
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      let courseRows: any[] = [];
+      let lectureRows: any[] = [];
+      let fileRows: any[] = [];
+
+      if (payload.snapshot) {
+        // EXACT restore from snapshot (original timers / expiry dates preserved)
+        courseRows = (payload.snapshot.courseAccess ?? []).map((r: any) => ({
+          studentId: r.studentId,
+          courseId: r.courseId,
+          createdAt: toDate(r.createdAt) ?? new Date(),
+          activatedAt: toDate(r.activatedAt) ?? new Date(),
+          expiresAt: toDate(r.expiresAt),
+        }));
+        lectureRows = (payload.snapshot.lectureAccess ?? []).map((r: any) => ({
+          studentId: r.studentId,
+          lectureId: r.lectureId,
+          createdAt: toDate(r.createdAt) ?? new Date(),
+          isStarted: !!r.isStarted,
+          activatedAt: toDate(r.activatedAt),
+          expiresAt: toDate(r.expiresAt),
+          timerPausedAt: toDate(r.timerPausedAt),
+        }));
+        fileRows = (payload.snapshot.fileAccess ?? []).map((r: any) => ({
+          studentId: r.studentId,
+          attachmentId: r.attachmentId ?? null,
+          courseId: r.courseId ?? null,
+          source: r.source,
+          createdAt: toDate(r.createdAt) ?? new Date(),
+        }));
+      } else {
+        // FROM_CODES: legacy relock that ran BEFORE snapshots were added.
+        // 1) Rebuild course, lecture, and file access from all redeemed ActivationCodes for this course
+        const redeemedCodes = await tx.activationCode.findMany({
+          where: {
+            status: CodeStatus.REDEEMED,
+            studentId: { not: null },
+            OR: [
+              { redeemedCourseId: course.id },
+              { redeemedLecture: { courseId: course.id } },
+              { redeemedAttachment: { lecture: { courseId: course.id } } },
+            ],
+          },
+          select: {
+            studentId: true,
+            targetType: true,
+            redeemedAt: true,
+            redeemedCourseId: true,
+            redeemedLectureId: true,
+            redeemedAttachmentId: true,
+          },
+        });
+
+        const studentsWithAnyCode = new Set<string>();
+        for (const c of redeemedCodes) {
+          if (!c.studentId) continue;
+          studentsWithAnyCode.add(c.studentId);
+          const redeemedAt = c.redeemedAt ?? new Date();
+          if (c.targetType === 'COURSE' && c.redeemedCourseId) {
+            courseRows.push({
+              studentId: c.studentId,
+              courseId: c.redeemedCourseId,
+              activatedAt: redeemedAt,
+              expiresAt:
+                course.validityDays && course.validityDays > 0
+                  ? new Date(redeemedAt.getTime() + course.validityDays * 86400000)
+                  : null,
+            });
+          } else if (c.targetType === 'LECTURE' && c.redeemedLectureId) {
+            lectureRows.push({
+              studentId: c.studentId,
+              lectureId: c.redeemedLectureId,
+              isStarted: false,
+            });
+          } else if (c.targetType === 'FILE' && c.redeemedAttachmentId) {
+            fileRows.push({
+              studentId: c.studentId,
+              attachmentId: c.redeemedAttachmentId,
+              courseId: null,
+              source: 'FILE_CODE',
+            });
+          } else if (c.targetType === 'COURSE_FILES' && c.redeemedCourseId) {
+            fileRows.push({
+              studentId: c.studentId,
+              attachmentId: null,
+              courseId: c.redeemedCourseId,
+              source: 'COURSE_FILES_CODE',
+            });
+          }
+        }
+
+        // 2) Also recover lecture access for lectures students had already started (via view usage or session progress)
+        //    and recover course access for any student who was manually granted access by an admin (activity in course, no code)
+        const [viewUsages, sessionProg] = await Promise.all([
+          tx.studentSessionViewUsage.findMany({
+            where: { session: { lecture: { courseId: course.id } } },
+            select: { studentId: true, session: { select: { lectureId: true } } },
+          }),
+          tx.sessionProgress.findMany({
+            where: { session: { lecture: { courseId: course.id } } },
+            select: { studentId: true, session: { select: { lectureId: true } } },
+          }),
+        ]);
+
+        for (const item of [...viewUsages, ...sessionProg]) {
+          lectureRows.push({
+            studentId: item.studentId,
+            lectureId: item.session.lectureId,
+            isStarted: true,
+            activatedAt: new Date(),
+          });
+          if (!studentsWithAnyCode.has(item.studentId)) {
+            courseRows.push({
+              studentId: item.studentId,
+              courseId: course.id,
+              activatedAt: new Date(),
+              expiresAt: null,
+            });
+          }
+        }
+      }
+
+      // Skip students who already have access again (e.g. redeemed a new code after the relock)
+      const courseRes = courseRows.length
+        ? await tx.studentCourseAccess.createMany({ data: courseRows, skipDuplicates: true })
+        : { count: 0 };
+      const lectureRes = lectureRows.length
+        ? await tx.studentLectureAccess.createMany({ data: lectureRows, skipDuplicates: true })
+        : { count: 0 };
+
+      // File access has no unique constraint — dedupe manually
+      const existingFiles = await tx.studentFileAccess.findMany({
+        where: { studentId: { in: [...new Set(fileRows.map((r) => r.studentId))] } },
+        select: { studentId: true, attachmentId: true, courseId: true },
+      });
+      const key = (r: any) => `${r.studentId}|${r.attachmentId ?? ''}|${r.courseId ?? ''}`;
+      const seen = new Set(existingFiles.map(key));
+      const newFileRows = fileRows.filter((r) => {
+        const k = key(r);
+        if (seen.has(k)) return false;
+        seen.add(k);
+        return true;
+      });
+      const fileRes = newFileRows.length
+        ? await tx.studentFileAccess.createMany({ data: newFileRows })
+        : { count: 0 };
+
+      // Mark the relock as restored so it can't be applied twice
+      await tx.systemAuditLog.update({
+        where: { id: log.id },
+        data: {
+          payload: JSON.stringify({ ...payload, restoredAt: new Date().toISOString(), restoredBy: actorId }),
+        },
+      });
+
+      const counts = {
+        courseAccessRestored: courseRes.count,
+        lectureAccessRestored: lectureRes.count,
+        fileAccessRestored: fileRes.count,
+      };
+
+      await tx.systemAuditLog.create({
+        data: {
+          actorId,
+          actionType: 'COURSE_RELOCK_RESTORED',
+          payload: JSON.stringify({ courseId: course.id, courseTitle: course.title, relockId, mode: payload.snapshot ? 'EXACT' : 'FROM_CODES', ...counts }),
+          ipAddress: ipAddress ?? null,
+        },
+      });
+
+      return counts;
+    }, { timeout: 120000 });
+
+    return {
+      message: `Access to "${course.title}" restored for previously enrolled students.`,
+      mode: payload.snapshot ? 'EXACT' : 'FROM_CODES',
+      ...result,
+    };
+  }
+
+  private parseRelockPayload(payload: string | null): any {
+    if (!payload) return null;
+    try {
+      return JSON.parse(payload);
+    } catch {
+      return null;
+    }
   }
 
   async extendLectureExpiry(studentId: string, lectureId: string, extraDays: number) {
@@ -620,7 +871,15 @@ export class AdminService {
       }),
       this.prisma.systemAuditLog.count(),
     ]);
-    return { items, total, skip, take };
+    // Strip heavy relock snapshots from the audit viewer output
+    const cleaned = items.map((item: any) => {
+      if (item.actionType !== 'COURSE_RELOCKED') return item;
+      const p = this.parseRelockPayload(item.payload);
+      if (!p?.snapshot) return item;
+      const { snapshot, ...rest } = p;
+      return { ...item, payload: JSON.stringify(rest) };
+    });
+    return { items: cleaned, total, skip, take };
   }
 
   async getStudentProgress(studentId: string) {

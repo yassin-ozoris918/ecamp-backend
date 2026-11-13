@@ -163,6 +163,25 @@ export class AdminController {
     return this.adminService.relockCourse(courseId, req.user.sub, ip);
   }
 
+  // History of relocks for a course (used to undo an accidental relock)
+  @Get('courses/:courseId/relocks')
+  async getCourseRelocks(@Param('courseId') courseId: string) {
+    return this.adminService.getCourseRelocks(courseId);
+  }
+
+  // Undo a relock: restore access ONLY for students who had it before that relock
+  @Post('course-relocks/:relockId/restore')
+  @HttpCode(HttpStatus.OK)
+  async restoreCourseRelock(
+    @Param('relockId') relockId: string,
+    @Req() req: RequestWithUser,
+  ) {
+    const ip = (req.headers['cf-connecting-ip'] as string)
+      || (req.headers['x-forwarded-for'] as string)
+      || req.ip;
+    return this.adminService.restoreCourseRelock(relockId, req.user.sub, ip);
+  }
+
   @Post('users/:id/extend-lecture')
   async extendLectureExpiry(
     @Param('id') studentId: string,
