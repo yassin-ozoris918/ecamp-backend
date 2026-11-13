@@ -547,10 +547,18 @@ export class AdminService {
         });
       }
 
-      // 3. Remove access
+      // 3. Remove access and immediately expire any active video playback sessions
       const courseAccess = await tx.studentCourseAccess.deleteMany({ where: { courseId } });
       const lectureAccess = await tx.studentLectureAccess.deleteMany({ where: { lecture: { courseId } } });
       const fileAccess = await tx.studentFileAccess.deleteMany({ where: fileAccessWhere });
+      await tx.playbackSession.updateMany({
+        where: {
+          videoSession: { lecture: { courseId } },
+          consumed: false,
+          expiresAt: { gt: new Date() },
+        },
+        data: { expiresAt: new Date(0) },
+      });
 
       const counts = {
         courseAccessRemoved: courseAccess.count,
