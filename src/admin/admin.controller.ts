@@ -150,6 +150,19 @@ export class AdminController {
     return this.adminService.removeCourseAccess(studentId, courseId);
   }
 
+  // Relock a course for ALL students: everyone must redeem a new code to regain access.
+  @Post('courses/:courseId/relock')
+  @HttpCode(HttpStatus.OK)
+  async relockCourse(
+    @Param('courseId') courseId: string,
+    @Req() req: RequestWithUser,
+  ) {
+    const ip = (req.headers['cf-connecting-ip'] as string)
+      || (req.headers['x-forwarded-for'] as string)
+      || req.ip;
+    return this.adminService.relockCourse(courseId, req.user.sub, ip);
+  }
+
   @Post('users/:id/extend-lecture')
   async extendLectureExpiry(
     @Param('id') studentId: string,

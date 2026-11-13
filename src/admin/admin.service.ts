@@ -480,6 +480,98 @@ export class AdminService {
     return { message: 'Course access revoked successfully' };
   }
 
+  /**
+   * Relock a whole course for ALL students (e.g. at the start of a new term / after the midterm).
+   *
+   * Removes every access grant tied to this course so each student must redeem a NEW code:
+   *  - course access (COURSE codes / admin grants)
+   *  - per-lecture access (LECTURE codes, and the rows auto-created when a course-access student opened a lecture)
+   *  - file access (FILE / COURSE_FILES codes / admin grants) for this course's attachments
+   *
+   * Learning progress (session completion, quiz/exam attempts, view usage, XP, certificates) is NOT touched.
+   * Previously redeemed codes stay REDEEMED, so they cannot be reused.
+   *
+   * Rows are hard-deleted on purpose: the (studentId, courseId) / (studentId, lectureId) unique
+   * constraints would otherwise block the student from redeeming a new code.
+   */
+  async relockCourse(courseId: string, actorId: string, ipAddress?: string) {
+    const course = await this.prisma.course.findUnique({ where: { id: courseId } });
+    if (!course) throw new NotFoundException('Course not found');
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Record a REVOKED entry in each affected code's history (code itself stays REDEEMED)
+      const affectedCodes = await tx.activationCode.findMany({
+        where: {
+          status: CodeStatus.REDEEMED,
+          OR: [
+            { redeemedCourseId: courseId },
+            { redeemedLecture: { courseId } },
+            { redeemedAttachment: { lecture: { courseId } } },
+          ],
+        },
+        select: { id: true, code: true, studentId: true, redeemedCourseId: true, redeemedLectureId: true, redeemedAttachmentId: true },
+      });
+
+      if (affectedCodes.length > 0) {
+        await tx.activationCodeHistory.createMany({
+          data: affectedCodes.map((c) => ({
+            codeId: c.id,
+            code: c.code,
+            redeemedCourseId: c.redeemedCourseId,
+            redeemedLectureId: c.redeemedLectureId,
+            redeemedAttachmentId: c.redeemedAttachmentId,
+            studentId: c.studentId,
+            action: 'REVOKED',
+            oldStatus: CodeStatus.REDEEMED,
+            newStatus: CodeStatus.REDEEMED,
+            actorId,
+            ipAddress: ipAddress ?? null,
+          })),
+        });
+      }
+
+      const courseAccess = await tx.studentCourseAccess.deleteMany({
+        where: { courseId },
+      });
+      const lectureAccess = await tx.studentLectureAccess.deleteMany({
+        where: { lecture: { courseId } },
+      });
+      const fileAccess = await tx.studentFileAccess.deleteMany({
+        where: {
+          OR: [
+            { courseId },
+            { attachment: { lecture: { courseId } } },
+          ],
+        },
+      });
+
+      return {
+        courseAccessRemoved: courseAccess.count,
+        lectureAccessRemoved: lectureAccess.count,
+        fileAccessRemoved: fileAccess.count,
+        codesRevoked: affectedCodes.length,
+      };
+    }, { timeout: 60000 });
+
+    try {
+      await this.prisma.systemAuditLog.create({
+        data: {
+          actorId,
+          actionType: 'COURSE_RELOCKED',
+          payload: JSON.stringify({ courseId, courseTitle: course.title, ...result }),
+          ipAddress: ipAddress ?? null,
+        },
+      });
+    } catch {
+      // Audit logging must never break the operation itself
+    }
+
+    return {
+      message: `Course "${course.title}" has been relocked. Students must redeem a new code to regain access.`,
+      ...result,
+    };
+  }
+
   async extendLectureExpiry(studentId: string, lectureId: string, extraDays: number) {
     const access = await this.prisma.studentLectureAccess.findFirst({
       where: { studentId, lectureId, },
