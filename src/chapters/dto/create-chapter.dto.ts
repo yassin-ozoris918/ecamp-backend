@@ -21,6 +21,7 @@ export class CreateChapterDto {
 export class UpdateChapterDto {
   @IsOptional()
   @IsString()
+  @IsNotEmpty()
   title?: string;
 
   @IsOptional()

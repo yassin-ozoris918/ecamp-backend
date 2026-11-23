@@ -13,27 +13,24 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum NotificationEventCategory {
-  QUIZ_FAILED
-  EXAM_FAILED
-  LECTURE_EXPIRED
-  RISK_ALERT
-}
-
 enum QuizQuestionVersion {
   A
   B
 }
 
-enum NotificationChannelType {
-  WHATSAPP
-  SMS
-  EMAIL
+// --- Student in-app notifications ---
+// Only content that students can actually open is notified. Chapter- and course-level
+// attachments are staff-only (no student endpoint), so they intentionally have no type here.
+enum ContentNotificationType {
+  LECTURE_ADDED  // the first video of a lecture became available (= "a new lecture")
+  SESSION_ADDED  // another video session was added to a lecture that already had videos
+  MATERIAL_ADDED // a new file/handout/notes was added to a lecture
 }
 
-enum NotificationDeliveryStatus {
+enum NotificationOutboxStatus {
   PENDING
-  DELIVERED
+  PROCESSING
+  DONE
   FAILED
 }
 
@@ -63,6 +60,16 @@ enum ActivationCodeType {
   COURSE
   FILE
   COURSE_FILES
+}
+
+// How a student obtained a StudentLectureAccess row. A lecture with requiresOwnCode only accepts
+// CODE / ADMIN / DEMO rows — access derived from the full course (or a free course) does not open it.
+enum LectureAccessSource {
+  CODE   // redeemed a lecture activation code
+  COURSE // created automatically when a full-course student started the lecture
+  FREE   // created when a student started a lecture of a free course
+  ADMIN  // granted manually by an admin
+  DEMO   // demo/preview account
 }
 
 enum CourseType {
@@ -190,7 +197,7 @@ model User {
   certificates  Certificate[]
   aiUsageLogs   AiUsageLog[]
   riskProfile   StudentRiskProfile?
-  parentLogs    ParentNotificationLog[]
+  notifications Notification[]
   uploadedMedia Media[]
 
   profileUpdateRequests  ProfileUpdateRequest[] @relation("ProfileUpdateStudent")
@@ -363,6 +370,8 @@ model Lecture {
   warningMinutes   Int       @default(0)
   // View limit: null = unlimited; positive integer = max views per video session
   maxViews         Int?
+  // Locked lecture: full-course / free-course access does NOT open it; it needs its own lecture code.
+  requiresOwnCode  Boolean   @default(false)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   deletedAt        DateTime?
@@ -546,6 +555,7 @@ model StudentLectureAccess {
   expiresAt     DateTime?
   timerPausedAt DateTime?
   deletedAt     DateTime?
+  source        LectureAccessSource @default(COURSE)
 
   student User    @relation(fields: [studentId], references: [id], onDelete: Cascade)
   lecture Lecture @relation(fields: [lectureId], references: [id], onDelete: Cascade)
@@ -1020,19 +1030,56 @@ model StudentRiskProfile {
   createdAt           DateTime @default(now())
 }
 
-model ParentNotificationLog {
-  id                String                     @id @default(uuid())
-  studentId         String
-  student           User                       @relation(fields: [studentId], references: [id], onDelete: Cascade)
-  parentPhoneNumber String
-  eventCategory     NotificationEventCategory
-  channelType       NotificationChannelType
-  deliveryStatus    NotificationDeliveryStatus @default(PENDING)
-  messageContent    String
-  dispatchedAt      DateTime                   @default(now())
-  errorNote         String?
+// Outbox: one row per content change that students should hear about. Written in the SAME
+// transaction as the content row (so a notification can never be lost or orphaned) and fanned
+// out to students in the background by NotificationWorkerService.
+model NotificationEvent {
+  id             String                   @id @default(uuid())
+  type           ContentNotificationType
+  dedupeKey      String                   @unique // "VIDEO:<sessionId>" / "MATERIAL:<attachmentId>" — one event per item, ever
+  groupKey       String // "VIDEO:<lectureId>" / "MATERIAL:<lectureId>" — a burst of uploads becomes one notification
+  courseId       String
+  lectureId      String
+  targetId       String // sessionId / attachmentId
+  itemTitle      String
+  status         NotificationOutboxStatus @default(PENDING)
+  attempts       Int                      @default(0)
+  lastError      String?
+  scheduledFor   DateTime                 @default(now())
+  lockedAt       DateTime?
+  processedAt    DateTime?
+  recipientCount Int                      @default(0)
+  createdAt      DateTime                 @default(now())
 
-  @@index([studentId])
+  notifications Notification[]
+
+  @@index([status, scheduledFor])
+  @@index([groupKey, status])
+  @@index([courseId])
+  @@index([lectureId])
+  @@index([targetId])
+}
+
+// Inbox: one row per student per (merged) event. Text is rendered on the client from `type`
+// + `params`, so it follows the student's language (ar/en).
+model Notification {
+  id        String                  @id @default(uuid())
+  userId    String
+  eventId   String
+  type      ContentNotificationType
+  courseId  String
+  lectureId String
+  link      String // in-app route, chosen per student by how they are enrolled
+  params    Json // { courseTitle, lectureTitle, itemTitle, count }
+  readAt    DateTime?
+  createdAt DateTime                @default(now())
+
+  user  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  event NotificationEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
 }
 
 model SystemAuditLog {

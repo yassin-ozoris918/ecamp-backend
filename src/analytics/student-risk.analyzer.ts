@@ -1,15 +1,12 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter';
+import { OnEvent } from '@nestjs/event-emitter';
 
 @Injectable()
 export class StudentRiskAnalyzer {
   private readonly logger = new Logger(StudentRiskAnalyzer.name);
 
-  constructor(
-    private prisma: PrismaService,
-    private eventEmitter: EventEmitter2,
-  ) {}
+  constructor(private prisma: PrismaService) {}
 
   @OnEvent('attempt.evaluated')
   async handleAttemptEvaluated(payload: {
@@ -84,14 +81,5 @@ export class StudentRiskAnalyzer {
     });
 
     this.logger.log(`Student ${payload.studentId} Risk Metrics -> Avg: ${runningAverageScore.toFixed(2)}, Failures: ${consecutiveFailures}, AtRisk: ${isAtRisk}`);
-
-    // 4. Trigger alert if they just became at risk, or if they failed again while at risk
-    if (isAtRisk && (!profile.isAtRisk || !payload.isPassed)) {
-       this.eventEmitter.emit('risk.alert', {
-         studentId: payload.studentId,
-         eventCategory: payload.type === 'EXAM' ? 'EXAM_FAILED' : 'QUIZ_FAILED',
-         metrics: { consecutiveFailures, runningAverageScore }
-       });
-    }
   }
 }

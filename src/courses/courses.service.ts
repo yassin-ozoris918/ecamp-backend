@@ -9,6 +9,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { CreateCourseDto } from './dto/create-course.dto';
 import { Role } from '@prisma/client';
 import { validateCourseTargeting, validateCourseTargetingAsync } from '../common/utils/segmentation-validation.util';
+import { deleteNotificationsForCourse } from '../notifications/content-notification-outbox';
+import { filterUnreferencedUrls } from '../common/storage-refs';
 @Injectable()
 export class CoursesService {
   constructor(private prisma: PrismaService) {}
@@ -348,10 +350,12 @@ export class CoursesService {
 
       return {
         id: lec.id,
+        courseId: lec.courseId,
         title: lec.title,
         description: lec.description,
         sortOrder: lec.sortOrder,
         chapterId: lec.chapterId,
+        requiresOwnCode: !!lec.requiresOwnCode,
         items,
       };
     };
@@ -654,9 +658,14 @@ export class CoursesService {
       }
     }
 
-    // Since we don't have StorageService imported, we'll manually use @aws-sdk/client-s3 here, or we can use CloudflareService if available.
-    // Wait, CloudflareService is imported? Let's check imports! No, neither are imported. Let me dynamically import DeleteObjectsCommand.
-    
+    // Database first; then remove only storage objects no other course still uses (lectures copied
+    // into another course share their videos/files).
+    const [deleted] = await this.prisma.$transaction([
+      this.prisma.course.delete({ where: { id } }),
+      deleteNotificationsForCourse(this.prisma, id),
+    ]);
+    urlsToDelete.splice(0, urlsToDelete.length, ...(await filterUnreferencedUrls(this.prisma, urlsToDelete)));
+
     if (urlsToDelete.length > 0) {
       const bucketName = process.env.R2_BUCKET_NAME;
       const endpoint = process.env.R2_ENDPOINT;
@@ -698,7 +707,7 @@ export class CoursesService {
       }
     }
 
-    return this.prisma.course.delete({ where: { id } });
+    return deleted;
   }
 
   async getCoursesForStudent(userId: string, includeMaterialsOnly = false) {

@@ -57,6 +57,7 @@ import { AiModule } from './ai/ai.module';
 import { StorageModule } from './storage/storage.module';
 import { CloudflareModule } from './cloudflare/cloudflare.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { ContentOrganizerModule } from './content-organizer/content-organizer.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { SystemAuditInterceptor } from './common/interceptors/audit.interceptor';
 import { SettingsModule } from './settings/settings.module';
@@ -179,6 +180,7 @@ import { TutorialsModule } from './tutorials/tutorials.module';
     StorageModule,
     CloudflareModule,
     NotificationsModule,
+    ContentOrganizerModule,
     AnalyticsModule,
     UsersModule,
     AdminModule,

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AttemptStatus } from '@prisma/client';
+import { courseLevelAccessApplies, effectiveLectureAccess, isLectureLocked } from '../common/lecture-lock.policy';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { StorageService } from '../storage/storage.service';
 import { CloudflareService } from '../cloudflare/cloudflare.service';
@@ -171,12 +172,15 @@ export class ProgressService {
 
     if (!lectureInfo) throw new NotFoundException('Lecture not found');
 
-    const access = await this.prisma.studentLectureAccess.findFirst({
-      where: { studentId, lectureId, },
-    });
-    const courseAccess = await this.prisma.studentCourseAccess.findFirst({
-      where: { studentId, courseId: lectureInfo.courseId, },
-    });
+    // Locked lecture: only its own lecture code (or admin/demo) opens it — never the course or free status.
+    const access = effectiveLectureAccess(
+      lectureInfo,
+      await this.prisma.studentLectureAccess.findFirst({ where: { studentId, lectureId } }),
+    );
+    const courseAccess = courseLevelAccessApplies(lectureInfo)
+      ? await this.prisma.studentCourseAccess.findFirst({ where: { studentId, courseId: lectureInfo.courseId } })
+      : null;
+    const courseIsFree = lectureInfo.course.isFree && courseLevelAccessApplies(lectureInfo);
 
     const now = new Date();
     let isFullyLocked = true;
@@ -192,7 +196,7 @@ export class ProgressService {
         effectiveExpiresAt = new Date(access.expiresAt.getTime() + actualExtensionMs);
       }
       
-      if (lectureInfo.course.isFree) {
+      if (courseIsFree) {
         effectiveExpiresAt = null;
       }
       
@@ -203,8 +207,8 @@ export class ProgressService {
       }
     }
     
-    if ((courseAccess || lectureInfo.course.isFree) && isFullyLocked) {
-      if (lectureInfo.course.isFree || !courseAccess?.expiresAt || now <= courseAccess.expiresAt) {
+    if ((courseAccess || courseIsFree) && isFullyLocked) {
+      if (courseIsFree || !courseAccess?.expiresAt || now <= courseAccess.expiresAt) {
         isFullyLocked = false;
         // courseAccess alone means lecture is NOT started yet
         isStarted = false;
@@ -242,6 +246,7 @@ export class ProgressService {
 
     const attachments = await this.prisma.attachment.findMany({
       where: { lectureId },
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
     });
 
     let playlist: any[] = [];
@@ -400,9 +405,11 @@ export class ProgressService {
 
     const navAccesses = await this.prisma.studentLectureAccess.findMany({
       where: { studentId, lecture: { courseId: lectureInfo.courseId }, },
-      select: { lectureId: true },
+      select: { lectureId: true, source: true, lecture: { select: { requiresOwnCode: true } } },
     });
-    const accessibleLectureIds = new Set(navAccesses.map((a) => a.lectureId));
+    const accessibleLectureIds = new Set(
+      navAccesses.filter((a) => effectiveLectureAccess(a.lecture, a)).map((a) => a.lectureId),
+    );
 
     const orderedLectures: { id: string; title: string; thumbnailUrl: string | null }[] = [];
 
@@ -437,6 +444,7 @@ export class ProgressService {
 
     return {
       isLocked: isFullyLocked,
+      requiresOwnCode: isLectureLocked(lectureInfo),
       isStarted: isStarted,
       expiresAt: applicableAccess?.expiresAt || null,
       access_expires_at: applicableAccess?.expiresAt || null,
@@ -563,13 +571,16 @@ export class ProgressService {
     }
 
     const formatLecture = (l: any) => {
-      const access = accesses.find((a) => a.lectureId === l.id);
+      const locked = isLectureLocked(l);
+      const access = effectiveLectureAccess(l, accesses.find((a) => a.lectureId === l.id));
+      const viaCourse = courseLevelAccessApplies(l) && !!courseAccess;
+      const viaFree = courseLevelAccessApplies(l) && course.isFree;
 
-      let isUnlocked = course.isFree || !!access || !!courseAccess || isDemo;
+      let isUnlocked = viaFree || !!access || viaCourse || isDemo;
       const isStarted = access ? access.isStarted : false;
       let isExpired = false;
 
-      if (!course.isFree && !isDemo) {
+      if (!viaFree && !isDemo) {
         // Check if the lecture access has expired
         if (access && access.expiresAt) {
           const now = new Date();
@@ -584,7 +595,7 @@ export class ProgressService {
             isUnlocked = false;
             isExpired = true;
           }
-        } else if (!access && courseAccess && courseAccess.expiresAt) {
+        } else if (!access && viaCourse && courseAccess.expiresAt) {
           if (new Date() > courseAccess.expiresAt) {
             isUnlocked = false;
             isExpired = true;
@@ -622,6 +633,7 @@ export class ProgressService {
         isUnlocked,
         isStarted,
         isExpired,
+        requiresOwnCode: locked,
         chapterId: l.chapterId,
         items,
       };

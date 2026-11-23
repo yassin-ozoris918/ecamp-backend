@@ -10,14 +10,12 @@ import { CreateExamDto } from './dto/create-exam.dto';
 import { UpdateExamDto } from './dto/update-exam.dto';
 import { AddExamQuestionDto } from './dto/add-exam-question.dto';
 import { QuestionType, Role, AttemptStatus } from '@prisma/client';
-import { NotificationsService } from '../notifications/notifications.service';
 import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 
 @Injectable()
 export class ExamsService {
   constructor(
     private prisma: PrismaService,
-    private notificationsService: NotificationsService,
     private eventEmitter: EventEmitter2,
   ) {}
 
@@ -71,9 +69,17 @@ export class ExamsService {
     const exam = await this.prisma.exam.findUnique({ where: { id } });
     if (!exam) throw new NotFoundException('Exam not found');
 
+    // The DTO calls it passingScore; the column is passGrade (passing the DTO straight through made
+    // Prisma reject every settings save).
+    const { passingScore, title, ...rest } = dto;
+    if (title !== undefined && !title.trim()) throw new BadRequestException('Title cannot be empty.');
     return this.prisma.exam.update({
       where: { id },
-      data: dto,
+      data: {
+        ...rest,
+        ...(title !== undefined ? { title: title.trim() } : {}),
+        ...(passingScore !== undefined ? { passGrade: passingScore } : {}),
+      },
     });
   }
 
@@ -284,7 +290,8 @@ export class ExamsService {
         course: {
           include: {
             lectures: {
-              where: { },
+              // Locked lectures are sold separately, so they are not required for the course exam.
+              where: { requiresOwnCode: false },
               select: { id: true },
             },
           },
@@ -582,29 +589,6 @@ export class ExamsService {
       score: scorePercentage,
       isPassed,
     });
-
-    //Parent Notification Trigger
-    // Fetch the student's details to check their education level
-    const student = await this.prisma.user.findUnique({
-      where: { id: attempt.studentId },
-      select: { fullName: true, educationLevel: true, parentPhoneNumber: true },
-    });
-
-    // If they are a high school student, send the score to their parent
-    if (
-      student &&
-      student.educationLevel === 'HIGH_SCHOOL' &&
-      student.parentPhoneNumber
-    ) {
-      // We don't use 'await' here because we want this to run in the background.
-      // We explicitly mark this as ignored with the `void` operator.
-      void this.notificationsService.sendParentWhatsApp(
-        student.parentPhoneNumber,
-        student.fullName,
-        attempt.exam.title,
-        finalizedAttempt.score || 0,
-      );
-    }
 
     return {
       message: 'Essays graded and final score calculated successfully.',

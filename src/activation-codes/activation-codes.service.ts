@@ -9,7 +9,8 @@ import { CoursesService } from '../courses/courses.service';
 import { GenerateCodesDto } from './dto/generate-codes.dto';
 import { RedeemCodeDto } from './dto/redeem-code.dto';
 import * as crypto from 'crypto';
-import { CodeStatus, ActivationCodeType, EducationLevel } from '@prisma/client';
+import { CodeStatus, ActivationCodeType, EducationLevel, LectureAccessSource } from '@prisma/client';
+import { effectiveLectureAccess } from '../common/lecture-lock.policy';
 
 @Injectable()
 export class ActivationCodesService {
@@ -216,17 +217,34 @@ export class ActivationCodesService {
           where: { studentId, lectureId: dto.targetId, },
         });
 
-        if (existingAccess) {
+        if (existingAccess && effectiveLectureAccess(lecture, existingAccess)) {
           throw new ForbiddenException('You already have access to this lecture. Keep this code safe!');
         }
 
-        await tx.studentLectureAccess.create({
-          data: {
-            studentId,
-            lectureId: dto.targetId,
-            isStarted: false,
-          },
-        });
+        if (existingAccess) {
+          // Locked lecture the student had only opened through the full course / free course:
+          // the code turns it into a fresh, separately-owned lecture (new timer).
+          await tx.studentLectureAccess.update({
+            where: { id: existingAccess.id },
+            data: {
+              source: LectureAccessSource.CODE,
+              isStarted: false,
+              activatedAt: null,
+              expiresAt: null,
+              timerPausedAt: null,
+              deletedAt: null,
+            },
+          });
+        } else {
+          await tx.studentLectureAccess.create({
+            data: {
+              studentId,
+              lectureId: dto.targetId,
+              isStarted: false,
+              source: LectureAccessSource.CODE,
+            },
+          });
+        }
         responseTitle = lecture.title;
 
         // Update code

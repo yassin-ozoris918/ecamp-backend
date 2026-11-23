@@ -68,4 +68,11 @@ export class CreateLectureDto {
   @IsInt()
   @Min(1)
   maxViews?: number | null;
+
+  /**
+   * Locked lecture: full-course access does not open it; students must redeem a lecture code.
+   */
+  @IsOptional()
+  @IsBoolean()
+  requiresOwnCode?: boolean;
 }

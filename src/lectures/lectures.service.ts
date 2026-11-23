@@ -6,7 +6,11 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLectureDto } from './dto/create-lecture.dto';
-import { Role } from '@prisma/client';
+import { UpdateLectureDto } from './dto/update-lecture.dto';
+import { LectureAccessSource, Role } from '@prisma/client';
+import { courseLevelAccessApplies, effectiveLectureAccess, isLectureLocked } from '../common/lecture-lock.policy';
+import { deleteNotificationsForLecture } from '../notifications/content-notification-outbox';
+import { filterUnreferencedUrls } from '../common/storage-refs';
 import { CloudflareService } from '../cloudflare/cloudflare.service';
 import { ViewLimitService } from '../sessions/view-limit.service';
 
@@ -55,6 +59,7 @@ export class LecturesService {
         warningMinutes: dto.warningMinutes || 0,
         // maxViews: null = unlimited (omitted or null from DTO)
         maxViews: dto.maxViews ?? null,
+        requiresOwnCode: dto.requiresOwnCode ?? false,
       },
     });
   }
@@ -82,7 +87,7 @@ export class LecturesService {
 
   async update(
     id: string,
-    dto: Partial<CreateLectureDto>,
+    dto: UpdateLectureDto,
     userId: string,
     role: Role,
   ) {
@@ -121,30 +126,43 @@ export class LecturesService {
   async remove(id: string, userId: string, role: Role) {
     const lecture = await this.prisma.lecture.findUnique({
       where: { id },
-      include: { 
+      include: {
         attachments: true,
-        sessions: true 
-      }
+        sessions: true,
+      },
     });
     if (!lecture) throw new NotFoundException('Lecture not found.');
     await this.verifyCourseOwnership(lecture.courseId, userId, role);
 
-    const urlsToDelete: string[] = [];
-    if (lecture.thumbnailUrl) urlsToDelete.push(lecture.thumbnailUrl);
-    for (const att of lecture.attachments || []) {
-      urlsToDelete.push(att.fileUrl);
-    }
+    const candidateUrls: string[] = [];
+    if (lecture.thumbnailUrl) candidateUrls.push(lecture.thumbnailUrl);
+    for (const att of lecture.attachments || []) candidateUrls.push(att.fileUrl);
     for (const session of lecture.sessions || []) {
-      if (session.videoUrl) {
-        if (
-          session.videoUrl.includes('cloudflarestream.com') ||
-          session.videoUrl.includes('videodelivery.net') ||
-          /^[a-f0-9]{32}$/i.test(session.videoUrl)
-        ) {
-          await this.cloudflareService.deleteVideo?.(session.videoUrl);
-        } else {
-          urlsToDelete.push(session.videoUrl);
+      if (session.videoUrl) candidateUrls.push(session.videoUrl);
+    }
+
+    // 1. Database first: if this fails nothing is lost, and storage is only touched after it succeeded.
+    const [deleted] = await this.prisma.$transaction([
+      this.prisma.lecture.delete({ where: { id } }),
+      deleteNotificationsForLecture(this.prisma, id),
+    ]);
+
+    // 2. Storage: skip anything still used elsewhere (e.g. a copy of this lecture in another course).
+    const unreferenced = await filterUnreferencedUrls(this.prisma, candidateUrls);
+    const isStreamVideo = (url: string) =>
+      url.includes('cloudflarestream.com') || url.includes('videodelivery.net') || /^[a-f0-9]{32}$/i.test(url);
+    const videoUrls = new Set((lecture.sessions || []).map((s) => s.videoUrl).filter(Boolean) as string[]);
+
+    const urlsToDelete: string[] = [];
+    for (const url of unreferenced) {
+      if (videoUrls.has(url) && isStreamVideo(url)) {
+        try {
+          await this.cloudflareService.deleteVideo?.(url);
+        } catch (error) {
+          console.error('Failed to delete video from Cloudflare Stream', error);
         }
+      } else {
+        urlsToDelete.push(url);
       }
     }
 
@@ -187,7 +205,7 @@ export class LecturesService {
       }
     }
 
-    return this.prisma.lecture.delete({ where: { id } });
+    return deleted;
   }
 
   async reorder(
@@ -200,20 +218,21 @@ export class LecturesService {
     await this.verifyCourseOwnership(lecture.courseId, userId, role);
 
     return this.prisma.$transaction(async (tx) => {
+      // Scoped to this lecture: an id from another lecture is ignored instead of being reordered there.
       for (const item of items) {
         if (item.type === 'SESSION') {
-          await tx.session.update({
-            where: { id: item.id, },
+          await tx.session.updateMany({
+            where: { id: item.id, lectureId },
             data: { sortOrder: item.orderIndex },
           });
         } else if (item.type === 'QUIZ') {
-          await tx.quiz.update({
-            where: { id: item.id, },
+          await tx.quiz.updateMany({
+            where: { id: item.id, lectureId },
             data: { sortOrder: item.orderIndex },
           });
         } else if (item.type === 'ATTACHMENT') {
-          await tx.attachment.update({
-            where: { id: item.id },
+          await tx.attachment.updateMany({
+            where: { id: item.id, lectureId },
             data: { orderIndex: item.orderIndex },
           });
         }
@@ -232,15 +251,22 @@ export class LecturesService {
       });
       if (existingAccess) return existingAccess;
       return this.prisma.studentLectureAccess.create({
-        data: { studentId, lectureId, isStarted: true, activatedAt: new Date(), expiresAt: null },
+        data: { studentId, lectureId, isStarted: true, activatedAt: new Date(), expiresAt: null, source: LectureAccessSource.DEMO },
       });
     }
     // --- End demo bypass ---
 
-    // Check if they already have an unstarted lecture access
-    const existingAccess = await this.prisma.studentLectureAccess.findFirst({
+    const locked = isLectureLocked(lecture);
+
+    // Check if they already have an unstarted lecture access.
+    // For a locked lecture, access that only came from the course/free course does not count.
+    const existingRow = await this.prisma.studentLectureAccess.findFirst({
       where: { studentId, lectureId },
     });
+    const existingAccess = effectiveLectureAccess(lecture, existingRow);
+    if (locked && !existingAccess) {
+      throw new ForbiddenException('This lecture is locked. Redeem a lecture code to unlock it.');
+    }
 
     const now = new Date();
     const daysMs = (lecture.durationDays || 0) * 24 * 60 * 60 * 1000;
@@ -250,7 +276,7 @@ export class LecturesService {
     const expiresAt = totalAccessDurationMs > 0 ? new Date(now.getTime() + totalAccessDurationMs) : null;
 
     const course = await this.prisma.course.findUnique({ where: { id: lecture.courseId } });
-    const isFree = course?.isFree || false;
+    const isFree = (course?.isFree || false) && courseLevelAccessApplies(lecture);
 
     if (existingAccess) {
       if (existingAccess.isStarted && !isFree) {
@@ -298,7 +324,7 @@ export class LecturesService {
       throw new ForbiddenException('Your course access has expired.');
     }
 
-    // Create the lecture access since they have course access
+    // Create the lecture access since they have course access (or the course is free)
     return this.prisma.studentLectureAccess.create({
       data: {
         studentId,
@@ -306,6 +332,7 @@ export class LecturesService {
         isStarted: true,
         activatedAt: now,
         expiresAt,
+        source: courseAccess ? LectureAccessSource.COURSE : LectureAccessSource.FREE,
       },
     });
   }
@@ -355,12 +382,15 @@ export class LecturesService {
     const isDemo = (student as any)?.isDemo === true;
 
     if (!isDemo) {
-      const access = await this.prisma.studentLectureAccess.findFirst({
-        where: { studentId, lectureId: session.lectureId },
-      });
+      const access = effectiveLectureAccess(
+        session.lecture,
+        await this.prisma.studentLectureAccess.findFirst({
+          where: { studentId, lectureId: session.lectureId },
+        }),
+      );
 
       const course = await this.prisma.course.findUnique({ where: { id: session.lecture.courseId } });
-      const isFree = course?.isFree || false;
+      const isFree = (course?.isFree || false) && courseLevelAccessApplies(session.lecture);
 
       if (!isFree) {
         if (!access) {

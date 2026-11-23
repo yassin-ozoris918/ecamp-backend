@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { SessionsService } from './sessions.service';
 import { CreateSessionDto } from './dto/create-session.dto';
+import { UpdateSessionDto } from './dto/update-session.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -61,7 +62,7 @@ export class SessionsController {
   @Put(':id')
   update(
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: Partial<CreateSessionDto>,
+    @Body() dto: UpdateSessionDto,
     @Req() req: RequestWithUser,
   ) {
     const user = req.user;

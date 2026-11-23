@@ -38,42 +38,4 @@ export class NotificationsService {
       });
     }
   }
-
-
-
-  async sendParentWhatsApp(
-    parentPhone: string,
-    studentName: string,
-    examName: string,
-    score: number,
-  ) {
-    if (!parentPhone) return;
-
-    const enableWhatsApp = await this.settingsService.getSetting(
-      'EnableWhatsApp',
-      false,
-    );
-    if (!enableWhatsApp) return;
-
-    try {
-      const message = `🎓 *E.Camp Update*\n\nYour student, ${studentName}, has just completed the assessment: *${examName}*.\n\n📊 *Final Score:* ${score}%\n\nKeep up the great work!`;
-
-      await this.provider.sendWhatsApp({
-        to: parentPhone,
-        body: message,
-      });
-
-      this.logger.log(
-        `[WhatsApp Sent] To: ${parentPhone} | Message: ${message.replace(/\n/g, ' ')}`,
-      );
-    } catch (error) {
-      // We don't want to crash the whole grading process just because a WhatsApp message failed to send
-      const errorMessage =
-        error instanceof Error ? error.message : 'Unknown error';
-      this.logger.error(
-        `Failed to send WhatsApp to ${parentPhone}:`,
-        errorMessage,
-      );
-    }
-  }
 }

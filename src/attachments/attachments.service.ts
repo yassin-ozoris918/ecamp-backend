@@ -4,6 +4,12 @@ import { StorageService } from '../storage/storage.service';
 import { CoursesService } from '../courses/courses.service';
 import { CreateAttachmentDto } from './dto/create-attachment.dto';
 import { Role } from '@prisma/client';
+import { courseLevelAccessApplies, effectiveLectureAccess } from '../common/lecture-lock.policy';
+import { filterUnreferencedUrls } from '../common/storage-refs';
+import {
+  cancelPendingNotificationsForTarget,
+  enqueueLectureMaterialNotification,
+} from '../notifications/content-notification-outbox';
 
 @Injectable()
 export class AttachmentsService {
@@ -18,14 +24,21 @@ export class AttachmentsService {
 
     const fileUrl = await this.storage.uploadFile(file, 'attachments');
     
-    return this.prisma.attachment.create({
-      data: {
-        title: dto.title || file.originalname,
-        lectureId: dto.lectureId,
-        fileUrl: fileUrl,
-        type: dto.type || 'OTHER',
-        allowDownload: dto.allowDownload ?? null,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      // New files go to the end of the lecture's file list.
+      const max = await tx.attachment.aggregate({ where: { lectureId: dto.lectureId }, _max: { orderIndex: true } });
+      const attachment = await tx.attachment.create({
+        data: {
+          title: dto.title || file.originalname,
+          lectureId: dto.lectureId,
+          fileUrl: fileUrl,
+          type: dto.type || 'OTHER',
+          allowDownload: dto.allowDownload ?? null,
+          orderIndex: (max._max.orderIndex ?? -1) + 1,
+        },
+      });
+      await enqueueLectureMaterialNotification(tx, attachment.id);
+      return attachment;
     });
   }
 
@@ -57,7 +70,7 @@ export class AttachmentsService {
     const items = await this.prisma.attachment.findMany({
       where: { lectureId, deletedAt: null },
       include: { lecture: { select: { course: { select: { allowFileDownload: true } } } } },
-      orderBy: { createdAt: 'asc' },
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
     });
     return items.map(({ lecture, ...att }) => ({
       ...att,
@@ -79,10 +92,20 @@ export class AttachmentsService {
       return false;
     }
 
-    const lectureAccess = await this.prisma.studentLectureAccess.findFirst({
-      where: { studentId, lectureId: attachment.lectureId },
-    });
+    const lectureAccess = effectiveLectureAccess(
+      attachment.lecture,
+      await this.prisma.studentLectureAccess.findFirst({
+        where: { studentId, lectureId: attachment.lectureId },
+      }),
+    );
     if (lectureAccess) return true;
+
+    // A locked lecture's files are sold with the lecture: full-course and course-files (materials)
+    // codes do not open them. A single-file code bought for THIS exact file still does.
+    if (!courseLevelAccessApplies(attachment.lecture)) {
+      const ownFile = await this.prisma.studentFileAccess.findFirst({ where: { studentId, attachmentId } });
+      return !!ownFile;
+    }
 
     const courseAccess = await this.prisma.studentCourseAccess.findFirst({
       where: { studentId, courseId: attachment.lecture.courseId },
@@ -121,7 +144,7 @@ export class AttachmentsService {
         ...(search ? { title: { contains: search, mode: 'insensitive' } } : {}),
       },
       include: {
-        lecture: { select: { id: true, title: true, course: { select: { id: true, title: true, type: true, allowFileDownload: true } } } },
+        lecture: { select: { id: true, title: true, requiresOwnCode: true, course: { select: { id: true, title: true, type: true, allowFileDownload: true } } } },
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -148,17 +171,22 @@ export class AttachmentsService {
       const courseId = attachment.lecture?.course?.id;
       if (!courseId || !attachment.lecture) return null; // Skip attachments that somehow don't belong to a lecture or course
 
-      const hasCourseAccess = courseAccesses.some(ca => ca.courseId === courseId);
+      const lectureRow = effectiveLectureAccess(
+        attachment.lecture,
+        lectureAccesses.find(la => la.lectureId === attachment.lecture.id),
+      );
+      const courseLevel = courseLevelAccessApplies(attachment.lecture);
+      const hasCourseAccess = courseLevel && courseAccesses.some(ca => ca.courseId === courseId);
       if (hasCourseAccess) {
         accessStatus = 'UNLOCKED';
         accessSource = 'COURSE';
       } else {
-        const hasLectureAccess = lectureAccesses.some(la => la.lectureId === attachment.lecture.id);
+        const hasLectureAccess = !!lectureRow;
         if (hasLectureAccess) {
           accessStatus = 'UNLOCKED';
           accessSource = 'LECTURE';
         } else {
-          const hasCourseFiles = fileAccesses.some(fa => fa.courseId === courseId);
+          const hasCourseFiles = courseLevel && fileAccesses.some(fa => fa.courseId === courseId);
           if (hasCourseFiles) {
             accessStatus = 'UNLOCKED';
             accessSource = 'COURSE_FILES_CODE';
@@ -252,7 +280,13 @@ export class AttachmentsService {
 
     await this.verifyCourseOwnership(attachment.lecture.courseId, instructorId, role);
 
-    const fileUrl = attachment.fileUrl;
+    // Database first; the storage object is removed only if no other row (e.g. a copied lecture) uses it.
+    const [deleted] = await this.prisma.$transaction([
+      this.prisma.attachment.delete({ where: { id } }),
+      cancelPendingNotificationsForTarget(this.prisma, id),
+    ]);
+
+    const [fileUrl] = await filterUnreferencedUrls(this.prisma, [attachment.fileUrl]);
     if (fileUrl) {
       const bucketName = process.env.R2_BUCKET_NAME;
       const endpoint = process.env.R2_ENDPOINT;
@@ -289,9 +323,7 @@ export class AttachmentsService {
       }
     }
 
-    return this.prisma.attachment.delete({
-      where: { id },
-    });
+    return deleted;
   }
 
   private async verifyLectureOwnership(lectureId: string, instructorId: string, role: Role) {

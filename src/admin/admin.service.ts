@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Role, CodeStatus, AttemptStatus } from '@prisma/client';
+import { Role, CodeStatus, AttemptStatus, LectureAccessSource } from '@prisma/client';
 import { GetUsersQueryDto } from './dto/get-users-query.dto';
 import * as bcrypt from 'bcrypt';
 import { normalizeEducationProfile } from '../common/utils/segmentation-validation.util';
@@ -452,12 +452,14 @@ export class AdminService {
       update: {
         activatedAt: new Date(),
         expiresAt,
+        source: LectureAccessSource.ADMIN,
         },
       create: {
         studentId,
         lectureId,
         activatedAt: new Date(),
         expiresAt,
+        source: LectureAccessSource.ADMIN,
       },
     });
 
@@ -656,6 +658,9 @@ export class AdminService {
           activatedAt: toDate(r.activatedAt) ?? new Date(),
           expiresAt: toDate(r.expiresAt),
         }));
+        // Snapshots taken before access sources existed have no `source`: a student who also had
+        // full-course access got it from the course, anyone else from a lecture code.
+        const hadCourse = new Set((payload.snapshot.courseAccess ?? []).map((r: any) => r.studentId));
         lectureRows = (payload.snapshot.lectureAccess ?? []).map((r: any) => ({
           studentId: r.studentId,
           lectureId: r.lectureId,
@@ -664,6 +669,11 @@ export class AdminService {
           activatedAt: toDate(r.activatedAt),
           expiresAt: toDate(r.expiresAt),
           timerPausedAt: toDate(r.timerPausedAt),
+          source: (Object.values(LectureAccessSource) as string[]).includes(r.source)
+            ? r.source
+            : hadCourse.has(r.studentId)
+              ? LectureAccessSource.COURSE
+              : LectureAccessSource.CODE,
         }));
         fileRows = (payload.snapshot.fileAccess ?? []).map((r: any) => ({
           studentId: r.studentId,
@@ -715,6 +725,7 @@ export class AdminService {
               studentId: c.studentId,
               lectureId: c.redeemedLectureId,
               isStarted: false,
+              source: LectureAccessSource.CODE,
             });
           } else if (c.targetType === 'FILE' && c.redeemedAttachmentId) {
             fileRows.push({
@@ -752,6 +763,8 @@ export class AdminService {
             lectureId: item.session.lectureId,
             isStarted: true,
             activatedAt: new Date(),
+            // Lecture-code rows were pushed first above and win on conflict; activity alone means course access.
+            source: LectureAccessSource.COURSE,
           });
           if (!studentsWithAnyCode.has(item.studentId)) {
             courseRows.push({

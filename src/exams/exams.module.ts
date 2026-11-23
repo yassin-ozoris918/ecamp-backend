@@ -3,11 +3,10 @@ import { ExamsService } from './exams.service';
 import { ExamsController } from './exams.controller';
 import { ExamsAdminController } from './exams.admin.controller';
 import { PrismaModule } from '../prisma/prisma.module';
-import { NotificationsModule } from '../notifications/notifications.module';
 import { AiModule } from '../ai/ai.module';
 
 @Module({
-  imports: [PrismaModule, NotificationsModule, AiModule],
+  imports: [PrismaModule, AiModule],
   controllers: [ExamsController, ExamsAdminController],
   providers: [ExamsService],
 })

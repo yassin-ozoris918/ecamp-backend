@@ -5,7 +5,12 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateSessionDto } from './dto/create-session.dto';
+import { UpdateSessionDto } from './dto/update-session.dto';
 import { Role } from '@prisma/client';
+import {
+  cancelPendingNotificationsForTarget,
+  enqueueSessionVideoNotification,
+} from '../notifications/content-notification-outbox';
 
 @Injectable()
 export class SessionsService {
@@ -48,8 +53,10 @@ export class SessionsService {
   async create(dto: CreateSessionDto, instructorId: string, role: Role) {
     await this.verifySessionOwnership(dto.lectureId, instructorId, role);
 
-    return this.prisma.session.create({
-      data: dto,
+    return this.prisma.$transaction(async (tx) => {
+      const session = await tx.session.create({ data: dto });
+      if (session.videoUrl) await enqueueSessionVideoNotification(tx, session.id);
+      return session;
     });
   }
 
@@ -76,16 +83,18 @@ export class SessionsService {
 
   async update(
     id: string,
-    dto: Partial<CreateSessionDto>,
+    dto: UpdateSessionDto,
     instructorId: string,
     role: Role,
   ) {
     const session = await this.findOne(id);
     await this.verifySessionOwnership(session.lectureId, instructorId, role);
 
-    return this.prisma.session.update({
-      where: { id },
-      data: dto,
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.session.update({ where: { id }, data: dto });
+      // Notify only when the session gets its FIRST video (replacing a video is not "new content").
+      if (!session.videoUrl && updated.videoUrl) await enqueueSessionVideoNotification(tx, id);
+      return updated;
     });
   }
 
@@ -95,6 +104,7 @@ export class SessionsService {
 
     const [deleted] = await this.prisma.$transaction([
       this.prisma.session.delete({ where: { id } }),
+      cancelPendingNotificationsForTarget(this.prisma, id),
       // Re-index remaining sessions in the same lecture to fill ordering gaps
       this.prisma.$executeRaw`
         UPDATE "Session"
@@ -120,10 +130,14 @@ export class SessionsService {
     const session = await this.findOne(id);
     await this.verifySessionOwnership(session.lectureId, instructorId, role);
 
-    return this.prisma.session.update({
-      where: { id },
-      data: { videoUrl },
-      select: { id: true, title: true, videoUrl: true },
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.session.update({
+        where: { id },
+        data: { videoUrl },
+        select: { id: true, title: true, videoUrl: true },
+      });
+      if (!session.videoUrl && updated.videoUrl) await enqueueSessionVideoNotification(tx, id);
+      return updated;
     });
   }
 }
