@@ -309,11 +309,11 @@ export class CoursesService {
         },
         chapters: {
           where: { deletedAt: null },
-          orderBy: { orderIndex: 'asc' },
+          orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
           include: {
             lectures: {
               where: { deletedAt: null },
-              orderBy: { sortOrder: 'asc' },
+              orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
               include: {
                 sessions: {
                   where: { deletedAt: null },
@@ -327,7 +327,7 @@ export class CoursesService {
         },
         lectures: {
           where: { chapterId: null, deletedAt: null }, // unassigned lectures
-          orderBy: { sortOrder: 'asc' },
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
           include: {
             sessions: {
               where: { deletedAt: null },

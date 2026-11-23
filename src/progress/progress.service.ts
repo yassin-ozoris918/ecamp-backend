@@ -387,18 +387,18 @@ export class ProgressService {
     const [navChapters, navStandaloneLectures] = await Promise.all([
       this.prisma.chapter.findMany({
         where: { courseId: lectureInfo.courseId, },
-        orderBy: { orderIndex: 'asc' },
+        orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
         include: {
           lectures: {
             where: { },
-            orderBy: { sortOrder: 'asc' },
+            orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
             select: { id: true, title: true, thumbnailUrl: true },
           },
         },
       }),
       this.prisma.lecture.findMany({
         where: { courseId: lectureInfo.courseId, chapterId: null, },
-        orderBy: { sortOrder: 'asc' },
+        orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
         select: { id: true, title: true, thumbnailUrl: true },
       }),
     ]);
@@ -527,11 +527,11 @@ export class ProgressService {
     // Fetch chapters and standalone lectures in a single query
     const chapters = await this.prisma.chapter.findMany({
       where: { courseId, },
-      orderBy: { orderIndex: 'asc' },
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
       include: {
         lectures: {
           where: { deletedAt: null },
-          orderBy: { sortOrder: 'asc' },
+          orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
           include: {
             sessions: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
             quizzes: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
@@ -542,7 +542,7 @@ export class ProgressService {
 
     const standaloneLectures = await this.prisma.lecture.findMany({
       where: { courseId, chapterId: null, deletedAt: null },
-      orderBy: { sortOrder: 'asc' },
+      orderBy: [{ sortOrder: 'asc' }, { createdAt: 'asc' }],
       include: {
         sessions: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
         quizzes: { where: { deletedAt: null }, orderBy: { sortOrder: 'asc' } },
