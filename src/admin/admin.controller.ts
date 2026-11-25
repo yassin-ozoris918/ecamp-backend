@@ -285,6 +285,12 @@ export class AdminController {
     return this.adminService.getPlatformStats();
   }
 
+  /** Everything waiting for an admin, plus a few activity numbers (dashboard + sidebar badges). */
+  @Get('attention')
+  async getAttention() {
+    return this.adminService.getAttention();
+  }
+
   @Get('at-risk')
   async getAtRiskStudents(@Query('days') days?: string) {
     const daysNumber = days ? parseInt(days, 10) : 7;

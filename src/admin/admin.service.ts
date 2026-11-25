@@ -499,6 +499,47 @@ export class AdminService {
    * A full snapshot of the removed rows is stored in SystemAuditLog (actionType COURSE_RELOCKED)
    * inside the same transaction, so an accidental relock can be undone via restoreCourseRelock().
    */
+  /**
+   * Work waiting for an admin + activity numbers, in one cheap call (polled by the sidebar badges).
+   * Each count matches the list on its page.
+   */
+  async getAttention() {
+    const now = Date.now();
+    const weekAgo = new Date(now - 7 * 86_400_000);
+    const [
+      pendingRegistrations,
+      profileRequests,
+      quizAnswersToReview,
+      examsToGrade,
+      failedNotifications,
+      newStudents7d,
+      activeStudents7d,
+      unusedCodes,
+      draftCourses,
+    ] = await Promise.all([
+      this.prisma.user.count({ where: { role: Role.STUDENT, isActive: false } }),
+      this.prisma.profileUpdateRequest.count({ where: { status: 'PENDING' } }),
+      this.prisma.quizAttempt.count({ where: { status: AttemptStatus.PENDING, submittedAt: { not: null } } }),
+      this.prisma.examAttempt.count({ where: { status: AttemptStatus.PENDING, submittedAt: { not: null } } }),
+      this.prisma.notificationEvent.count({ where: { status: 'FAILED' } }),
+      this.prisma.user.count({ where: { role: Role.STUDENT, createdAt: { gte: weekAgo } } }),
+      this.prisma.user.count({ where: { role: Role.STUDENT, isActive: true, lastLoginAt: { gte: weekAgo } } }),
+      this.prisma.activationCode.count({ where: { status: CodeStatus.UNUSED } }),
+      this.prisma.course.count({ where: { status: 'DRAFT' } }),
+    ]);
+    return {
+      pendingRegistrations,
+      profileRequests,
+      quizAnswersToReview,
+      examsToGrade,
+      failedNotifications,
+      newStudents7d,
+      activeStudents7d,
+      unusedCodes,
+      draftCourses,
+    };
+  }
+
   async relockCourse(courseId: string, actorId: string, ipAddress?: string) {
     const course = await this.prisma.course.findUnique({ where: { id: courseId } });
     if (!course) throw new NotFoundException('Course not found');

@@ -375,4 +375,42 @@ export class InstructorDashboardService {
 
     return { data: students, total, page, limit };
   }
+
+  /**
+   * Exam attempts that were submitted but still need manual grading (status PENDING), with how many
+   * essay / short answers have no grade yet. Instructors only see exams of their own courses.
+   */
+  async getPendingExamAttempts(userId: string, role: string) {
+    const mine = { instructors: { some: { instructorId: userId, deletedAt: null } } };
+    const scope =
+      role === 'ADMIN'
+        ? {}
+        : { exam: { OR: [{ course: mine }, { chapter: { course: mine } }, { lecture: { course: mine } }] } };
+    const attempts = await this.prisma.examAttempt.findMany({
+      where: { status: 'PENDING', submittedAt: { not: null }, ...scope },
+      orderBy: { submittedAt: 'asc' },
+      take: 200,
+      select: {
+        id: true,
+        examId: true,
+        submittedAt: true,
+        student: { select: { id: true, fullName: true, profilePictureUrl: true } },
+        exam: { select: { title: true } },
+        responses: {
+          where: { instructorOverrideScore: null, question: { type: { in: ['ESSAY', 'SHORT_ANSWER'] } } },
+          select: { id: true },
+        },
+      },
+    });
+    return attempts.map((a) => ({
+      attemptId: a.id,
+      examId: a.examId,
+      studentId: a.student.id,
+      studentName: a.student.fullName,
+      studentProfilePictureUrl: a.student.profilePictureUrl,
+      examTitle: a.exam.title,
+      ungradedEssaysCount: a.responses.length,
+      submittedAt: a.submittedAt,
+    }));
+  }
 }

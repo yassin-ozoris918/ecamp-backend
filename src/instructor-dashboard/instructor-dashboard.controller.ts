@@ -84,4 +84,10 @@ export class InstructorDashboardStatsController {
   async getDashboardStats(@Req() req: RequestWithUser) {
     return this.dashboardService.getDashboardStats(req.user.sub);
   }
+
+  /** Submitted exams with essay / short answers still waiting for a grade (Grading Queue). */
+  @Get('exams/pending')
+  async getPendingExamAttempts(@Req() req: RequestWithUser) {
+    return this.dashboardService.getPendingExamAttempts(req.user.sub, req.user.role);
+  }
 }
