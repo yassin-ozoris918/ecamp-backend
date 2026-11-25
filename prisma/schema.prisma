@@ -1280,3 +1280,56 @@ model HelpVideoTargetGroup {
   @@index([targetDepartmentId])
   @@index([targetProgramId])
 }
+
+// ─── Support chatbot ─────────────────────────────────────────────────────────
+// The bot never writes its own answers: it only picks one of these admin-written FAQ entries (or none).
+model SupportFaq {
+  id             String   @id @default(uuid())
+  questionEn     String
+  questionAr     String
+  answerEn       String
+  answerAr       String
+  /// Other ways students ask this (any language or dialect); used for matching only.
+  phrasings      String[] @default([])
+  category       String?
+  /// Optional button under the answer: an in-app path ("/profile") or an https:// link.
+  linkUrl        String?
+  linkLabelEn    String?
+  linkLabelAr    String?
+  isActive       Boolean  @default(true)
+  sortOrder      Int      @default(0)
+  timesShown     Int      @default(0)
+  helpfulCount   Int      @default(0)
+  unhelpfulCount Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  queries SupportBotQuery[]
+
+  @@index([isActive, sortOrder])
+}
+
+enum SupportBotOutcome {
+  ANSWERED
+  NO_MATCH
+  REFUSED
+}
+
+/// What students asked the bot (anonymous: no user id is stored). Unanswered ones feed the admin's "to do" list.
+model SupportBotQuery {
+  id        String            @id @default(uuid())
+  question  String
+  language  String
+  outcome   SupportBotOutcome
+  /// How the answer was chosen: "keyword", "ai" or "pick" (student tapped a suggested question).
+  matchedBy String?
+  faqId     String?
+  faq       SupportFaq?       @relation(fields: [faqId], references: [id], onDelete: SetNull)
+  helpful   Boolean?
+  /// Admin marked an unanswered question as handled.
+  resolved  Boolean           @default(false)
+  createdAt DateTime          @default(now())
+
+  @@index([outcome, resolved, createdAt])
+  @@index([createdAt])
+}

@@ -185,8 +185,9 @@ export class ActivationCodesService {
     if (!student) throw new NotFoundException('Student not found.');
 
     return this.prisma.$transaction(async (tx) => {
+      // Accept the code however the student typed it (case, spaces, missing dashes, O for 0).
       const activationCode = await tx.activationCode.findFirst({
-        where: { code: dto.code, },
+        where: { code: { in: codeCandidates(dto.code) } },
       });
 
       if (!activationCode) {
@@ -392,3 +393,16 @@ export class ActivationCodesService {
   }
 }
 
+/**
+ * Ways a typed code may match a stored one. Generated codes are three blocks of 8 hex characters
+ * (0-9, A-F) joined by dashes, so letters that are not hex but look like digits (O, I, L) can safely be
+ * read as 0 and 1. The exact input is tried too, so older or hand-made codes keep working.
+ */
+export function codeCandidates(input: string): string[] {
+  const raw = String(input ?? '').trim();
+  const upper = raw.toUpperCase().replace(/\s+/g, '');
+  const candidates = new Set<string>([raw, upper]);
+  const hex = upper.replace(/[OQ]/g, '0').replace(/[IL]/g, '1').replace(/[^0-9A-F]/g, '');
+  if (hex.length === 24) candidates.add(`${hex.slice(0, 8)}-${hex.slice(8, 16)}-${hex.slice(16)}`);
+  return [...candidates].filter(Boolean);
+}

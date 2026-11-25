@@ -76,6 +76,7 @@ import { ExportModule } from './export/export.module';
 import { ProfileUpdateRequestsModule } from './profile-update-requests/profile-update-requests.module';
 import { AcademicDataModule } from './academic-data/academic-data.module';
 import { TutorialsModule } from './tutorials/tutorials.module';
+import { SupportBotModule } from './support-bot/support-bot.module';
 
 @Module({
   imports: [
@@ -195,6 +196,7 @@ import { TutorialsModule } from './tutorials/tutorials.module';
     ProfileUpdateRequestsModule,
     AcademicDataModule,
     TutorialsModule,
+    SupportBotModule,
   ],
   controllers: [AppController],
   providers: [
