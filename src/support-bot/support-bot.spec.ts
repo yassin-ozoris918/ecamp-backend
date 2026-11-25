@@ -151,3 +151,35 @@ describe('SupportBotService.decide', () => {
     expect(d.outcome).toBe('ANSWERED');
   });
 });
+
+describe('SupportBotService rejected AI keys', () => {
+  it('skips a rejected Gemini key after the first failure and uses Groq', async () => {
+    const prisma: any = { supportFaq: { findMany: jest.fn().mockResolvedValue(faqs) } };
+    const config: any = { get: (k: string) => (k === 'GEMINI_API_KEY' || k === 'GROQ_API_KEY' ? 'test' : undefined) };
+    const svc = new SupportBotService(prisma, config);
+    const generateContent = jest.fn().mockRejectedValue(Object.assign(new Error('API key not valid. Please pass a valid API key.'), { status: 401 }));
+    const create = jest.fn().mockResolvedValue({ choices: [{ message: { content: '{"kind":"support","match":8}' } }] });
+    (svc as any).gemini = { models: { generateContent } };
+    (svc as any).groq = { chat: { completions: { create } } };
+    jest.spyOn((svc as any).logger, 'error').mockImplementation(() => undefined);
+
+    const first = await svc.decide('the lessons wont start on my laptop');
+    expect(first).toMatchObject({ outcome: 'ANSWERED', matchedBy: 'ai' });
+    expect(generateContent).toHaveBeenCalledTimes(1); // stopped at the first auth error, no second model tried
+
+    await svc.decide('lessons stuck on the laptop again');
+    expect(generateContent).toHaveBeenCalledTimes(1); // skipped for an hour
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(svc.aiStatus()).toEqual({ gemini: 'rejected', groq: 'ok' });
+  });
+
+  it('does not treat a temporary error as a bad key', async () => {
+    const prisma: any = { supportFaq: { findMany: jest.fn().mockResolvedValue(faqs) } };
+    const config: any = { get: (k: string) => (k === 'GEMINI_API_KEY' ? 'test' : undefined) };
+    const svc = new SupportBotService(prisma, config);
+    (svc as any).gemini = { models: { generateContent: jest.fn().mockRejectedValue(Object.assign(new Error('overloaded'), { status: 503 })) } };
+    jest.spyOn((svc as any).logger, 'warn').mockImplementation(() => undefined);
+    await svc.decide('the lessons wont start on my laptop');
+    expect(svc.aiStatus().gemini).toBe('ok');
+  });
+});

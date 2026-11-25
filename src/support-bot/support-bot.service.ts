@@ -77,6 +77,8 @@ export class SupportBotService {
   private cache: { at: number; faqs: SupportFaq[] } | null = null;
   /** After an AI failure, skip the AI for a minute so students are not kept waiting. */
   private aiPausedUntil = 0;
+  /** A provider whose key was rejected (401/403) is skipped for an hour instead of being retried on every question. */
+  private readonly keyRejectedUntil: Record<'gemini' | 'groq', number> = { gemini: 0, groq: 0 };
 
   constructor(
     private readonly prisma: PrismaService,
@@ -211,7 +213,7 @@ export class SupportBotService {
   }
 
   private async callGemini(prompt: string): Promise<string | null> {
-    if (!this.gemini) return null;
+    if (!this.gemini || Date.now() < this.keyRejectedUntil.gemini) return null;
     const models = [this.config.get<string>('SUPPORT_BOT_MODEL'), 'gemini-2.5-flash', 'gemini-2.0-flash'].filter(Boolean) as string[];
     for (const model of [...new Set(models)]) {
       try {
@@ -239,6 +241,7 @@ export class SupportBotService {
         const text = typeof res?.text === 'string' ? res.text : null;
         if (text) return text;
       } catch (e: any) {
+        if (this.rejectKeyIfAuthError('gemini', e)) return null;
         this.logger.warn(`Support bot: Gemini model ${model} failed: ${e?.message ?? e}`);
       }
     }
@@ -246,7 +249,7 @@ export class SupportBotService {
   }
 
   private async callGroq(prompt: string): Promise<string | null> {
-    if (!this.groq) return null;
+    if (!this.groq || Date.now() < this.keyRejectedUntil.groq) return null;
     const models = [this.config.get<string>('SUPPORT_BOT_GROQ_MODEL'), 'openai/gpt-oss-120b', 'llama-3.3-70b-versatile'].filter(Boolean) as string[];
     for (const model of [...new Set(models)]) {
       try {
@@ -265,10 +268,32 @@ export class SupportBotService {
         const text = res.choices?.[0]?.message?.content;
         if (text) return text;
       } catch (e: any) {
+        if (this.rejectKeyIfAuthError('groq', e)) return null;
         this.logger.warn(`Support bot: Groq model ${model} failed: ${e?.message ?? e}`);
       }
     }
     return null;
+  }
+
+  /** True (and the provider is skipped for an hour) when the error means the API key itself is invalid. */
+  private rejectKeyIfAuthError(provider: 'gemini' | 'groq', e: any): boolean {
+    const status = Number(e?.status ?? e?.code ?? e?.response?.status);
+    const msg = String(e?.message ?? '');
+    const authFailed =
+      status === 401 || status === 403 || /UNAUTHENTICATED|PERMISSION_DENIED|API key not valid|invalid api key|invalid_api_key/i.test(msg);
+    if (!authFailed) return false;
+    if (Date.now() >= this.keyRejectedUntil[provider]) {
+      this.logger.error(`Support bot: the ${provider === 'gemini' ? 'GEMINI_API_KEY' : 'GROQ_API_KEY'} was rejected; skipping ${provider} for 1 hour. Replace the key in .env and restart.`);
+    }
+    this.keyRejectedUntil[provider] = Date.now() + 3_600_000;
+    return true;
+  }
+
+  /** For the admin page: which AI providers are set up and whether their key was rejected. */
+  aiStatus() {
+    const state = (configured: boolean, provider: 'gemini' | 'groq') =>
+      !configured ? 'not_set' : Date.now() < this.keyRejectedUntil[provider] ? 'rejected' : 'ok';
+    return { gemini: state(Boolean(this.gemini), 'gemini'), groq: state(Boolean(this.groq), 'groq') };
   }
 
   private toReply(id: string | null, d: BotDecision, lang: Lang): BotReply {
@@ -383,6 +408,7 @@ export class SupportBotService {
       unhelpful,
       unansweredOpen,
       aiEnabled: Boolean(this.gemini || this.groq),
+      ai: this.aiStatus(),
       topFaqs: top.map((t) => ({ faqId: t.faqId, count: t._count._all })),
     };
   }
