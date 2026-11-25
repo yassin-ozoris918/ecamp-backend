@@ -512,6 +512,117 @@ export class ProgressService {
 
 
 
+  // --- Continue learning (student dashboard) ---
+  /**
+   * The lecture to resume (most recent activity, still open, not finished) and the student's
+   * lectures/courses whose access ends soon. Uses the same access rules as the playlist.
+   */
+  async getContinueLearning(studentId: string) {
+    const now = new Date();
+    const SOON_LECTURE_MS = 72 * 60 * 60 * 1000;
+    const SOON_COURSE_MS = 14 * 24 * 60 * 60 * 1000;
+    const MAX_PAUSE_MS = 2 * 60 * 60 * 1000;
+
+    const effectiveEnd = (a: { expiresAt: Date | null; timerPausedAt: Date | null }) => {
+      if (!a.expiresAt) return null;
+      if (!a.timerPausedAt) return a.expiresAt;
+      const ext = Math.max(0, Math.min(now.getTime() - a.timerPausedAt.getTime(), MAX_PAUSE_MS));
+      return new Date(a.expiresAt.getTime() + ext);
+    };
+
+    const lectureSelect = {
+      id: true,
+      title: true,
+      requiresOwnCode: true,
+      deletedAt: true,
+      chapter: { select: { title: true } },
+      course: { select: { id: true, title: true, status: true, isFree: true, deletedAt: true } },
+      sessions: { where: { deletedAt: null }, orderBy: [{ sortOrder: 'asc' as const }, { createdAt: 'asc' as const }], select: { id: true, title: true } },
+      quizzes: { where: { deletedAt: null }, select: { id: true } },
+    };
+
+    const [lectureAccess, courseAccess, recentProgress] = await Promise.all([
+      this.prisma.studentLectureAccess.findMany({
+        where: { studentId, isStarted: true },
+        select: { lectureId: true, source: true, expiresAt: true, timerPausedAt: true, activatedAt: true, lecture: { select: lectureSelect } },
+      }),
+      this.prisma.studentCourseAccess.findMany({
+        where: { studentId },
+        select: { courseId: true, expiresAt: true, course: { select: { id: true, title: true, status: true, deletedAt: true } } },
+      }),
+      this.prisma.sessionProgress.findMany({
+        where: { studentId },
+        orderBy: { updatedAt: 'desc' },
+        take: 30,
+        select: { updatedAt: true, session: { select: { lectureId: true } } },
+      }),
+    ]);
+
+    const visible = (c: { status: string; deletedAt: Date | null } | null | undefined) => !!c && c.status === 'PUBLISHED' && !c.deletedAt;
+
+    // Last activity per lecture: latest session progress, else when the lecture was started.
+    const lastActivity = new Map<string, number>();
+    for (const p of recentProgress) {
+      const id = p.session?.lectureId;
+      if (id && !lastActivity.has(id)) lastActivity.set(id, p.updatedAt.getTime());
+    }
+
+    const lectureIds = lectureAccess.map((a) => a.lectureId);
+    const sessionIds = lectureAccess.flatMap((a) => a.lecture.sessions.map((s) => s.id));
+    const quizIds = lectureAccess.flatMap((a) => a.lecture.quizzes.map((q) => q.id));
+    const [done, passed] = await Promise.all([
+      sessionIds.length
+        ? this.prisma.sessionProgress.findMany({ where: { studentId, isCompleted: true, sessionId: { in: sessionIds } }, select: { sessionId: true } })
+        : Promise.resolve([] as { sessionId: string }[]),
+      quizIds.length
+        ? this.prisma.quizAttempt.findMany({ where: { studentId, status: 'PASSED', quizId: { in: quizIds } }, select: { quizId: true }, distinct: ['quizId'] })
+        : Promise.resolve([] as { quizId: string }[]),
+    ]);
+    const doneSet = new Set(done.map((d) => d.sessionId));
+    const passedSet = new Set(passed.map((q) => q.quizId));
+
+    const lectures = lectureAccess
+      .filter((a) => !a.lecture.deletedAt && visible(a.lecture.course) && effectiveLectureAccess(a.lecture, a))
+      .map((a) => {
+        const l = a.lecture;
+        const free = l.course.isFree && courseLevelAccessApplies(l);
+        const endsAt = free ? null : effectiveEnd(a);
+        const doneCount = l.sessions.filter((s) => doneSet.has(s.id)).length + l.quizzes.filter((q) => passedSet.has(q.id)).length;
+        const total = l.sessions.length + l.quizzes.length;
+        return {
+          lectureId: l.id,
+          lectureTitle: l.title,
+          chapterTitle: l.chapter?.title ?? null,
+          courseId: l.course.id,
+          courseTitle: l.course.title,
+          done: doneCount,
+          total,
+          nextItemTitle: l.sessions.find((s) => !doneSet.has(s.id))?.title ?? null,
+          accessEndsAt: endsAt,
+          expired: !!endsAt && endsAt.getTime() <= now.getTime(),
+          lastActivityAt: lastActivity.get(l.id) ?? a.activatedAt?.getTime() ?? 0,
+        };
+      })
+      .filter((l) => lectureIds.includes(l.lectureId));
+
+    const open = lectures.filter((l) => !l.expired);
+    const byRecent = [...open].sort((a, b) => b.lastActivityAt - a.lastActivityAt);
+    const resume = byRecent.find((l) => l.total === 0 || l.done < l.total) ?? null;
+
+    const endingSoon = open
+      .filter((l) => l.accessEndsAt && l.accessEndsAt.getTime() - now.getTime() <= SOON_LECTURE_MS && (l.total === 0 || l.done < l.total))
+      .sort((a, b) => a.accessEndsAt!.getTime() - b.accessEndsAt!.getTime())
+      .map(({ lastActivityAt: _ignored, ...rest }) => rest);
+
+    const coursesEndingSoon = courseAccess
+      .filter((c) => visible(c.course) && c.expiresAt && c.expiresAt > now && c.expiresAt.getTime() - now.getTime() <= SOON_COURSE_MS)
+      .map((c) => ({ courseId: c.courseId, courseTitle: c.course.title, accessEndsAt: c.expiresAt }));
+
+    if (!resume) return { resume: null, endingSoon, coursesEndingSoon };
+    const { lastActivityAt: _ignored, ...resumeOut } = resume;
+    return { resume: resumeOut, endingSoon, coursesEndingSoon };
+  }
+
   // --- Course Syllabus ---
   async getCourseSyllabus(courseId: string, studentId?: string) {
     const course = await this.prisma.course.findUnique({
@@ -570,6 +681,26 @@ export class ProgressService {
       });
     }
 
+    // Per-student progress + per-lecture content counts (for progress bars and "2 videos · 1 quiz · 3 files").
+    const lectureIds = allLectures.map((l) => l.id);
+    const sessionIds = allLectures.flatMap((l: any) => l.sessions.map((s: any) => s.id));
+    const quizIds = allLectures.flatMap((l: any) => l.quizzes.map((q: any) => q.id));
+    const [doneSessions, passedQuizzes, fileCounts] = await Promise.all([
+      studentId && sessionIds.length
+        ? this.prisma.sessionProgress.findMany({ where: { studentId, isCompleted: true, sessionId: { in: sessionIds } }, select: { sessionId: true } })
+        : Promise.resolve([] as { sessionId: string }[]),
+      studentId && quizIds.length
+        ? this.prisma.quizAttempt.findMany({ where: { studentId, status: 'PASSED', quizId: { in: quizIds } }, select: { quizId: true }, distinct: ['quizId'] })
+        : Promise.resolve([] as { quizId: string }[]),
+      lectureIds.length
+        ? this.prisma.attachment.groupBy({ by: ['lectureId'], where: { lectureId: { in: lectureIds }, deletedAt: null }, _count: { _all: true } })
+        : Promise.resolve([] as { lectureId: string; _count: { _all: number } }[]),
+    ]);
+    const doneSessionSet = new Set(doneSessions.map((d) => d.sessionId));
+    const passedQuizSet = new Set(passedQuizzes.map((q) => q.quizId));
+    const filesByLecture = new Map(fileCounts.map((f) => [f.lectureId, f._count._all]));
+    const courseAccessActive = !!courseAccess && (!courseAccess.expiresAt || new Date() <= courseAccess.expiresAt);
+
     const formatLecture = (l: any) => {
       const locked = isLectureLocked(l);
       const access = effectiveLectureAccess(l, accesses.find((a) => a.lectureId === l.id));
@@ -579,6 +710,8 @@ export class ProgressService {
       let isUnlocked = viaFree || !!access || viaCourse || isDemo;
       const isStarted = access ? access.isStarted : false;
       let isExpired = false;
+      // When the student's own timer for this lecture ends (null = no timer / not started).
+      let accessEndsAt: Date | null = null;
 
       if (!viaFree && !isDemo) {
         // Check if the lecture access has expired
@@ -595,6 +728,7 @@ export class ProgressService {
             isUnlocked = false;
             isExpired = true;
           }
+          accessEndsAt = effectiveExpiresAt;
         } else if (!access && viaCourse && courseAccess.expiresAt) {
           if (new Date() > courseAccess.expiresAt) {
             isUnlocked = false;
@@ -635,6 +769,15 @@ export class ProgressService {
         isExpired,
         requiresOwnCode: locked,
         chapterId: l.chapterId,
+        accessEndsAt,
+        progress: {
+          done:
+            l.sessions.filter((s: any) => doneSessionSet.has(s.id)).length +
+            l.quizzes.filter((q: any) => passedQuizSet.has(q.id)).length,
+          total: l.sessions.length + l.quizzes.length,
+        },
+        counts: { videos: l.sessions.length, quizzes: l.quizzes.length, files: filesByLecture.get(l.id) ?? 0 },
+        durationSec: l.sessions.reduce((sum: number, s: any) => sum + (s.duration || 0), 0),
         items,
       };
     };
@@ -687,6 +830,14 @@ export class ProgressService {
       chapters: formattedChapters,
       standaloneLectures: formattedStandaloneLectures,
       exams: mappedExams,
+      // How this student can use the course (drives the course header: unlock vs. progress).
+      access: {
+        hasFullCourse: courseAccessActive,
+        courseExpiresAt: courseAccess?.expiresAt ?? null,
+        courseExpired: !!courseAccess && !courseAccessActive,
+        isFree: course.isFree,
+        isDemo,
+      },
     };
   }
 }

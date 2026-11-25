@@ -27,6 +27,9 @@ export class InstructorDashboardService {
             title: true,
             thumbnailUrl: true,
             description: true,
+            status: true,
+            type: true,
+            isFree: true,
             updatedAt: true,
             _count: {
               select: { lectures: true, chapters: true, studentAccess: true },

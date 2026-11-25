@@ -162,9 +162,22 @@ export class GamificationService {
       where: { role: 'STUDENT', xp: { gt: user?.xp || 0 } },
     });
 
-    const courseCount = await this.prisma.studentLectureAccess.count({
-      where: { studentId: userId, },
-    });
+    // Distinct courses the student has (full-course access or at least one lecture of it) — the
+    // same notion of "my courses" as the dashboard. It used to count lecture-access rows instead.
+    const [courseRows, lectureRows] = await Promise.all([
+      this.prisma.studentCourseAccess.findMany({
+        where: { studentId: userId, course: { status: 'PUBLISHED' } },
+        select: { courseId: true },
+      }),
+      this.prisma.studentLectureAccess.findMany({
+        where: { studentId: userId, lecture: { course: { status: 'PUBLISHED' } } },
+        select: { lecture: { select: { courseId: true } } },
+      }),
+    ]);
+    const courseCount = new Set([
+      ...courseRows.map((r) => r.courseId),
+      ...lectureRows.map((r) => r.lecture.courseId),
+    ]).size;
 
     const completedCount = await this.prisma.sessionProgress.count({
       where: { studentId: userId, isCompleted: true },

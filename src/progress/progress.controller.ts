@@ -29,6 +29,13 @@ export class ProgressController {
     return this.progressService.getStudentDashboard(user.sub);
   }
 
+  // "Continue where you left off" + lectures whose access ends soon (student dashboard)
+  @Roles(Role.STUDENT)
+  @Get('continue')
+  getContinueLearning(@Req() req: RequestWithUser) {
+    return this.progressService.getContinueLearning(req.user.sub);
+  }
+
   // Get the unified, locked/unlocked playlist for a specific lecture
   @Roles(Role.STUDENT)
   @Get('playlist/:lectureId')
