@@ -16,6 +16,7 @@ import {
 
 export interface NotificationParams {
   courseTitle: string;
+  chapterTitle: string | null;
   lectureTitle: string;
   itemTitle: string;
   count: number;
@@ -170,6 +171,7 @@ export class NotificationWorkerService implements OnApplicationBootstrap, OnModu
     const firstLive = targetIds.map((id) => liveTargets.find((t) => t.id === id)).find(Boolean)!;
     const params: NotificationParams = {
       courseTitle: course.title,
+      chapterTitle: lecture.chapter?.title ?? null,
       lectureTitle: lecture.title,
       itemTitle: firstLive.title,
       count: liveTargets.length,

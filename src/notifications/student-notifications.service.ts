@@ -49,7 +49,29 @@ export class StudentNotificationsService {
     });
 
     const hasMore = rows.length > limit;
-    const items = hasMore ? rows.slice(0, limit) : rows;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+
+    // Show the CURRENT course / chapter / lecture names, so a notification stays accurate after a
+    // rename or a move to another chapter. Falls back to the names saved when it was sent.
+    const lectureIds = [...new Set(page.map((n) => n.lectureId))];
+    const lectures = lectureIds.length
+      ? await this.prisma.lecture.findMany({
+          where: { id: { in: lectureIds } },
+          select: { id: true, title: true, chapter: { select: { title: true } }, course: { select: { title: true } } },
+        })
+      : [];
+    const live = new Map(lectures.map((l) => [l.id, l]));
+    const items = page.map((n) => {
+      const l = live.get(n.lectureId);
+      const saved = (n.params ?? {}) as Record<string, unknown>;
+      return {
+        ...n,
+        params: l
+          ? { ...saved, courseTitle: l.course.title, chapterTitle: l.chapter?.title ?? null, lectureTitle: l.title }
+          : saved,
+      };
+    });
+
     const unreadCount = await this.unreadCount(userId);
     return { items, nextCursor: hasMore ? items[items.length - 1].id : null, unreadCount };
   }

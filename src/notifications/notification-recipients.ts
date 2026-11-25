@@ -238,7 +238,14 @@ export class NotificationRecipientsService {
   loadLectureContext(lectureId: string) {
     return this.prisma.lecture.findUnique({
       where: { id: lectureId },
-      select: { id: true, title: true, deletedAt: true, requiresOwnCode: true, course: { select: COURSE_SELECT } },
+      select: {
+        id: true,
+        title: true,
+        deletedAt: true,
+        requiresOwnCode: true,
+        chapter: { select: { title: true } },
+        course: { select: COURSE_SELECT },
+      },
     });
   }
 

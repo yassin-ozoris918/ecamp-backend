@@ -5,6 +5,7 @@ const lectureCtx = (over: any = {}) => ({
   id: 'L1',
   title: 'Lecture 1',
   deletedAt: null,
+  chapter: { title: 'Chapter 3 [ Fluids ]' },
   course: {
     id: 'C1',
     title: 'Anatomy',
@@ -65,7 +66,11 @@ describe('NotificationWorkerService.processGroup', () => {
     const rows = prisma.notification.createMany.mock.calls[0][0];
     expect(rows.skipDuplicates).toBe(true);
     expect(rows.data).toHaveLength(2);
-    expect(rows.data[0]).toMatchObject({ eventId: 'e1', type: 'SESSION_ADDED', params: { count: 2, courseTitle: 'Anatomy', lectureTitle: 'Lecture 1' } });
+    expect(rows.data[0]).toMatchObject({
+      eventId: 'e1',
+      type: 'SESSION_ADDED',
+      params: { count: 2, courseTitle: 'Anatomy', chapterTitle: 'Chapter 3 [ Fluids ]', lectureTitle: 'Lecture 1' },
+    });
   });
 
   it('a burst that contains the first video of the lecture is announced as a NEW LECTURE', async () => {
