@@ -1,3 +1,4 @@
+import { assertQuestionsUnanswered } from '../common/answered-questions';
 import type { RequestWithUser } from '../auth/interfaces/request-with-user.interface';
 import { QuizzesService } from './quizzes.service';
 import { Controller, Post, Body, UseGuards, Delete, Param, Put, Req, Get, Patch, ForbiddenException, Query, BadRequestException } from '@nestjs/common';
@@ -55,6 +56,7 @@ export class QuizzesAdminController {
   @Roles(Role.ADMIN)
   @Delete('questions/:id')
   async deleteQuestion(@Param('id') id: string) {
+    await assertQuestionsUnanswered(this.prisma, { quizQuestionId: id });
     return this.prisma.quizQuestion.delete({ where: { id } });
   }
 

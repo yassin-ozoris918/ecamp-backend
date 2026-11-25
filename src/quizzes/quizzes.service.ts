@@ -1,3 +1,4 @@
+import { assertQuestionsUnanswered } from '../common/answered-questions';
 import {
   Injectable,
   NotFoundException,
@@ -155,6 +156,7 @@ export class QuizzesService {
     try {
       // Wrap in a transaction: delete existing, insert new
       return await this.prisma.$transaction(async (tx) => {
+        await assertQuestionsUnanswered(tx, { quizId });
         await tx.quizQuestion.deleteMany({
           where: { quizId }
         });
@@ -181,7 +183,7 @@ export class QuizzesService {
         return { message: 'Quiz questions synced successfully' };
       });
     } catch (error: any) {
-      if (error.code === 'P2003' || (error.message && error.message.includes('violates RESTRICT setting'))) {
+      if (error.code === 'P2003') {
         throw new BadRequestException('quiz.messages.cannotModifyUsed');
       }
       throw error;

@@ -312,8 +312,17 @@ describe('QuizzesService (Objective Grading)', () => {
           deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
           createMany: jest.fn().mockResolvedValue({ count: 3 }),
         },
+        quizAttemptResponse: { count: jest.fn().mockResolvedValue(0) },
       };
       (prisma.$transaction as jest.Mock).mockImplementation(async (cb: any) => cb(tx));
+    });
+
+    it('refuses to replace questions that students already answered', async () => {
+      tx.quizAttemptResponse.count.mockResolvedValue(2);
+      await expect(service.syncQuizQuestions('quiz-1', [{ text: 'New' }], 'admin-1', 'ADMIN' as any)).rejects.toThrow(
+        'quiz.messages.cannotModifyUsed',
+      );
+      expect(tx.quizQuestion.deleteMany).not.toHaveBeenCalled();
     });
 
     it('should persist matchOptions, referenceAnswer, correctOrder and version', async () => {

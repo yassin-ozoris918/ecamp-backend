@@ -55,8 +55,6 @@ describe('Admin overview + grading queue (e2e)', () => {
 
   afterAll(async () => {
     if (prisma) {
-      // Exam answers block deleting their questions (RESTRICT), so remove the attempt first.
-      await prisma.examAttempt.deleteMany({ where: { id: ids.attempt } });
       await prisma.course.deleteMany({ where: { id: { in: [ids.courseA, ids.courseB].filter(Boolean) } } });
       await prisma.user.deleteMany({ where: { email: { endsWith: `${tag}@t.test` } } });
     }

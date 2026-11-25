@@ -1,3 +1,4 @@
+import { assertQuestionsUnanswered } from '../common/answered-questions';
 import {
   Injectable,
   NotFoundException,
@@ -109,6 +110,7 @@ export class ExamsService {
     if (!exam) throw new NotFoundException('Exam not found');
 
     return this.prisma.$transaction(async (tx) => {
+      await assertQuestionsUnanswered(tx, { examId });
       await tx.examQuestion.deleteMany({
         where: { examId }
       });
