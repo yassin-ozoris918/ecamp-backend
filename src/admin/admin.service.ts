@@ -891,15 +891,19 @@ export class AdminService {
     });
     if (!access) throw new NotFoundException('Lecture access not found');
 
-    const currentExpiry = access.expiresAt || new Date();
-    const newExpiry = new Date(currentExpiry.getTime() + extraDays * 86400000);
+    const days = Number(extraDays);
+    if (!Number.isFinite(days) || days <= 0) throw new BadRequestException('extraDays must be a positive number');
+    // Count from today when the access already ran out, so extending always gives the student `days` more days.
+    const now = new Date();
+    const base = access.expiresAt && access.expiresAt > now ? access.expiresAt : now;
+    const newExpiry = new Date(base.getTime() + days * 86400000);
 
     await this.prisma.studentLectureAccess.update({
       where: { studentId_lectureId: { studentId, lectureId } },
       data: { expiresAt: newExpiry },
     });
 
-    return { message: `Lecture access extended by ${extraDays} days` };
+    return { message: `Lecture access extended by ${days} days`, expiresAt: newExpiry };
   }
 
   async getAuditLogs(skip: number = 0, take: number = 50) {
@@ -1422,6 +1426,10 @@ export class AdminService {
           lectureTitle: lec.title,
           chapterId: lec.chapter?.id || null,
           chapterTitle: lec.chapter?.title || null,
+          chapterOrder: lec.chapter?.orderIndex ?? null,
+          // Where this student's access comes from: the lecture's own grant/code, the course, or a free course.
+          hasLectureAccess: Boolean(la),
+          accessSource: la ? 'LECTURE' : ca ? 'COURSE' : course.isFree ? 'FREE' : null,
           maxViews: lec.maxViews,
           validityDays: lec.validityDays,
           durationDays: lec.durationDays,
