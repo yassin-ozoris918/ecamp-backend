@@ -212,10 +212,18 @@ export class SupportBotService {
     }
   }
 
+  /**
+   * Tries current Gemini models, fastest first. "-latest" aliases follow Google's newest model, so
+   * the bot keeps working when Google retires a version. "minimal" thinking keeps the lite model at
+   * about a second; if a model refuses that setting it is retried without it.
+   */
   private async callGemini(prompt: string): Promise<string | null> {
     if (!this.gemini || Date.now() < this.keyRejectedUntil.gemini) return null;
-    const models = [this.config.get<string>('SUPPORT_BOT_MODEL'), 'gemini-2.5-flash', 'gemini-2.0-flash'].filter(Boolean) as string[];
-    for (const model of [...new Set(models)]) {
+    const attempts: { model: string; thinking?: 'minimal' }[] = [];
+    const custom = this.config.get<string>('SUPPORT_BOT_MODEL');
+    if (custom) attempts.push({ model: custom });
+    attempts.push({ model: 'gemini-flash-lite-latest', thinking: 'minimal' }, { model: 'gemini-flash-lite-latest' }, { model: 'gemini-flash-latest' });
+    for (const { model, thinking } of attempts) {
       try {
         const res: any = await withTimeout(
           this.gemini.models.generateContent({
@@ -233,8 +241,8 @@ export class SupportBotService {
                 },
                 required: ['kind', 'match'],
               },
-              ...(model.includes('2.5') ? { thinkingConfig: { thinkingBudget: 0 } } : {}),
-            },
+              ...(thinking ? { thinkingConfig: { thinkingLevel: thinking } } : {}),
+            } as any,
           }),
           AI_TIMEOUT_MS,
         );
@@ -242,7 +250,7 @@ export class SupportBotService {
         if (text) return text;
       } catch (e: any) {
         if (this.rejectKeyIfAuthError('gemini', e)) return null;
-        this.logger.warn(`Support bot: Gemini model ${model} failed: ${e?.message ?? e}`);
+        this.logger.warn(`Support bot: Gemini model ${model}${thinking ? ` (${thinking} thinking)` : ''} failed: ${String(e?.message ?? e).slice(0, 200)}`);
       }
     }
     return null;

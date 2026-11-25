@@ -121,7 +121,8 @@ export class AiService {
 
       // 2. Fire the multimodal payload with model failover chain
       const envModel = this.configService.get<string>('GEMINI_MODEL');
-      const candidateModels = Array.from(new Set([envModel, 'gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash'].filter(Boolean)));
+      // "-latest" aliases follow Google's current models (fixed names like gemini-2.0-flash get retired).
+      const candidateModels = Array.from(new Set([envModel, 'gemini-flash-latest', 'gemini-flash-lite-latest', 'gemini-2.5-flash'].filter(Boolean)));
       
       let aiResponse: any = null;
       let lastError: any = null;
@@ -323,7 +324,8 @@ Questions and student answers to grade:
 ${JSON.stringify(promptData, null, 2)}`;
 
       const aiResponse = await this.ai.models.generateContent({
-        model: 'gemini-2.5-pro',
+        // gemini-2.5-pro is retired and Pro models have no free quota; GEMINI_GRADING_MODEL can override.
+        model: this.configService.get<string>('GEMINI_GRADING_MODEL') || 'gemini-flash-latest',
         contents: prompt,
         config: {
           responseMimeType: 'application/json',
