@@ -22,6 +22,9 @@ import { PrismaService } from '../prisma/prisma.service';
  *
  * Quizzes and Exams are NOT affected by this service.
  */
+/** A playback counts as "still playing" if it checked in within this time. */
+const PLAYBACK_ACTIVE_MS = 2 * 60 * 1000;
+
 @Injectable()
 export class ViewLimitService {
   constructor(private prisma: PrismaService) {}
@@ -90,8 +93,10 @@ export class ViewLimitService {
   async createPlaybackSession(
     sessionId: string,
     studentId: string,
+    browserId?: string,
   ): Promise<string> {
-    const expiresAt = new Date(Date.now() + 8 * 60 * 60 * 1000); // 8 hours
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 8 * 60 * 60 * 1000); // 8 hours
 
     const ps = await this.prisma.playbackSession.create({
       data: {
@@ -99,10 +104,40 @@ export class ViewLimitService {
         sessionId,
         consumed: false,
         expiresAt,
+        browserId: browserId ?? null,
+        lastHeartbeatAt: now,
       },
     });
 
+    // One device streaming at a time: anything still playing in ANOTHER browser stops at its next check-in.
+    // (Several tabs in the same browser are fine.)
+    const recent = await this.prisma.playbackSession.findMany({
+      where: {
+        studentId,
+        id: { not: ps.id },
+        supersededAt: null,
+        lastHeartbeatAt: { gte: new Date(now.getTime() - PLAYBACK_ACTIVE_MS) },
+      },
+      select: { id: true, browserId: true },
+    });
+    const others = recent.filter((r) => r.browserId !== (browserId ?? null)).map((r) => r.id);
+    if (others.length) {
+      await this.prisma.playbackSession.updateMany({ where: { id: { in: others } }, data: { supersededAt: now } });
+    }
+
     return ps.id;
+  }
+
+  /** Player check-in. Inactive when another browser on this account started playing since. */
+  async heartbeat(playbackSessionId: string, studentId: string): Promise<{ active: boolean; reason?: string }> {
+    const ps = await this.prisma.playbackSession.findFirst({
+      where: { id: playbackSessionId, studentId },
+      select: { id: true, supersededAt: true },
+    });
+    if (!ps) return { active: false, reason: 'unknown_session' };
+    if (ps.supersededAt) return { active: false, reason: 'playing_elsewhere' };
+    await this.prisma.playbackSession.update({ where: { id: ps.id }, data: { lastHeartbeatAt: new Date() } });
+    return { active: true };
   }
 
   /**

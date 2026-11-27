@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsOptional, IsString } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsOptional, IsString, IsObject } from 'class-validator';
 
 export class LoginDto {
   @IsNotEmpty()
@@ -12,4 +12,9 @@ export class LoginDto {
   @IsOptional()
   @IsString()
   deviceId?: string;
+
+  /** Trusted-device details: hardware signals + a signature from this browser's private key. */
+  @IsOptional()
+  @IsObject()
+  device?: Record<string, any>;
 }

@@ -25,16 +25,27 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  async validate(payload: { sub: string; email: string; role: Role }) {
+  async validate(payload: { sub: string; email: string; role: Role; did?: string; bid?: string }) {
     // SECURITY: Ensure the user hasn't been suspended since the token was issued
     // ALSO: Fetch the real-time role in case an Admin just promoted/demoted them!
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
-      select: { isActive: true, role: true },
+      select: {
+        isActive: true,
+        role: true,
+        ...(payload.bid
+          ? { deviceBrowsers: { where: { id: payload.bid, revokedAt: null, device: { status: 'ACTIVE' as const } }, select: { id: true }, take: 1 } }
+          : {}),
+      },
     });
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Your account has been suspended.');
+    }
+
+    // Device removed or replaced by an admin: this browser's login ends now.
+    if (payload.bid && !(user as { deviceBrowsers?: unknown[] }).deviceBrowsers?.length) {
+      throw new UnauthorizedException({ message: 'auth.errors.deviceRevoked', code: 'DEVICE_REVOKED' });
     }
 
     if (user.role !== Role.ADMIN) {
@@ -51,6 +62,8 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       sub: payload.sub,
       email: payload.email,
       role: user.role, // Always use the LIVE role from the database, not the stale token payload
+      did: payload.did,
+      bid: payload.bid,
     };
   }
 }

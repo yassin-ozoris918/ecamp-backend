@@ -3,8 +3,6 @@ import {
   Injectable,
   BadRequestException,
 } from '@nestjs/common';
-import * as fs from 'fs';
-import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -16,7 +14,7 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { MaintenancePolicy } from './policies/maintenance.policy';
 
 import { validateUniversitySegmentation, validateStudentSegmentation, normalizeEducationProfile } from '../common/utils/segmentation-validation.util';
-import { parseDeviceDetails } from '../common/utils/device-parser.util';
+import { DeviceTrustService, type DeviceContext, type DeviceGrant, type DeviceInput } from '../devices/device-trust.service';
 
 @Injectable()
 export class AuthService {
@@ -26,6 +24,7 @@ export class AuthService {
     private configService: ConfigService,
     private eventEmitter: EventEmitter2,
     private maintenancePolicy: MaintenancePolicy,
+    private devices: DeviceTrustService,
   ) {}
 
   async register(dto: RegisterDto, ipAddress?: string, browser?: string, headerDeviceId?: string) {
@@ -85,7 +84,8 @@ export class AuthService {
           parentPhoneNumber: dto.parentPhoneNumber,
           profilePictureUrl: dto.profilePictureUrl,
           role: Role.STUDENT,
-          deviceId: finalDeviceId || null,
+          // New clients link the device through DeviceTrustService below; old clients use the single hash.
+          deviceId: dto.device ? null : finalDeviceId || null,
           isActive: true, // Auto-approve on registration ("Pending" manual approval is currently on hold)
         },
       });
@@ -100,7 +100,15 @@ export class AuthService {
       throw error;
     }
 
-    if (user.role === Role.STUDENT && finalDeviceId) {
+    let grant: DeviceGrant = { deviceId: null, browserId: null };
+    if (user.role === Role.STUDENT && dto.device) {
+      grant = await this.devices.checkSignIn(
+        { id: user.id, deviceId: null },
+        dto.device as DeviceInput,
+        { ip: ipAddress, userAgent: browser, headerDeviceId: headerDeviceId || dto.deviceId },
+        'register',
+      );
+    } else if (user.role === Role.STUDENT && finalDeviceId) {
       await this.prisma.deviceSession.create({
         data: {
           studentId: user.id,
@@ -142,8 +150,8 @@ export class AuthService {
     }
 
     // Issue tokens and return full profile for approved users
-    const tokens = await this.getTokens(user.id, user.email, user.role);
-    await this.updateRefreshToken(user.id, tokens.refreshToken);
+    const tokens = await this.getTokens(user.id, user.email, user.role, grant);
+    await this.storeRefreshToken(user.id, grant, tokens.refreshToken);
 
     this.eventEmitter.emit('user.login', user.id);
 
@@ -193,137 +201,19 @@ export class AuthService {
     const passwordMatches = await bcrypt.compare(dto.password, user.password);
     if (!passwordMatches) throw new ForbiddenException('auth.errors.invalidCredentials');
 
-    // --- DEVICE BINDING LOGIC (STUDENTS ONLY, non-demo) ---
+    // --- TRUSTED DEVICE (STUDENTS ONLY, non-demo) ---
+    let grant: DeviceGrant = { deviceId: null, browserId: null };
     if (user.role === Role.STUDENT && !(user as any).isDemo) {
-      const finalDeviceId = headerDeviceId || dto.deviceId;
-      
-      try {
-        const logPath = path.join(process.cwd(), 'device-issues.log');
-        
-        if (fs.existsSync(logPath)) {
-          const stats = fs.statSync(logPath);
-          const daysOld = (Date.now() - stats.birthtimeMs) / (1000 * 60 * 60 * 24);
-          if (daysOld > 60) {
-            fs.unlinkSync(logPath); 
-          }
-        }
-        
-        const logData = {
-          timestamp: new Date().toISOString(),
-          studentEmail: user.email,
-          studentId: user.id,
-          expectedDeviceId: user.deviceId,
-          receivedFinalId: finalDeviceId,
-          rawHeaderDeviceId: headerDeviceId || null,
-          rawDtoDeviceId: dto.deviceId || null,
-          ipAddress: ipAddress || 'Unknown',
-          browserAgent: browser || 'Unknown',
-          isMatch: user.deviceId === finalDeviceId
-        };
-
-        fs.appendFileSync(logPath, JSON.stringify(logData) + '\n');
-      } catch (e) {
-        console.error('Failed to write device log:', e);
-      }
-
-      if (!finalDeviceId) {
-        throw new ForbiddenException('auth.errors.deviceRequired');
-      }
-
-      // Scenario B check must happen before the transaction (throws)
-      if (user.deviceId && user.deviceId !== finalDeviceId) {
-        const registeredRecord = (await this.prisma.deviceSession.findFirst({
-          where: {
-            studentId: user.id,
-            deviceFingerprint: user.deviceId,
-            browser: { not: null },
-          },
-          orderBy: { lastLoginAt: 'desc' },
-        })) || (await this.prisma.deviceSession.findFirst({
-          where: {
-            studentId: user.id,
-            deviceFingerprint: user.deviceId,
-          },
-          orderBy: { lastLoginAt: 'desc' },
-        })) || (await this.prisma.deviceHistory.findFirst({
-          where: {
-            studentId: user.id,
-            deviceFingerprint: user.deviceId,
-            action: 'REGISTERED',
-          },
-          orderBy: { createdAt: 'desc' },
-        }));
-
-        const registeredDevice = parseDeviceDetails(registeredRecord?.browser, registeredRecord?.createdAt);
-        const currentDevice = parseDeviceDetails(browser, new Date());
-
-        throw new ForbiddenException({
-          message: 'auth.errors.unrecognizedDevice',
-          code: 'UNRECOGNIZED_DEVICE',
-          registeredDevice,
-          currentDevice,
-        });
-      }
-
-      await this.prisma.$transaction(async (tx) => {
-        // Scenario A: First time logging in. Bind the device permanently.
-        if (!user.deviceId) {
-          await tx.user.update({
-            where: { id: user.id },
-            data: { deviceId: finalDeviceId },
-          });
-          user.deviceId = finalDeviceId;
-        }
-
-        // Check if this device fingerprint already has a session record
-        const existingSession = await tx.deviceSession.findFirst({
-          where: {
-            studentId: user.id,
-            deviceFingerprint: finalDeviceId,
-          },
-          select: { id: true },
-        });
-
-        // Track the DeviceSession
-        await tx.deviceSession.upsert({
-          where: {
-            studentId_deviceFingerprint: {
-              studentId: user.id,
-              deviceFingerprint: finalDeviceId,
-            },
-          },
-          update: {
-            browser,
-            ipAddress,
-            lastLoginAt: new Date(),
-            isLocked: false,
-          },
-          create: {
-            studentId: user.id,
-            deviceFingerprint: finalDeviceId,
-            browser,
-            ipAddress,
-            isLocked: false,
-          },
-        });
-
-        // Log REGISTERED only for genuinely new device sessions
-        if (!existingSession) {
-          await tx.deviceHistory.create({
-            data: {
-              studentId: user.id,
-              deviceFingerprint: finalDeviceId,
-              action: 'REGISTERED',
-              ipAddress,
-              browser,
-            },
-          });
-        }
-      });
+      grant = await this.devices.checkSignIn(
+        { id: user.id, deviceId: user.deviceId },
+        dto.device as DeviceInput | undefined,
+        { ip: ipAddress, userAgent: browser, headerDeviceId: headerDeviceId || dto.deviceId },
+        'login',
+      );
     }
 
-    const tokens = await this.getTokens(user.id, user.email, user.role);
-    await this.updateRefreshToken(user.id, tokens.refreshToken);
+    const tokens = await this.getTokens(user.id, user.email, user.role, grant);
+    await this.storeRefreshToken(user.id, grant, tokens.refreshToken);
 
     this.eventEmitter.emit('user.login', user.id);
 
@@ -359,7 +249,11 @@ export class AuthService {
     };
   }
 
-  async logout(userId: string) {
+  async logout(userId: string, browserId?: string) {
+    if (browserId) {
+      await this.devices.saveBrowserRefreshToken(browserId, null);
+      return;
+    }
     await this.prisma.user.updateMany({
       where: {
         id: userId,
@@ -369,60 +263,49 @@ export class AuthService {
     });
   }
 
-  async refreshTokens(userId: string, refreshToken: string, deviceIdHeader?: string) {
+  async refreshTokens(
+    userId: string,
+    refreshToken: string,
+    deviceIdHeader?: string,
+    device?: DeviceInput,
+    browserId?: string,
+    ctx: Omit<DeviceContext, 'headerDeviceId'> = {},
+  ) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
     });
 
-    if (!user || !user.refreshToken)
-      throw new ForbiddenException('Access Denied');
-
+    if (!user) throw new ForbiddenException('Access Denied');
     if (!user.isActive) {
       throw new ForbiddenException('Account is suspended');
     }
 
+    let grant: DeviceGrant = { deviceId: null, browserId: null };
+    let storedHash: string | null = user.refreshToken;
+
     if (user.role === Role.STUDENT && !(user as any).isDemo) {
-      if (!deviceIdHeader) {
-        throw new ForbiddenException('Device ID is missing from request.');
-      }
-      if (user.deviceId && user.deviceId !== deviceIdHeader) {
-        const registeredRecord = (await this.prisma.deviceSession.findFirst({
-          where: {
-            studentId: user.id,
-            deviceFingerprint: user.deviceId,
-            browser: { not: null },
-          },
-          orderBy: { lastLoginAt: 'desc' },
-        })) || (await this.prisma.deviceSession.findFirst({
-          where: {
-            studentId: user.id,
-            deviceFingerprint: user.deviceId,
-          },
-          orderBy: { lastLoginAt: 'desc' },
-        })) || (await this.prisma.deviceHistory.findFirst({
-          where: {
-            studentId: user.id,
-            deviceFingerprint: user.deviceId,
-            action: 'REGISTERED',
-          },
-          orderBy: { createdAt: 'desc' },
-        }));
-
-        const registeredDevice = parseDeviceDetails(registeredRecord?.browser, registeredRecord?.createdAt);
-
-        throw new ForbiddenException({
-          message: 'auth.errors.unrecognizedDevice',
-          code: 'UNRECOGNIZED_DEVICE',
-          registeredDevice,
-        });
+      if (browserId) {
+        // Login tied to a browser: that browser must still be trusted and prove it holds its key.
+        const browser = await this.devices.checkRefresh(user.id, browserId, device, { ...ctx, headerDeviceId: deviceIdHeader });
+        grant = { deviceId: browser.deviceId, browserId: browser.id };
+        storedHash = browser.refreshTokenHash;
+      } else {
+        // Login from before the trusted-device upgrade: check (and upgrade) the device like a sign-in.
+        grant = await this.devices.checkSignIn(
+          { id: user.id, deviceId: user.deviceId },
+          device,
+          { ...ctx, headerDeviceId: deviceIdHeader },
+          'refresh',
+        );
       }
     }
 
-    const rtMatches = await bcrypt.compare(refreshToken, user.refreshToken);
+    if (!storedHash) throw new ForbiddenException('Access Denied');
+    const rtMatches = await bcrypt.compare(refreshToken, storedHash);
     if (!rtMatches) throw new ForbiddenException('Access Denied');
 
-    const tokens = await this.getTokens(user.id, user.email, user.role);
-    await this.updateRefreshToken(user.id, tokens.refreshToken);
+    const tokens = await this.getTokens(user.id, user.email, user.role, grant);
+    await this.storeRefreshToken(user.id, grant, tokens.refreshToken);
 
     return {
       ...tokens,
@@ -457,31 +340,7 @@ export class AuthService {
   }
 
   async resetDevice(studentId: string, ipAddress?: string, browser?: string) {
-    // Fetch current device fingerprint for history before clearing it
-    const user = await this.prisma.user.findUnique({
-      where: { id: studentId },
-      select: { deviceId: true },
-    });
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: studentId },
-        data: { deviceId: null },
-      });
-
-      if (user?.deviceId) {
-        await tx.deviceHistory.create({
-          data: {
-            studentId,
-            deviceFingerprint: user.deviceId,
-            action: 'RESET',
-            ipAddress,
-            browser,
-          },
-        });
-      }
-    });
-
+    await this.devices.resetStudentDevice(studentId, { ip: ipAddress, userAgent: browser });
     return {
       message:
         'Device binding has been reset successfully. The student can now log in from a new device.',
@@ -502,8 +361,23 @@ export class AuthService {
     });
   }
 
-  private async getTokens(userId: string, email: string, role: Role) {
-    const jwtPayload = { sub: userId, email, role };
+  /** Students' refresh tokens live on their browser record, so each browser has its own login. */
+  private async storeRefreshToken(userId: string, grant: DeviceGrant, refreshToken: string) {
+    if (grant.browserId) {
+      await this.devices.saveBrowserRefreshToken(grant.browserId, await this.hashData(refreshToken));
+    } else {
+      await this.updateRefreshToken(userId, refreshToken);
+    }
+  }
+
+  private async getTokens(userId: string, email: string, role: Role, grant?: DeviceGrant) {
+    const jwtPayload = {
+      sub: userId,
+      email,
+      role,
+      ...(grant?.deviceId ? { did: grant.deviceId } : {}),
+      ...(grant?.browserId ? { bid: grant.browserId } : {}),
+    };
 
     const [at, rt] = await Promise.all([
       this.jwtService.signAsync(jwtPayload, {

@@ -49,6 +49,8 @@ describe('ViewLimitService', () => {
       playbackSession: {
         create: jest.fn(),
         findUnique: jest.fn(),
+        findMany: jest.fn().mockResolvedValue([]),
+        updateMany: jest.fn(),
         update: jest.fn(),
       },
       $transaction: jest.fn(),

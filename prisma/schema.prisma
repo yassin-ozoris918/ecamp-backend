@@ -203,6 +203,11 @@ model User {
   profileUpdateRequests  ProfileUpdateRequest[] @relation("ProfileUpdateStudent")
   profileUpdatesReviewed ProfileUpdateRequest[] @relation("ProfileUpdateReviewer")
 
+  trustedDevices       StudentDevice[]
+  deviceBrowsers       DeviceBrowser[]
+  deviceLoginAttempts  DeviceLoginAttempt[]
+  deviceChangeRequests DeviceChangeRequest[]
+
   @@index([universityId])
   @@index([facultyId])
   @@index([departmentId])
@@ -451,6 +456,11 @@ model PlaybackSession {
   consumed  Boolean  @default(false)
   createdAt DateTime @default(now())
   expiresAt DateTime
+  /// Browser that is playing (DeviceBrowser id); null for older sign-ins.
+  browserId       String?
+  lastHeartbeatAt DateTime?
+  /// Set when the same account started playing in another browser (one stream at a time).
+  supersededAt    DateTime?
 
   student      User    @relation("StudentPlaybackSessions", fields: [studentId], references: [id], onDelete: Cascade)
   videoSession Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)
@@ -1332,4 +1342,136 @@ model SupportBotQuery {
 
   @@index([outcome, resolved, createdAt])
   @@index([createdAt])
+}
+
+// ─── Trusted devices ─────────────────────────────────────────────────────────
+// A student may use ONE physical device. Each browser on it holds a private key that never leaves the
+// browser (WebCrypto, non-exportable), so the device can't be "copied" by copying a value. Other browsers
+// on the same machine are recognised by comparing hardware details, not one exact hash.
+
+enum DeviceStatus {
+  ACTIVE
+  REPLACED
+  REVOKED
+}
+
+enum DeviceAttemptOutcome {
+  BOUND // first device linked to the account
+  ALLOWED // known browser on the trusted device
+  NEW_BROWSER // another browser on the same device, added automatically
+  LEGACY // signed in with the old single-hash check (old app version)
+  BLOCKED // a different device
+  NEEDS_APPROVAL // same device but too many browsers, or doubtful match
+}
+
+enum DeviceChangeStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model StudentDevice {
+  id         String       @id @default(uuid())
+  studentId  String
+  status     DeviceStatus @default(ACTIVE)
+  /// Hardware details reported by the browser (os, cpu, screen, gpu, phone model…).
+  signals    Json
+  /// Readable name, e.g. "Windows computer · Intel Iris Xe Graphics".
+  label      String
+  /// windows | mac | linux | iphone | ipad | android_phone | android_tablet | unknown
+  kind       String       @default("unknown")
+  /// desktop | mobile | tablet | unknown
+  category   String       @default("unknown")
+  /// The old single-hash device id, so students bound before the upgrade keep working.
+  legacyId   String?
+  createdAt  DateTime     @default(now())
+  lastSeenAt DateTime     @default(now())
+  endedAt    DateTime?
+  endReason  String?
+
+  student  User            @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  browsers DeviceBrowser[]
+
+  @@index([studentId, status])
+  @@index([legacyId])
+}
+
+model DeviceBrowser {
+  id               String    @id @default(uuid())
+  deviceId         String
+  studentId        String
+  /// Public half of the browser's key (JWK JSON). The private half never leaves the browser.
+  publicKey        String
+  keyThumbprint    String
+  /// e.g. "Chrome", "Edge", "Safari"
+  name             String
+  userAgent        String?
+  lastIp           String?
+  /// Each browser has its own refresh token, so signing in on Edge doesn't sign Chrome out.
+  refreshTokenHash String?
+  createdAt        DateTime  @default(now())
+  lastSeenAt       DateTime  @default(now())
+  revokedAt        DateTime?
+
+  device  StudentDevice @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+  student User          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, keyThumbprint])
+  @@index([keyThumbprint])
+  @@index([deviceId])
+}
+
+/// Every student sign-in decision (replaces the device-issues.log text file). Older than 90 days is pruned.
+model DeviceLoginAttempt {
+  id            String               @id @default(uuid())
+  studentId     String
+  outcome       DeviceAttemptOutcome
+  /// 0..1 similarity between this browser's hardware and the trusted device.
+  matchScore    Float?
+  /// Why: "known_browser", "hardware_match", "different_hardware", "too_many_browsers", "bad_proof"…
+  reason        String?
+  label         String?
+  kind          String?
+  signals       Json?
+  publicKey     String?
+  keyThumbprint String?
+  browserId     String?
+  browserName   String?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime             @default(now())
+
+  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([studentId, createdAt])
+  @@index([outcome, createdAt])
+  @@index([keyThumbprint])
+  @@index([createdAt])
+}
+
+/// A student asks to move their account to a new device; an admin approves or rejects it.
+model DeviceChangeRequest {
+  id            String             @id @default(uuid())
+  studentId     String
+  status        DeviceChangeStatus @default(PENDING)
+  signals       Json
+  label         String
+  kind          String             @default("unknown")
+  category      String             @default("unknown")
+  publicKey     String?
+  keyThumbprint String?
+  browserName   String?
+  note          String?
+  ipAddress     String?
+  userAgent     String?
+  reviewedById  String?
+  reviewNote    String?
+  reviewedAt    DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  student User @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([studentId])
 }

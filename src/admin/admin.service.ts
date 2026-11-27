@@ -1,3 +1,4 @@
+import { DeviceTrustService } from '../devices/device-trust.service';
 import {
   Injectable,
   NotFoundException,
@@ -13,7 +14,10 @@ import * as path from 'path';
 
 @Injectable()
 export class AdminService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private deviceTrust: DeviceTrustService,
+  ) {}
 
   async getUsers(query: GetUsersQueryDto) {
     const {
@@ -373,34 +377,9 @@ export class AdminService {
   }
 
   async resetDeviceLock(userId: string, ipAddress?: string, browser?: string) {
-    const user = await this.prisma.user.findUnique({ where: { id: userId } });
+    const user = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
     if (!user) throw new NotFoundException('User not found');
-
-    await this.prisma.$transaction(async (tx) => {
-      await tx.user.update({
-        where: { id: userId },
-        data: { deviceId: null },
-      });
-
-      // Also clear DeviceSessions
-      await tx.deviceSession.updateMany({
-        where: { studentId: userId, },
-        data: { deletedAt: new Date() },
-      });
-
-      if (user.deviceId) {
-        await tx.deviceHistory.create({
-          data: {
-            studentId: userId,
-            deviceFingerprint: user.deviceId,
-            action: 'RESET',
-            ipAddress,
-            browser,
-          },
-        });
-      }
-    });
-
+    await this.deviceTrust.resetStudentDevice(userId, { ip: ipAddress, userAgent: browser });
     return { message: 'Device lock reset successfully' };
   }
 
@@ -516,6 +495,7 @@ export class AdminService {
       activeStudents7d,
       unusedCodes,
       draftCourses,
+      deviceRequests,
     ] = await Promise.all([
       this.prisma.user.count({ where: { role: Role.STUDENT, isActive: false } }),
       this.prisma.profileUpdateRequest.count({ where: { status: 'PENDING' } }),
@@ -526,6 +506,7 @@ export class AdminService {
       this.prisma.user.count({ where: { role: Role.STUDENT, isActive: true, lastLoginAt: { gte: weekAgo } } }),
       this.prisma.activationCode.count({ where: { status: CodeStatus.UNUSED } }),
       this.prisma.course.count({ where: { status: 'DRAFT' } }),
+      this.prisma.deviceChangeRequest.count({ where: { status: 'PENDING' } }),
     ]);
     return {
       pendingRegistrations,
@@ -537,6 +518,7 @@ export class AdminService {
       activeStudents7d,
       unusedCodes,
       draftCourses,
+      deviceRequests,
     };
   }
 

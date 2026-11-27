@@ -74,7 +74,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   logout(@Req() req: RequestWithUser) {
     const user = req.user;
-    return this.authService.logout(user.sub);
+    return this.authService.logout(user.sub, user.bid);
   }
 
   @UseGuards(AuthGuard('jwt-refresh'))
@@ -86,7 +86,10 @@ export class AuthController {
     return this.authService.refreshTokens(
       user.sub,
       user.refreshToken as string,
-      deviceIdHeader
+      deviceIdHeader,
+      (req.body as { device?: Record<string, unknown> } | undefined)?.device,
+      user.bid,
+      { ip: req.ip, userAgent: req.headers['user-agent'] },
     );
   }
 

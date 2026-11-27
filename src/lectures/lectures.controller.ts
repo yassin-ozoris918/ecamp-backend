@@ -52,7 +52,19 @@ export class LecturesController {
   @Get('sessions/:id/stream-token')
   getSecureStreamToken(@Param('id') id: string, @Req() req: RequestWithUser) {
     const user = req.user;
-    return this.lecturesService.getSecureStreamToken(id, user.sub, user.role);
+    return this.lecturesService.getSecureStreamToken(id, user.sub, user.role, user.bid);
+  }
+
+  // Player check-in every ~30 s. Answers { active: false } when the account started playing in another
+  // browser, so only one device streams at a time.
+  @Roles(Role.STUDENT, Role.INSTRUCTOR)
+  @UseGuards(DeviceRestrictionGuard)
+  @Post('sessions/:id/heartbeat')
+  heartbeat(@Body() body: { playbackSessionId?: string }, @Req() req: RequestWithUser) {
+    if (req.user.role === Role.INSTRUCTOR || !body?.playbackSessionId || body.playbackSessionId === 'instructor-bypass') {
+      return { active: true };
+    }
+    return this.viewLimitService.heartbeat(body.playbackSessionId, req.user.sub);
   }
 
   // Get view status for a specific session (used by frontend to show usage)

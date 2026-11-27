@@ -338,7 +338,7 @@ export class LecturesService {
   }
 
   // --- Phase D: Secure Streaming Token ---
-  async getSecureStreamToken(sessionId: string, studentId: string, role?: Role) {
+  async getSecureStreamToken(sessionId: string, studentId: string, role?: Role, browserId?: string) {
     const session = await this.prisma.session.findUnique({
       where: { id: sessionId, },
       include: { lecture: true },
@@ -423,6 +423,7 @@ export class LecturesService {
     const playbackSessionId = await this.viewLimitService.createPlaybackSession(
       sessionId,
       studentId,
+      browserId,
     );
 
     let videoId = session.videoUrl;

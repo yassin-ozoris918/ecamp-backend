@@ -7,5 +7,8 @@ export interface RequestWithUser extends Request {
     email: string;
     role: Role;
     refreshToken?: string;
+    /** Trusted device and browser this login belongs to (students only). */
+    did?: string;
+    bid?: string;
   };
 }

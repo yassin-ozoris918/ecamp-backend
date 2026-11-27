@@ -9,12 +9,14 @@ import { PrismaModule } from '../prisma/prisma.module';
 import { StorageModule } from '../storage/storage.module';
 import { SettingsModule } from '../settings/settings.module';
 import { MaintenancePolicy } from './policies/maintenance.policy';
+import { DevicesModule } from '../devices/devices.module';
 
 @Module({
   imports: [
     PrismaModule,
     StorageModule,
     SettingsModule,
+    DevicesModule,
     JwtModule.register({}), // We don't set secrets here because the strategies handle them dynamically
   ],
   controllers: [AuthController],

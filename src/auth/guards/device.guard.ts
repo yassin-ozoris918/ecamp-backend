@@ -1,11 +1,11 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  ForbiddenException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 
+/**
+ * Extra device check on video endpoints for students.
+ * - Logins tied to a trusted browser were already checked by JwtStrategy (browser and device active).
+ * - Older logins (before the trusted-device upgrade) fall back to the single-hash header.
+ */
 @Injectable()
 export class DeviceRestrictionGuard implements CanActivate {
   constructor(private prisma: PrismaService) {}
@@ -13,40 +13,28 @@ export class DeviceRestrictionGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const user = request.user;
+    if (!user) return false;
+    if (user.role === 'ADMIN' || user.role === 'INSTRUCTOR') return true;
+    if (user.bid) return true;
+
     const deviceId = request.headers['x-device-id'] || request.body?.deviceId || request.query?.deviceId;
+    if (!deviceId) throw new ForbiddenException('Device ID is missing from request.');
 
-    if (!user) {
-      return false; // Not authenticated
-    }
-
-    if (user.role === 'ADMIN' || user.role === 'INSTRUCTOR') {
-      return true; // Restrictions apply to students only
-    }
-
-    if (!deviceId) {
-      throw new ForbiddenException('Device ID is missing from request.');
-    }
-
-    // Fetch the bound device from the database
     const dbUser = await this.prisma.user.findUnique({
       where: { id: user.sub || user.id },
-      select: { deviceId: true, isDemo: true },
+      select: {
+        deviceId: true,
+        isDemo: true,
+        trustedDevices: { where: { status: 'ACTIVE' }, select: { legacyId: true }, take: 1 },
+      },
     });
+    if (!dbUser) return false;
+    if (dbUser.isDemo) return true;
 
-    if (!dbUser) {
-      return false;
+    const legacyIds = [dbUser.deviceId, dbUser.trustedDevices[0]?.legacyId].filter(Boolean);
+    if (legacyIds.length > 0 && !legacyIds.includes(deviceId)) {
+      throw new ForbiddenException({ message: 'auth.errors.unrecognizedDevice', code: 'UNRECOGNIZED_DEVICE' });
     }
-
-    if ((dbUser as any).isDemo) {
-      return true; // Bypass for demo accounts
-    }
-
-    if (dbUser.deviceId !== deviceId) {
-      throw new ForbiddenException(
-        'Unrecognized Device. You can only access your account from your registered device. Please contact support to request a device reset.',
-      );
-    }
-
     return true;
   }
 }

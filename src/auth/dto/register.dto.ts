@@ -8,6 +8,7 @@ import {
   IsEnum,
   Matches,
   MaxLength,
+  IsObject,
 } from 'class-validator';
 import { 
   EducationLevel, 
@@ -142,4 +143,9 @@ export class RegisterDto {
   @IsString()
   @IsOptional()
   otherProgramName?: string;
+
+  /** Trusted-device details: hardware signals + a signature from this browser's private key. */
+  @IsOptional()
+  @IsObject()
+  device?: Record<string, any>;
 }

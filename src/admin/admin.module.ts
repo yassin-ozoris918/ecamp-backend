@@ -1,3 +1,4 @@
+import { DevicesModule } from '../devices/devices.module';
 import { Module } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
@@ -6,7 +7,7 @@ import { ReportsService } from './reports.service';
 import { AiModule } from '../ai/ai.module';
 
 @Module({
-  imports: [PrismaModule, AiModule],
+  imports: [PrismaModule, AiModule, DevicesModule],
   controllers: [AdminController],
   providers: [AdminService, ReportsService],
 })
