@@ -144,9 +144,18 @@ export class AttachmentsService {
         ...(search ? { title: { contains: search, mode: 'insensitive' } } : {}),
       },
       include: {
-        lecture: { select: { id: true, title: true, requiresOwnCode: true, course: { select: { id: true, title: true, type: true, allowFileDownload: true } } } },
+        lecture: {
+          select: {
+            id: true,
+            title: true,
+            orderIndex: true,
+            requiresOwnCode: true,
+            chapter: { select: { id: true, title: true, orderIndex: true } },
+            course: { select: { id: true, title: true, type: true, allowFileDownload: true } },
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
     });
 
     if (attachments.length === 0) return [];
@@ -208,7 +217,17 @@ export class AttachmentsService {
         title: attachment.title,
         type: attachment.type,
         course: { id: attachment.lecture.course.id, title: attachment.lecture.course.title, type: attachment.lecture.course.type },
-        lecture: { id: attachment.lecture.id, title: attachment.lecture.title },
+        lecture: {
+          id: attachment.lecture.id,
+          title: attachment.lecture.title,
+          orderIndex: attachment.lecture.orderIndex,
+          // Sold separately: only its own lecture code (or a code for this file) opens it.
+          locked: attachment.lecture.requiresOwnCode,
+        },
+        chapter: attachment.lecture.chapter
+          ? { id: attachment.lecture.chapter.id, title: attachment.lecture.chapter.title, orderIndex: attachment.lecture.chapter.orderIndex }
+          : null,
+        createdAt: attachment.createdAt,
         accessStatus,
         accessSource,
         canDownload: this.resolveCanDownload(attachment.allowDownload, attachment.lecture.course.allowFileDownload),

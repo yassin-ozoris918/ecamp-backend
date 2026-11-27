@@ -14,6 +14,7 @@ import {
 import { ActivationCodesService } from './activation-codes.service';
 import { GenerateCodesDto } from './dto/generate-codes.dto';
 import { RedeemCodeDto } from './dto/redeem-code.dto';
+import { RedeemFilesDto } from './dto/redeem-files.dto';
 import { AuthGuard } from '@nestjs/passport';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
@@ -88,5 +89,16 @@ export class ActivationCodesController {
     const ip = req.ip || req.socket?.remoteAddress;
     const browser = req.headers['user-agent'];
     return this.activationCodesService.redeemCode(dto, req.user.sub, ip, browser);
+  }
+
+  // Files page: one box for any files code; the server works out what the code is for.
+  @UseGuards(ThrottlerGuard)
+  @Roles(Role.STUDENT)
+  @Post('redeem-files')
+  @HttpCode(HttpStatus.OK)
+  redeemForFiles(@Body() dto: RedeemFilesDto, @Req() req: RequestWithUser) {
+    const ip = req.ip || req.socket?.remoteAddress;
+    const browser = req.headers['user-agent'];
+    return this.activationCodesService.redeemForFiles(dto, req.user.sub, ip, browser);
   }
 }
