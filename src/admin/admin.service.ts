@@ -1439,12 +1439,17 @@ export class AdminService {
       const courseExpiresAt = ca?.expiresAt || null;
       const isCourseExpired = Boolean(courseExpiresAt && new Date(courseExpiresAt) < now);
 
+      const handouts = fileAccesses.find((fa) => fa.courseId === course.id && !fa.attachmentId);
+
       return {
         courseId: course.id,
         courseTitle: course.title,
         isFree: course.isFree,
         type: course.type,
         hasDirectCourseAccess,
+        hasHandoutsAccess: Boolean(handouts),
+        handoutsSince: handouts?.createdAt || null,
+        handoutsSource: handouts?.source || null,
         unlockedAt: ca?.createdAt || null,
         activatedAt: ca?.activatedAt || null,
         expiresAt: courseExpiresAt,
@@ -1886,7 +1891,9 @@ export class AdminService {
         attachmentTitle: fa.attachment?.title || null,
         attachmentType: fa.attachment?.type || null,
         lectureTitle: fa.attachment?.lecture?.title || null,
+        courseId: fa.courseId || fa.attachment?.lecture?.course?.id || null,
         courseTitle: fa.course?.title || fa.attachment?.lecture?.course?.title || null,
+        wholeCourse: !fa.attachmentId,
       })),
       deviceHistory,
       deviceSessions,
@@ -2193,6 +2200,49 @@ export class AdminService {
       create: { studentId, courseId, activatedAt: new Date(), expiresAt },
     });
     return { message: 'Course access granted successfully' };
+  }
+
+  /**
+   * Give a student the handouts (files) of a course only, exactly as if they had redeemed a
+   * course-files code: every file of the course opens, except files of lectures sold separately
+   * (requiresOwnCode). Videos stay locked. No expiry, like the code.
+   */
+  async grantCourseFilesAccess(studentId: string, courseId: string) {
+    if (!courseId) throw new BadRequestException('courseId is required');
+    const course = await this.prisma.course.findUnique({ where: { id: courseId }, select: { id: true, title: true } });
+    if (!course) throw new NotFoundException('Course not found');
+    const student = await this.prisma.user.findUnique({ where: { id: studentId }, select: { id: true, role: true } });
+    if (!student || student.role !== Role.STUDENT) throw new NotFoundException('Student not found');
+
+    const now = new Date();
+    const full = await this.prisma.studentCourseAccess.findFirst({
+      where: { studentId, courseId, OR: [{ expiresAt: null }, { expiresAt: { gt: now } }] },
+      select: { id: true },
+    });
+    if (full) {
+      throw new BadRequestException('This student already has the whole course, which includes its handouts.');
+    }
+
+    const existing = await this.prisma.studentFileAccess.findFirst({
+      where: { studentId, courseId, attachmentId: null },
+      select: { id: true },
+    });
+    if (existing) return { message: 'This student already has the handouts of this course', alreadyHad: true };
+
+    await this.prisma.studentFileAccess.create({
+      data: { studentId, courseId, source: 'ADMIN_GRANT' },
+    });
+    return { message: 'Handouts access granted successfully', alreadyHad: false };
+  }
+
+  /** Take back course-wide handouts access (from a course-files code or an admin grant). Single-file codes stay. */
+  async removeCourseFilesAccess(studentId: string, courseId: string) {
+    if (!courseId) throw new BadRequestException('courseId is required');
+    const res = await this.prisma.studentFileAccess.deleteMany({
+      where: { studentId, courseId, attachmentId: null },
+    });
+    if (res.count === 0) throw new NotFoundException('This student has no handouts access for this course');
+    return { message: 'Handouts access removed successfully' };
   }
 
   async getStudentUnlockableItems(studentId: string) {

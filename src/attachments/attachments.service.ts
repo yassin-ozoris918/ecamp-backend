@@ -195,15 +195,15 @@ export class AttachmentsService {
           accessStatus = 'UNLOCKED';
           accessSource = 'LECTURE';
         } else {
-          const hasCourseFiles = courseLevel && fileAccesses.some(fa => fa.courseId === courseId);
-          if (hasCourseFiles) {
+          const courseFiles = courseLevel ? fileAccesses.find(fa => fa.courseId === courseId && !fa.attachmentId) : undefined;
+          if (courseFiles) {
             accessStatus = 'UNLOCKED';
-            accessSource = 'COURSE_FILES_CODE';
+            accessSource = courseFiles.source === 'ADMIN_GRANT' ? 'ADMIN_GRANT' : 'COURSE_FILES_CODE';
           } else {
-            const hasFileAccess = fileAccesses.some(fa => fa.attachmentId === attachment.id);
-            if (hasFileAccess) {
+            const ownFile = fileAccesses.find(fa => fa.attachmentId === attachment.id);
+            if (ownFile) {
               accessStatus = 'UNLOCKED';
-              accessSource = 'FILE_CODE';
+              accessSource = ownFile.source === 'ADMIN_GRANT' ? 'ADMIN_GRANT' : 'FILE_CODE';
             }
           }
         }

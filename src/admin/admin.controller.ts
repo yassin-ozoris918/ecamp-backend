@@ -134,6 +134,23 @@ export class AdminController {
     return this.adminService.grantCourseAccess(studentId, courseId, validityDays);
   }
 
+  // Handouts only: the course files, as if the student redeemed a course-files code.
+  @Post('users/:id/grant-course-files')
+  async grantCourseFilesAccess(
+    @Param('id') studentId: string,
+    @Body('courseId') courseId: string,
+  ) {
+    return this.adminService.grantCourseFilesAccess(studentId, courseId);
+  }
+
+  @Post('users/:id/remove-course-files')
+  async removeCourseFilesAccess(
+    @Param('id') studentId: string,
+    @Body('courseId') courseId: string,
+  ) {
+    return this.adminService.removeCourseFilesAccess(studentId, courseId);
+  }
+
   @Post('users/:id/remove-lecture')
   async removeLectureAccess(
     @Param('id') studentId: string,
