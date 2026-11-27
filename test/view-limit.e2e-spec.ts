@@ -373,6 +373,41 @@ describe('View Limit System (e2e)', () => {
 
   // ==================== Existing time-limit behavior (unchanged) ====================
 
+  it('[WM] Watermark tamper report is recorded, shows in the sharing check, and the code finds the student', async () => {
+    const ps = await prisma.playbackSession.create({
+      data: { studentId, sessionId: sessionAId, expiresAt: new Date(Date.now() + 3600_000) },
+    });
+    await request(app.getHttpServer())
+      .post(`/lectures/sessions/${sessionAId}/protection-event`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .set('x-device-id', 'test-device-id')
+      .send({ playbackSessionId: ps.id, kind: 'hidden' })
+      .expect(200);
+    // Someone else's playback session can't be touched
+    await request(app.getHttpServer())
+      .post(`/lectures/sessions/${sessionAId}/protection-event`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .set('x-device-id', 'test-device-id')
+      .send({ playbackSessionId: '00000000-0000-0000-0000-000000000000', kind: 'weird' })
+      .expect(200);
+    const after = await prisma.playbackSession.findUnique({ where: { id: ps.id } });
+    expect(after?.tamperCount).toBe(1);
+    expect(after?.lastTamperKind).toBe('hidden');
+
+    const code = studentId.replace(/-/g, '').slice(0, 8).toUpperCase();
+    const lookup = await request(app.getHttpServer())
+      .get(`/admin/devices/watermark/${code}`)
+      .set('Authorization', `Bearer ${adminToken}`)
+      .expect(200);
+    const hit = lookup.body.find((s: any) => s.id === studentId);
+    expect(hit).toBeTruthy();
+    expect(hit.risk.reasons.some((r: any) => r.code === 'watermark_tampered')).toBe(true);
+    expect(hit.tampers[0]).toMatchObject({ video: 'Session A', count: 1, kind: 'hidden' });
+
+    await request(app.getHttpServer()).get('/admin/devices/watermark/XYZ').set('Authorization', `Bearer ${adminToken}`).expect(400);
+    await request(app.getHttpServer()).get(`/admin/devices/watermark/${code}`).set('Authorization', `Bearer ${studentToken}`).expect(403);
+  });
+
   it('[22-26] Existing time-limit still blocks when expired (unchanged behavior)', async () => {
     // Create a separate student and access record that is expired
     const password2 = await bcrypt.hash('pw', 10);

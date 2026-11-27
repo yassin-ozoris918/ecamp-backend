@@ -67,6 +67,20 @@ export class LecturesController {
     return this.viewLimitService.heartbeat(body.playbackSessionId, req.user.sub);
   }
 
+  // The player reports that its watermark was hidden or removed (it has already stopped the video).
+  // Counted on the playback session and shown to admins in the account-sharing check.
+  @Roles(Role.STUDENT, Role.INSTRUCTOR)
+  @UseGuards(DeviceRestrictionGuard)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  @Post('sessions/:id/protection-event')
+  protectionEvent(@Body() body: { playbackSessionId?: string; kind?: string }, @Req() req: RequestWithUser) {
+    if (req.user.role !== Role.STUDENT || typeof body?.playbackSessionId !== 'string' || body.playbackSessionId === 'instructor-bypass') {
+      return { ok: true };
+    }
+    return this.viewLimitService.reportTamper(body.playbackSessionId, req.user.sub, body.kind);
+  }
+
   // Get view status for a specific session (used by frontend to show usage)
   @Roles(Role.STUDENT, Role.INSTRUCTOR)
   @UseGuards(DeviceRestrictionGuard)

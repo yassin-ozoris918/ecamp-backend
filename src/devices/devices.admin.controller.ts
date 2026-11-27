@@ -44,6 +44,11 @@ export class DevicesAdminController {
     return this.devices.suspicious();
   }
 
+  @Get('watermark/:code')
+  watermark(@Param('code') code: string) {
+    return this.devices.watermarkLookup(code);
+  }
+
   @Get('students/:id')
   student(@Param('id', ParseUUIDPipe) id: string) {
     return this.devices.studentDevices(id);

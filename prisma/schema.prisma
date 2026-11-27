@@ -461,6 +461,10 @@ model PlaybackSession {
   lastHeartbeatAt DateTime?
   /// Set when the same account started playing in another browser (one stream at a time).
   supersededAt    DateTime?
+  /// Times the video watermark was hidden or removed during this playback (the player stops and reports it).
+  tamperCount     Int       @default(0)
+  lastTamperAt    DateTime?
+  lastTamperKind  String?
 
   student      User    @relation("StudentPlaybackSessions", fields: [studentId], references: [id], onDelete: Cascade)
   videoSession Session @relation(fields: [sessionId], references: [id], onDelete: Cascade)

@@ -246,6 +246,36 @@ export class DevicesAdminService {
     };
   }
 
+  /**
+   * Who does a watermark belong to? The code on the video is the first 8 characters of the account id.
+   * Also lists the student's recent videos with watermark trouble.
+   */
+  async watermarkLookup(code: string) {
+    const clean = code.replace(/[^0-9a-f]/gi, '').toLowerCase();
+    if (clean.length !== 8) throw new BadRequestException('The code has 8 letters and numbers, e.g. 4F9A2C1B');
+    const students = await this.prisma.user.findMany({
+      where: { id: { startsWith: clean } },
+      take: 5,
+      select: { id: true, fullName: true, email: true, phoneNumber: true, role: true, isActive: true, createdAt: true },
+    });
+    const risk = students.length ? await this.risk(students.map((s) => s.id)) : [];
+    const tampers = students.length
+      ? await this.prisma.playbackSession.findMany({
+          where: { studentId: { in: students.map((s) => s.id) }, tamperCount: { gt: 0 } },
+          orderBy: { lastTamperAt: 'desc' },
+          take: 10,
+          select: { studentId: true, tamperCount: true, lastTamperAt: true, lastTamperKind: true, videoSession: { select: { title: true } } },
+        })
+      : [];
+    return students.map((s) => ({
+      ...s,
+      risk: risk.find((r) => r.studentId === s.id) ?? { studentId: s.id, score: 0, level: 'low', reasons: [] },
+      tampers: tampers
+        .filter((t) => t.studentId === s.id)
+        .map((t) => ({ video: t.videoSession?.title ?? null, count: t.tamperCount, at: t.lastTamperAt, kind: t.lastTamperKind })),
+    }));
+  }
+
   async revokeBrowser(browserId: string) {
     const res = await this.prisma.deviceBrowser.updateMany({ where: { id: browserId, revokedAt: null }, data: { revokedAt: new Date(), refreshTokenHash: null } });
     if (!res.count) throw new NotFoundException('Browser not found or already removed');
@@ -267,7 +297,7 @@ export class DevicesAdminService {
     const since90 = new Date(Date.now() - 90 * DAY);
     const scope = onlyStudentIds ? { studentId: { in: onlyStudentIds } } : {};
 
-    const [attemptGroups, badProofs, blockedLabels, sharedKeys, activeDevices, takeovers, changes] = await Promise.all([
+    const [attemptGroups, badProofs, blockedLabels, sharedKeys, activeDevices, takeovers, changes, tampers] = await Promise.all([
       this.prisma.deviceLoginAttempt.groupBy({ by: ['studentId', 'outcome'], where: { ...scope, createdAt: { gte: since30 } }, _count: { _all: true } }),
       this.prisma.deviceLoginAttempt.groupBy({ by: ['studentId'], where: { ...scope, createdAt: { gte: since30 }, reason: { in: ['bad_proof'] } }, _count: { _all: true } }),
       this.prisma.deviceLoginAttempt.groupBy({ by: ['studentId', 'label'], where: { ...scope, createdAt: { gte: since30 }, outcome: { in: ['BLOCKED', 'NEEDS_APPROVAL'] } } }),
@@ -279,6 +309,7 @@ export class DevicesAdminService {
       this.prisma.studentDevice.findMany({ where: { status: 'ACTIVE' }, select: { studentId: true, signals: true } }),
       this.prisma.playbackSession.groupBy({ by: ['studentId'], where: { ...scope, supersededAt: { gte: since30 } }, _count: { _all: true } }),
       this.prisma.deviceHistory.groupBy({ by: ['studentId'], where: { ...scope, createdAt: { gte: since90 }, action: { in: ['RESET', 'REPLACED'] } }, _count: { _all: true } }),
+      this.prisma.playbackSession.groupBy({ by: ['studentId'], where: { ...scope, tamperCount: { gt: 0 }, lastTamperAt: { gte: since30 } }, _count: { _all: true } }),
     ]);
 
     const entries = new Map<string, RiskEntry>();
@@ -317,6 +348,7 @@ export class DevicesAdminService {
 
     for (const g of takeovers) add(g.studentId, Math.min(25, 5 * g._count._all), 'playback_taken_over', g._count._all);
     for (const g of changes) add(g.studentId, Math.min(30, 10 * g._count._all), 'device_changes', g._count._all);
+    for (const g of tampers) add(g.studentId, Math.min(40, 20 * g._count._all), 'watermark_tampered', g._count._all);
 
     return [...entries.values()]
       .map((e) => ({ ...e, score: Math.min(100, e.score), level: e.score >= 50 ? ('high' as const) : e.score >= 20 ? ('medium' as const) : ('low' as const) }))

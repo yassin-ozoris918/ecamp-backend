@@ -140,6 +140,16 @@ export class ViewLimitService {
     return { active: true };
   }
 
+  /** The player stopped because its watermark was hidden or removed. */
+  async reportTamper(playbackSessionId: string, studentId: string, kind?: string): Promise<{ ok: true }> {
+    const safeKind = kind === 'removed' || kind === 'hidden' || kind === 'altered' ? kind : 'altered';
+    await this.prisma.playbackSession.updateMany({
+      where: { id: playbackSessionId, studentId },
+      data: { tamperCount: { increment: 1 }, lastTamperAt: new Date(), lastTamperKind: safeKind },
+    });
+    return { ok: true };
+  }
+
   /**
    * Atomically consumes one view for a student + session using an idempotency token.
    *
